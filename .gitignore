@@ -1,0 +1,21 @@
+# Dependencies and builds
+node_modules/
+.next/
+out/
+coverage/
+test-results/
+playwright-report/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Tool and operating-system files
+.DS_Store
+*.log
+.vercel/
+.trigger/
+
+# Generated QA artifacts
+tools/docx_qa/
