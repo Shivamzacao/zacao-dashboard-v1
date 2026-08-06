@@ -1,9 +1,5 @@
 # Traceability Register
 
-Status: Initialized; populated during Backend Subphase B0 and maintained through release.
+The canonical register is [`docs/architecture/TRACEABILITY.md`](../architecture/TRACEABILITY.md), as required by the locked architecture plan.
 
-| Deliverable component | Class | Metric/source contract | Backend endpoint | Frontend component | Tests | Status |
-|---|---|---|---|---|---|---|
-| Pending B0 inventory | — | — | — | — | — | Not started |
-
-Every implemented component must have one complete row before its phase gate passes.
+This compatibility pointer preserves the original clean-baseline path. Do not maintain a second traceability matrix here.
