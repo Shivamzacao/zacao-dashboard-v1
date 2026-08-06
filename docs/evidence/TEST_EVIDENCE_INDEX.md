@@ -17,5 +17,6 @@
 | B1-E05 | Phase 1 / B1 | Secret scan | Passed | `phase-1/b1/B1_TEST_EVIDENCE.md` |
 | B1-E06 | Phase 1 / B1 | Dependency advisory audit | Initial finding resolved by Next.js 16.3.0; final audit found no known vulnerabilities | `phase-1/b1/B1_TEST_EVIDENCE.md` |
 | B1-GATE | Phase 1 / B1 | Gate assessment | Passed; awaiting ZACAO approval | `phase-1/b1/B1_GATE_REPORT.md` |
+| B2-GATE | Phase 1 / B2 | Focused Shopify adapter verification | Passed; live smoke not run without credentials | `phase-1/b2/B2_GATE_REPORT.md` |
 
 Evidence is append-only by phase. A skipped or inapplicable check is never counted as passed.
