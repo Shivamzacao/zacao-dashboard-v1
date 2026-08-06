@@ -6,8 +6,8 @@ Only the currently authorized subphase may move beyond `Not started`.
 
 | Subphase | Objective | Status | Gate dependency |
 |---|---|---|---|
-| B0 | Repository preflight and scope lock | Requires approval | ZACAO approval of the B0 gate report and legacy disposition |
-| B1 | Backend foundation and contracts | Not started | B0 gate approval and separate authorization |
+| B0 | Repository preflight and scope lock | Completed | Approved by ZACAO through explicit B1 authorization on 2026-08-06 |
+| B1 | Backend foundation and contracts | Blocked | Resolve `BLK-006`, rerun B1 gates, and obtain explicit approval |
 | B2 | Shopify source adapter | Not started | B1 gate approval |
 | B3 | Klaviyo Future-Ready Core adapter | Not started | B2 gate approval |
 | B4 | Google Drive, Budget, and S&OP adapters | Not started | B3 gate approval |

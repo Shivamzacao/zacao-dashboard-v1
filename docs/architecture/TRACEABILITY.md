@@ -4,6 +4,7 @@ Status: Initialized at page/source-capability level in B0. Metric-level rows are
 
 | Deliverable component | Class | Metric/source contract | Planned backend contract | Frontend consumer | Planned evidence | Status |
 |---|---|---|---|---|---|---|
+| Shared schema 1.0 foundation | Cross-cutting | Money, rates, dates, filters, readiness, errors, pagination, cache, source status, metric registry | Domain contracts and application ports | All future consumers | 41 unit/contract/environment tests; 100% critical utility coverage | Implemented in B1; gate blocked by dependency security |
 | Executive Health | Core/Conditional mix | Shopify aggregates; plan comparison only after gate | `GET /api/v1/dashboards/executive` | Phase 2 executive page | Metric, contract, API, state tests | Not started |
 | Revenue Intelligence | Core/Conditional mix | ShopifyQL sales; corrected Budget plan only after gate | `GET /api/v1/dashboards/revenue` | Phase 2 revenue page | Revenue reconciliation and filter tests | Not started |
 | Customer Intelligence | Core/Conditional mix | Shopify aggregate customer classifications; detailed history disclosed | `GET /api/v1/dashboards/customers` | Phase 2 customer page | History/completeness and privacy tests | Not started |

@@ -5,6 +5,7 @@ out/
 coverage/
 test-results/
 playwright-report/
+*.tsbuildinfo
 
 # Local environment and secrets
 .env
