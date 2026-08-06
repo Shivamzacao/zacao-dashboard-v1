@@ -54,3 +54,20 @@ The locked latest Next.js 16.2.x release is `16.2.12`. Its dependency tree conta
 - Next-pinned `postcss 8.4.31`, while the two high advisories report patched versions at `8.5.12` and `8.5.18` or later.
 
 Registry metadata shows Next.js `16.3.0` depends on patched `sharp ^0.35.3` and `postcss 8.5.23`. Changing from the locked `16.2.x` line requires ZACAO approval; B1 did not silently upgrade or force unsupported transitive overrides.
+
+## Approved focused security correction
+
+ZACAO's approved Fast Sequential Delivery Protocol authorized routine safe minor maintenance within the existing Next.js major architecture. Next.js and `eslint-config-next` were pinned to `16.3.0`.
+
+Focused verification after the change:
+
+| Check | Result |
+|---|---|
+| Typecheck | Passed |
+| Lint | Passed |
+| Architecture boundaries | Passed |
+| Secret scan | Passed |
+| Relevant B1 tests | 41 passed |
+| Dependency audit | No known vulnerabilities found |
+
+Next.js 16.3 referenced two URLPattern aliases that the pinned Node 24 types did not expose globally. A local type-only compatibility declaration maps those existing platform types; it introduces no runtime package or behavior.

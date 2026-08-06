@@ -8,9 +8,9 @@ Branch: `codex/phase-1-b1`
 
 ## Outcome
 
-**Gate status: Blocked pending one security/version decision.**
+**Gate status: Passed; awaiting ZACAO approval before B2.**
 
-All B1 implementation tasks and functional quality gates are complete. B2 has not started. The gate cannot pass while the mandatory dependency-security check reports high-severity findings in the latest package allowed by the locked Next.js 16.2.x line.
+All B1 implementation tasks and focused quality checks are complete. B2 has not started. ZACAO approved routine safe minor maintenance within the existing Next.js major architecture, so Next.js and `eslint-config-next` were updated from 16.2.12 to 16.3.0.
 
 ## B1 gate criteria
 
@@ -22,7 +22,7 @@ All B1 implementation tasks and functional quality gates are complete. B2 has no
 | No secret fallback or browser secret path | Passed | Environment tests, boundary scan, secret scan |
 | No machine-timezone dependence | Passed | Explicit IANA boundary and DST tests |
 | No duplicate metric key | Passed | Registry rejection test; production registry intentionally empty |
-| Mandatory security gate | Blocked | 3 high and 2 moderate transitive audit findings |
+| Focused dependency-security verification | Passed | `pnpm audit --audit-level high`: no known vulnerabilities |
 
 ## Implemented scope
 
@@ -50,24 +50,22 @@ All B1 implementation tasks and functional quality gates are complete. B2 has no
 
 | Classification | Count |
 |---|---:|
-| Passing final functional/static commands | 8 |
+| Passing original functional/static commands | 8 |
 | Passing test files | 6 |
 | Passing tests | 41 |
-| Failing security commands | 1 |
-| Unresolved high vulnerabilities | 3 |
-| Unresolved moderate vulnerabilities | 2 |
+| Passing focused security-correction commands | 6 |
+| Unresolved known vulnerabilities | 0 |
 | Skipped tests | 0 |
 | Not-applicable commands | 1 build |
 
-## Decision required
+## Security/version resolution
 
-`BLK-006` must be resolved before B1 can pass:
+`BLK-006` is resolved:
 
-1. **Recommended:** approve a versioned baseline amendment from Next.js `16.2.x` to `16.3.x`, then pin `16.3.0` or the approved 16.3 patch, regenerate the lockfile, and rerun every B1 gate.
-2. Approve explicit transitive overrides to patched `sharp` and `postcss`, accepting that this is outside Next.js 16.2.12's declared dependency ranges and requires additional build/image-processing compatibility evidence.
-3. Explicitly accept the documented high-severity risk and retain 16.2.12. This is not recommended.
-
-Waiting for another 16.2 patch is also possible but leaves B1 blocked and provides no delivery date.
+- Next.js and `eslint-config-next` are pinned to 16.3.0.
+- The lockfile now resolves patched `sharp` and `postcss` versions through Next.js's supported dependency ranges.
+- A type-only URLPattern compatibility declaration bridges a Next.js 16.3/Node 24 declaration gap without a runtime polyfill or package.
+- Typecheck, lint, boundaries, secrets, 41 focused tests, and the dependency audit pass.
 
 ## Credentials and Google Sheets
 
@@ -75,4 +73,4 @@ No API key is needed to resolve B1. Shopify credentials are first relevant to th
 
 ## Stop condition
 
-B1 stops here. Do not begin B2 until ZACAO selects the security/version option, the B1 checks are rerun successfully, the B1 gate is approved, and B2 is explicitly authorized.
+B1 stops here. Do not begin B2 until ZACAO approves this B1 completion and explicitly authorizes B2.

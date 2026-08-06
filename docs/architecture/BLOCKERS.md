@@ -9,7 +9,7 @@ Status: Reviewed and consolidated during Phase 1 Subphase B0.
 | BLK-003 | Detailed Shopify history path | Detailed customer/order analytics | Shopify audit | Aggregate-only V1, `read_all_orders`, controlled export, or prioritized combination | Open |
 | BLK-004 | Conditional workbook production data | Conditional modules | Budget/S&OP/Drive audit and Google Sheets operating model | Populate genuine data and pass per-module activation gates | Open by design |
 | BLK-005 | B0 legacy disposition approval | B0 gate and authorization to consider B1 | Clean repository audit and ZACAO instruction to start B1 | Approved by ZACAO on 2026-08-06 | Resolved |
-| BLK-006 | Locked Next.js 16.2.x line contains high-severity transitive advisories | B1 dependency-security gate | Exact 16.2.12 lockfile, `pnpm audit`, and registry metadata for 16.3.0 | Approve 16.3.x baseline amendment, explicit overrides, or documented risk acceptance | Blocking B1 gate |
+| BLK-006 | Locked Next.js 16.2.x line contained high-severity transitive advisories | B1 dependency-security gate | Updated to Next.js 16.3.0 under approved routine minor maintenance; focused checks and audit passed | No further decision required | Resolved |
 
 ## Non-blocking future input
 
