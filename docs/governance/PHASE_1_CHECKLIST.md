@@ -8,8 +8,8 @@ Only the currently authorized subphase may move beyond `Not started`.
 |---|---|---|---|
 | B0 | Repository preflight and scope lock | Completed | Approved by ZACAO through explicit B1 authorization on 2026-08-06 |
 | B1 | Backend foundation and contracts | Completed | Approved by ZACAO; canonical repository sanity check passed at `ab255d3` |
-| B2 | Shopify source adapter | Requires approval | Focused B2 verification passed; awaiting ZACAO approval before B3 |
-| B3 | Klaviyo Future-Ready Core adapter | Not started | B2 gate approval |
+| B2 | Shopify source adapter | Completed | Approved by ZACAO before B3 authorization |
+| B3 | Klaviyo Future-Ready Core adapter | Requires approval | Focused B3 verification passed; live credential verification deferred under the approved protocol |
 | B4 | Google Drive, Budget, and S&OP adapters | Not started | B3 gate approval |
 | B5 | Metric services and certified view models | Not started | B4 gate approval |
 | B6 | Orchestration and caching | Not started | B5 gate approval |

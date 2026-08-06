@@ -129,6 +129,23 @@ When an approved source does not resolve a required fact, report what is known, 
 
 Correct analytics has priority over code completeness. A working implementation with an unapproved business calculation is a failure.
 
+## Deferred live credential verification
+
+When a source capability required by the approved V1 scope was already verified during the V1 data-feasibility/connector audit, missing production credentials do not block implementation of that source adapter.
+
+In this situation:
+
+- Mark adapter implementation verification as complete when its focused non-live tests pass.
+- Mark live production-credential verification as **Deferred**, not passed.
+- Do not represent deferred verification as production-certified.
+- Record deferred verification in the blocker/readiness register.
+- Perform live read-only verification once the required credentials are supplied.
+- Require every deferred live source verification to pass before the Backend Stage production gate can pass.
+- Do not implement any metric, field, capability, or feature outside the previously verified and approved V1 source contract based on assumption.
+- If implementation requires something not verified during the V1 feasibility audit, stop and request verification instead of assuming availability.
+
+This rule changes verification timing only. It does not change V1 scope, architecture, data model, metric definitions, source mappings, read-only security, completed B1/B2 implementation, major stage gates, or sequential approval requirements.
+
 ## Context and scope protection
 
 Before a subphase, read only its locked plan section, relevant architecture and metric/source definitions, the previous completion summary, and the current blocker register. Do not repeatedly reread or reinterpret the whole project.

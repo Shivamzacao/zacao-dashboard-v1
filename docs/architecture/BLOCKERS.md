@@ -10,6 +10,8 @@ Status: Reviewed and consolidated during Phase 1 Subphase B0.
 | BLK-004 | Conditional workbook production data | Conditional modules | Budget/S&OP/Drive audit and Google Sheets operating model | Populate genuine data and pass per-module activation gates | Open by design |
 | BLK-005 | B0 legacy disposition approval | B0 gate and authorization to consider B1 | Clean repository audit and ZACAO instruction to start B1 | Approved by ZACAO on 2026-08-06 | Resolved |
 | BLK-006 | Locked Next.js 16.2.x line contained high-severity transitive advisories | B1 dependency-security gate | Updated to Next.js 16.3.0 under approved routine minor maintenance; focused checks and audit passed | No further decision required | Resolved |
+| BLK-007 | Live Shopify production-credential verification | Backend Stage production gate | Shopify capabilities were verified in the V1 feasibility audit; B2 focused non-live verification passed | Supply an approved least-privilege read-only credential and run the live smoke verification before the Backend Stage gate | Deferred; non-blocking until Backend Stage gate |
+| BLK-008 | Live Klaviyo production-credential verification | Backend Stage production gate | Klaviyo capabilities were verified in the V1 feasibility audit | Supply an approved least-privilege read-only credential and run the live smoke verification before the Backend Stage gate | Deferred; non-blocking until Backend Stage gate |
 
 ## Non-blocking future input
 
