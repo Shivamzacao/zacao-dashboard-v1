@@ -3,8 +3,8 @@
 | Subphase | Objective                                     | Status                           | Gate dependency                        |
 | -------- | --------------------------------------------- | -------------------------------- | -------------------------------------- |
 | F0       | Visual contract audit and frontend scope lock | Approved                         | B7 approved under sequencing amendment |
-| F1       | Frontend foundation and application shell     | Gate complete; awaiting approval | Explicit F0 approval                   |
-| F2       | Reusable dashboard component library          | Not started                      | Explicit F1 approval                   |
+| F1       | Frontend foundation and application shell     | Approved                         | Explicit F0 approval                   |
+| F2       | Reusable dashboard component library          | Gate complete; awaiting approval | Explicit F1 approval                   |
 | F3       | Complete page implementation                  | Not started                      | Explicit F2 approval                   |
 | F4       | Frontend hardening and optimization           | Not started                      | Explicit F3 approval                   |
 | F5       | Full frontend certification                   | Not started                      | Explicit F4 approval                   |
@@ -34,4 +34,17 @@
 | Implement loading, error, not-found, and freshness shells | Completed         | App Router special files and presentation components     |
 | Pass keyboard, focus, responsive, and WCAG checks         | Completed         | Focused Vitest and Playwright suites                     |
 | Add desktop and tablet visual baselines                   | Completed         | Playwright snapshot directory                            |
-| Obtain explicit approval before F2                        | Requires approval | F1 gate report                                           |
+| Obtain explicit approval before F2                        | Completed         | ZACAO F1 approval                                        |
+
+## F2 checklist
+
+| Item                                                    | Status            | Evidence                                          |
+| ------------------------------------------------------- | ----------------- | ------------------------------------------------- |
+| Implement typed provider-neutral component families     | Completed         | `src/presentation/components/dashboard/`          |
+| Implement all approved reusable chart wrappers          | Completed         | `charts.client.tsx`                               |
+| Cover truthful readiness and unavailable states         | Completed         | `state-surface.tsx`, synthetic fixture matrix     |
+| Verify extremes, null/zero, tables, drawer, and exports | Completed         | Focused F2 Vitest suite                           |
+| Pass accessibility, reflow, reduced-motion checks       | Completed         | Focused F2 Playwright suite                       |
+| Freeze desktop and tablet visual baselines              | Completed         | F2 snapshot directory and visual-regression report |
+| Preserve B7 and architecture boundaries                 | Completed         | Boundary check and F2 gate report                 |
+| Obtain explicit approval before F3                      | Requires approval | F2 gate report                                    |

@@ -19,6 +19,8 @@
     "test": "vitest run",
     "test:f1": "vitest run tests/presentation",
     "test:f1:browser": "playwright test --config playwright.config.ts",
+    "test:f2": "vitest run tests/presentation/f2-components.test.tsx",
+    "test:f2:browser": "playwright test --config playwright.f2.config.ts",
     "test:coverage": "vitest run --coverage",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:google-readonly": "node scripts/check-google-readonly.mjs",
@@ -26,11 +28,13 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "4.3.3",
+    "@tanstack/react-table": "8.21.3",
     "exceljs": "^4.4.0",
     "google-auth-library": "^11.0.0",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "recharts": "3.10.1",
     "server-only": "0.0.1",
     "tailwindcss": "4.3.3",
     "zod": "4.4.3"
