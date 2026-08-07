@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { FixtureReadinessShell } from "@/src/presentation/components/fixture-readiness-shell";
 import { PageHeader } from "@/src/presentation/components/page-header";
+import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/dashboard-page.client";
+import { dashboardPageSpec } from "@/src/presentation/features/dashboard-pages/page-specs";
 import { phase2FixtureProvider } from "@/src/presentation/providers/fixture-dashboard-provider";
 import { dashboardRouteBySlug, dashboardRoutes } from "@/src/presentation/shell/routes";
 
@@ -28,11 +29,12 @@ export default async function DashboardPage({ params }: DashboardPageProps) {
   if (!route) notFound();
 
   const fixture = phase2FixtureProvider.getShellContext();
+  const pageFixture = phase2FixtureProvider.getF3PageData();
 
   return (
     <main className="dashboard-content">
       <PageHeader route={route} source={fixture.sources[0]} />
-      <FixtureReadinessShell route={route} />
+      <DashboardPageView spec={dashboardPageSpec(route.slug)} fixture={pageFixture} />
     </main>
   );
 }

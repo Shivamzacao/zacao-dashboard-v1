@@ -8,14 +8,21 @@ export interface PaginationModel {
 
 interface PaginationProps extends PaginationModel {
   readonly onPageChange: (page: number) => void;
+  readonly ariaLabel?: string;
 }
 
-export function Pagination({ page, pageSize, totalRows, onPageChange }: PaginationProps) {
+export function Pagination({
+  page,
+  pageSize,
+  totalRows,
+  onPageChange,
+  ariaLabel = "Table pagination",
+}: PaginationProps) {
   const pageCount = Math.max(1, Math.ceil(totalRows / pageSize));
   const start = totalRows === 0 ? 0 : page * pageSize + 1;
   const end = Math.min(totalRows, (page + 1) * pageSize);
   return (
-    <nav className="pagination" aria-label="Table pagination">
+    <nav className="pagination" aria-label={ariaLabel}>
       <span>
         {start}–{end} of {totalRows}
       </span>

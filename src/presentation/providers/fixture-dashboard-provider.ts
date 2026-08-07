@@ -10,6 +10,10 @@ import type {
   FilterOptions,
 } from "@/src/application/api";
 import type { SourceStatus } from "@/src/domain/contracts";
+import {
+  f3PageFixtureData,
+  type F3PageFixtureData,
+} from "@/src/presentation/fixtures/f3-page-data";
 
 export interface FixtureShellContext {
   readonly environment: "test";
@@ -23,6 +27,7 @@ export interface DashboardDataProvider {
   getShellContext(): FixtureShellContext;
   getRepresentativeDashboard(): DashboardApiResponse;
   getRepresentativeDrilldown(): DrilldownApiResponse;
+  getF3PageData(): F3PageFixtureData;
 }
 
 interface FixtureBundleInput {
@@ -53,6 +58,7 @@ export function createFixtureDashboardProvider(
       }),
     getRepresentativeDashboard: () => dashboard,
     getRepresentativeDrilldown: () => drilldown,
+    getF3PageData: () => f3PageFixtureData,
   });
 }
 

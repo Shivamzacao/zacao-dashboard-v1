@@ -172,6 +172,7 @@ export function DataTable<Row extends object>({
         pageSize={pageSize}
         totalRows={totalRows}
         onPageChange={onPageChange}
+        ariaLabel={`${caption} pagination`}
       />
       {state !== "current" ? (
         <p className="table-state-note">

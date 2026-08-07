@@ -21,6 +21,8 @@
     "test:f1:browser": "playwright test --config playwright.config.ts",
     "test:f2": "vitest run tests/presentation/f2-components.test.tsx",
     "test:f2:browser": "playwright test --config playwright.f2.config.ts",
+    "test:f3": "vitest run tests/presentation/f3-pages.test.tsx",
+    "test:f3:browser": "playwright test --config playwright.f3.config.ts",
     "test:coverage": "vitest run --coverage",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:google-readonly": "node scripts/check-google-readonly.mjs",
