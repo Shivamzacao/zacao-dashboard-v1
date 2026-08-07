@@ -26,3 +26,17 @@ export const apiErrorSchema = z
   .strict();
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const apiProblemSchema = z
+  .object({
+    type: z.string().url(),
+    title: z.string().trim().min(1).max(120),
+    status: z.number().int().min(400).max(599),
+    code: errorCodeSchema,
+    detail: z.string().trim().min(1).max(500),
+    requestId: z.string().uuid(),
+    errors: z.array(errorDetailSchema),
+  })
+  .strict();
+
+export type ApiProblem = z.infer<typeof apiProblemSchema>;

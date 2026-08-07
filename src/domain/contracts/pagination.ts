@@ -3,7 +3,7 @@ import { z } from "zod";
 export const paginationRequestSchema = z
   .object({
     cursor: z.string().trim().min(1).max(500).nullable(),
-    limit: z.number().int().min(1).max(250),
+    limit: z.number().int().min(1).max(100),
   })
   .strict();
 
