@@ -1,0 +1,30 @@
+{
+  "testPath": "/Users/aziz/zacao-dashboard-v1/outputs/b4.4a/ZACAO Dashboard V1 — TEST.xlsx",
+  "productionPath": "/Users/aziz/zacao-dashboard-v1/outputs/b4.4a/ZACAO Dashboard V1 — PRODUCTION.xlsx",
+  "inputTabCount": 14,
+  "totalTabCount": 15,
+  "testRecordCounts": {
+    "Mappings": 11,
+    "Inventory": 36,
+    "Inventory_Lots": 4,
+    "Depletions": 5,
+    "Forecast": 73,
+    "Production": 5,
+    "SKU_Costs": 4,
+    "Finance_Actuals": 19,
+    "Cash": 7,
+    "Marketing_Spend": 17,
+    "Social_Metrics": 17,
+    "Partner_Performance": 7,
+    "Growth_Pipeline": 7,
+    "Rules_Targets": 6
+  },
+  "testTotalRecords": 218,
+  "productionBusinessRecords": 0,
+  "parity": "PASS",
+  "dropdownValidationColumns": 21,
+  "validatedInputRange": "2:10000",
+  "businessRowCapacityPerTab": 9999,
+  "capacityStrategy": "Uniform validation and contract-controlled formatting across rows 2-10000 on every input tab; unused rows receive no decorative fill or borders.",
+  "formulaCount": 0
+}

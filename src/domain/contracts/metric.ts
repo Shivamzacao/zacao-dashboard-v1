@@ -9,6 +9,7 @@ export const metricClassSchema = z.enum(["core", "future_ready_core", "condition
 export const metricValueKindSchema = z.enum([
   "money",
   "count",
+  "quantity",
   "rate_basis_points",
   "duration_seconds",
   "date",
@@ -28,3 +29,4 @@ export const metricDefinitionSchema = z
   .strict();
 
 export type MetricDefinition = z.infer<typeof metricDefinitionSchema>;
+export type MetricValueKind = z.infer<typeof metricValueKindSchema>;

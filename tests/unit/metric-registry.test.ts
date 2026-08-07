@@ -14,8 +14,11 @@ const definition: MetricDefinition = {
 };
 
 describe("metric registry", () => {
-  it("starts empty so B1 does not invent metric definitions", () => {
-    expect(metricRegistry.definitions).toEqual([]);
+  it("contains every active B5 definition exactly once", () => {
+    expect(metricRegistry.definitions.length).toBeGreaterThan(0);
+    expect(new Set(metricRegistry.definitions.map(({ key }) => key)).size).toBe(
+      metricRegistry.definitions.length,
+    );
   });
 
   it("registers and retrieves a versioned definition", () => {

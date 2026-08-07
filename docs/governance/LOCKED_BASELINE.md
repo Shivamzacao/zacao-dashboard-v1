@@ -1,6 +1,6 @@
 # ZACAO Dashboard V1 — Locked Planning Baseline
 
-Baseline: `planning-baseline-v1.0`  
+Baseline: `planning-baseline-v1.1`
 Status: Locked for implementation planning and phased execution  
 
 ## Authority order
@@ -21,7 +21,7 @@ Status: Locked for implementation planning and phased execution
 | `docs/locked/ZACAO_Dashboard_V1_Deliverable_Plan.docx` | `bca3188cdf13e47997ddb61366ea2a2d2b7e242a9dcf3d5c8a7b07d4a1319719` |
 | `docs/locked/ZACAO_Dashboard_V1_Technical_Architecture_and_Implementation_Plan.docx` | `b2f163aa519ff4bdbb783baf1e42c284908cfd1c4495fd60455dcc95ebe7f952` |
 | `docs/locked/ZACAO_Dashboard_V1_Technical_Architecture_and_Implementation_Plan.md` | `9a436ffc325fb30ff55e488cb8f178ec233de289cea89a74d239124a4e4d581d` |
-| `docs/locked/GOOGLE_SHEETS_OPERATING_MODEL.md` | `dcdc4e34854b6228889cdca8b721d9594f832b163a751318138f5b8222e5ba1b` |
+| `docs/locked/GOOGLE_SHEETS_OPERATING_MODEL.md` | `fde69b3c42ca1fbffa2d25077122ae9c643a19d6b581e0e68bcf7ec8fcd8714b` |
 
 ## Locked decisions
 
@@ -35,6 +35,7 @@ Status: Locked for implementation planning and phased execution
 - Klaviyo is Future-Ready Core and must handle both empty and populated accounts without redesign.
 - Test and production Google workbooks are separate.
 - Production never reads mock/test workbooks or accepts mock/test rows as business data.
+- Google Sheet physical row count is not a completeness signal or runtime boundary; populated records are discovered dynamically and empty rows are ignored.
 - Conditional modules remain not ready until genuine source data and all activation gates pass.
 - The approved demo is the visual contract.
 - Existing abandoned implementation code is not approved for reuse until explicitly audited.

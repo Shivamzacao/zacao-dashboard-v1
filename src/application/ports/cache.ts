@@ -5,10 +5,11 @@ export interface CacheEntry<T> {
   readonly generatedAt: string;
   readonly expiresAt: string;
   readonly staleUntil: string;
+  readonly tags: readonly string[];
 }
 
 export interface CachePort {
   get<T>(key: string): Promise<CacheEntry<T> | null>;
-  set<T>(key: string, value: T, policy: CachePolicy): Promise<void>;
+  set<T>(key: string, value: T, policy: CachePolicy, tags: readonly string[]): Promise<void>;
   invalidate(tags: readonly string[]): Promise<void>;
 }

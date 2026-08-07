@@ -13,5 +13,7 @@
 | DEC-009 | Adopt the Fast Sequential Delivery, Approval, Anti-Loop, and Anti-Hallucination Protocol for execution cadence only. | Approved | User instruction |
 | DEC-010 | Apply routine safe Next.js minor maintenance from 16.2.12 to 16.3.0 to resolve dependency advisories without changing architecture. | Approved under DEC-009 | B1 focused security correction |
 | DEC-011 | Permit audited source-adapter implementation to complete on focused non-live evidence while recording live production-credential verification as deferred and mandatory before the Backend Stage gate. | Approved by ZACAO | Fast Sequential Delivery Protocol |
+| DEC-012 | `Marketing_Spend` supplies spend only. CAC, ROAS, and LTV:CAC require separately approved numerator/denominator definitions and verified acquisition/attribution sources. Blended and campaign-attributed metrics remain distinct; unsupported attribution is never inferred and does not block unrelated Marketing Intelligence. | Approved by ZACAO | Approved B4.2 clarification |
+| DEC-013 | Google Sheet physical row count is not a V1 gate or runtime boundary. The adapter processes populated rows dynamically, ignores empty rows, validates every populated row against the approved schema, and never interprets capacity as completeness. ZACAO may extend tabs while preserving applicable validation and formatting. | Approved by ZACAO | B4.4B capacity-policy clarification |
 
 Material future decisions receive the next sequential ID and link to an ADR when technical architecture changes.

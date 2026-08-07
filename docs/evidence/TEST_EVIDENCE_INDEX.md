@@ -19,5 +19,9 @@
 | B1-GATE | Phase 1 / B1 | Gate assessment | Passed; awaiting ZACAO approval | `phase-1/b1/B1_GATE_REPORT.md` |
 | B2-GATE | Phase 1 / B2 | Focused Shopify adapter verification | Passed; live smoke not run without credentials | `phase-1/b2/B2_GATE_REPORT.md` |
 | B3-GATE | Phase 1 / B3 | Focused Klaviyo Future-Ready Core adapter verification | Passed; live production-credential verification deferred | `phase-1/b3/B3_GATE_REPORT.md` |
+| B4.4B-GATE | Phase 1 / B4.4B | Read-only native Google Sheets identity, schema, data-separation, validation, formatting, and formula verification | Passed; B4.5 runtime credentials deferred | `phase-1/B4_4B_GATE_REPORT.md` |
+| B4.5-GATE | Phase 1 / B4.5 | Focused Google Sheets/Drive adapter, schema, isolation, allowlist, and read-only verification | Passed; live production-credential verification deferred | `phase-1/b4/B4_5_GATE_REPORT.md` |
+| B5-GATE | Phase 1 / B5 | Focused deterministic metric calculations, certified view models, readiness states, source authority, and conditional interfaces | Passed: 29 focused tests; strict type, lint, boundary, format, and secret checks | `phase-1/b5/B5_GATE_REPORT.md` |
+| B6-GATE | Phase 1 / B6 | Focused orchestration selection/deduplication, cache lifecycle/isolation, stale disclosure, source failure isolation, and blocked-state propagation | Passed: 14 focused tests; strict type, lint, boundary, format, secret, and whitespace checks | `phase-1/b6/B6_GATE_REPORT.md` |
 
 Evidence is append-only by phase. A skipped or inapplicable check is never counted as passed.

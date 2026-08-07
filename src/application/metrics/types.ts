@@ -1,0 +1,176 @@
+import type { DateRange, SourceStatus } from "@/src/domain/contracts";
+
+export interface MetricServiceContext {
+  readonly environment: "test" | "production";
+  readonly dataPeriod: DateRange;
+  readonly sourceStatuses: readonly SourceStatus[];
+}
+
+export interface CustomerClassificationFact {
+  readonly classification: "new" | "returning" | "unclassified";
+  readonly customers: number;
+}
+
+export interface CustomerClassificationSummary {
+  readonly rows: readonly CustomerClassificationFact[];
+  readonly returningRateBasisPoints: number | null;
+}
+
+export interface ShopifyFunnelFact {
+  readonly sessions: number;
+  readonly visitors: number;
+  readonly cartAdditions: number;
+  readonly reachedCheckout: number;
+  readonly completedCheckout: number;
+  readonly conversionRateBasisPoints: number;
+}
+
+export interface ProductUnitsFact {
+  readonly period: string;
+  readonly product: string;
+  readonly variant: string | null;
+  readonly sku: string | null;
+  readonly merchandise: boolean;
+  readonly units: number;
+}
+
+export interface CatalogVariantFact {
+  readonly productId: string;
+  readonly productTitle: string;
+  readonly productStatus: string;
+  readonly variantId: string;
+  readonly variantTitle: string;
+  readonly sku: string | null;
+  readonly priceMinorUnits: number;
+  readonly activeOrSold: boolean;
+  readonly unitCostMinorUnits: number | null;
+}
+
+export interface InventoryFact {
+  readonly locationId: string;
+  readonly locationName: string;
+  readonly sku: string | null;
+  readonly quantityName: string;
+  readonly quantity: number;
+  readonly updatedAt: string;
+}
+
+export interface KlaviyoPerformanceFact {
+  readonly recipients: number | null;
+  readonly delivered: number | null;
+  readonly deliveryRateBasisPoints: number | null;
+  readonly opensUnique: number | null;
+  readonly openRateBasisPoints: number | null;
+  readonly clicksUnique: number | null;
+  readonly clickRateBasisPoints: number | null;
+  readonly clickToOpenRateBasisPoints: number | null;
+  readonly bounced: number | null;
+  readonly bounceRateBasisPoints: number | null;
+  readonly unsubscribesUnique: number | null;
+  readonly unsubscribeRateBasisPoints: number | null;
+  readonly spamComplaints: number | null;
+  readonly spamComplaintRateBasisPoints: number | null;
+  readonly conversions: number | null;
+  readonly conversionValueMinorUnits: number | null;
+  readonly revenuePerRecipientMinorUnits: number | null;
+}
+
+export interface KlaviyoPerformanceRow extends KlaviyoPerformanceFact {
+  readonly id: string;
+  readonly name: string;
+  readonly channel: "email" | "sms";
+}
+
+export interface KlaviyoSmsFact {
+  readonly sent: number | null;
+  readonly deliveredOrReceived: number | null;
+  readonly clicked: number | null;
+  readonly failed: number | null;
+  readonly unsubscribed: number | null;
+  readonly measurementLabel: "report_send_date" | "event_time";
+}
+
+export interface KlaviyoTrendPoint {
+  readonly period: string;
+  readonly count: number | null;
+}
+
+export type ManualMetricCell = string | number | boolean | null;
+export type ManualMetricRecord = Readonly<Record<string, ManualMetricCell>>;
+
+export interface ManualWorkbookFacts {
+  readonly tabs: Readonly<{
+    Depletions: { readonly records: readonly ManualMetricRecord[] };
+    Finance_Actuals: { readonly records: readonly ManualMetricRecord[] };
+    Marketing_Spend: { readonly records: readonly ManualMetricRecord[] };
+    Partner_Performance: { readonly records: readonly ManualMetricRecord[] };
+    Growth_Pipeline: { readonly records: readonly ManualMetricRecord[] };
+    Social_Metrics: { readonly records: readonly ManualMetricRecord[] };
+  }>;
+}
+
+export interface HistoryCompletenessFact {
+  readonly mode: "aggregate" | "detailed";
+  readonly completeness: "complete" | "partial";
+  readonly requestedStartDate: string;
+  readonly requestedEndDate: string;
+  readonly earliestDetailedRecordAt: string | null;
+  readonly warningCodes: readonly string[];
+}
+
+export interface SopInspectionFact {
+  readonly worksheetNames: readonly string[];
+  readonly nonEmptyCellCount: number;
+  readonly formulaCount: number;
+  readonly formulaErrorCells: readonly string[];
+  readonly placeholderCellCount: number;
+}
+
+export interface CombinedInventoryFact {
+  readonly asOfDate: string;
+  readonly warehouse: string;
+  readonly sku: string;
+  readonly quantity: number;
+}
+
+export interface InventoryLotFact {
+  readonly asOfDate: string;
+  readonly warehouse: string;
+  readonly sku: string;
+  readonly lotCode: string;
+  readonly bestByDate: string;
+  readonly quantityRemaining: number;
+  readonly status: string | null;
+}
+
+export interface ForecastVarianceFact {
+  readonly period: string;
+  readonly sku: string;
+  readonly channel: string;
+  readonly forecastUnits: number;
+  readonly actualUnits: number;
+}
+
+export interface ProductionIncomingFact {
+  readonly poNumber: string;
+  readonly poLine: string;
+  readonly sku: string;
+  readonly destinationWarehouse: string;
+  readonly status: string;
+  readonly expectedArrivalDate: string;
+  readonly incomingUnits: number;
+  readonly unitsReceived: number | null;
+}
+
+export interface CashPositionFact {
+  readonly date: string;
+  readonly account: string;
+  readonly balanceMinorUnits: number;
+  readonly restrictedCashMinorUnits: number | null;
+}
+
+export interface PlanActualFact {
+  readonly scopeKey: string;
+  readonly planMinorUnits: number;
+  readonly actualMinorUnits: number;
+}

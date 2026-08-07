@@ -27,6 +27,16 @@ Development and production data must be separated:
 
 Workbook IDs and tab/range identifiers are environment variables. The application must not locate a source by filename, “latest file,” Drive search order, or folder position.
 
+### Dynamic row-capacity policy
+
+- Physical Sheet row count is not a V1 business requirement, completeness signal, or runtime boundary.
+- Input tabs may retain their current capacity; ZACAO may add rows when needed.
+- The runtime reads populated records dynamically and ignores empty rows.
+- Neither row 1,000 nor row 10,000 may be hardcoded as an ingestion boundary.
+- Newly populated rows must match the approved schema, types, controlled values, and validation rules.
+- When extending a tab, the internal team must preserve or inherit applicable dropdown validation and display formats from a schema-controlled row.
+- Increasing capacity requires no application architecture change.
+
 ## 3. Test workbook rules
 
 The test workbook exists to prove technical behavior. It must:
@@ -165,4 +175,4 @@ Changes to required columns, types, keys, history policy, or tab/file identity a
 4. Successful regression and migration/compatibility checks.
 5. ZACAO approval before production configuration changes.
 
-This operating model is locked with planning baseline `v1.0`. Future changes are discussed and versioned; they are not silently inferred during coding.
+This operating model is locked with planning baseline `v1.1`. Version 1.1 adds the approved dynamic row-capacity policy without changing schema, metrics, scope, architecture, environment separation, or read-only runtime behavior. Future changes are discussed and versioned; they are not silently inferred during coding.

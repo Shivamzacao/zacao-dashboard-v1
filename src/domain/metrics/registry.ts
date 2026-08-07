@@ -1,4 +1,5 @@
 import { metricDefinitionSchema, type MetricDefinition } from "../contracts";
+import { activeMetricDefinitions } from "./catalog";
 
 export interface MetricRegistry {
   readonly definitions: readonly MetricDefinition[];
@@ -25,4 +26,4 @@ export function createMetricRegistry(input: readonly MetricDefinition[]): Metric
   });
 }
 
-export const metricRegistry = createMetricRegistry([]);
+export const metricRegistry = createMetricRegistry(activeMetricDefinitions);
