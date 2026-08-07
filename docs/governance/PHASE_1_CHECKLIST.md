@@ -4,18 +4,18 @@ Status values: `Not started`, `In progress`, `Completed`, `Blocked`, `Requires a
 
 Only the currently authorized subphase may move beyond `Not started`.
 
-| Subphase | Objective                                       | Status            | Gate dependency                                                                                    |
-| -------- | ----------------------------------------------- | ----------------- | -------------------------------------------------------------------------------------------------- |
-| B0       | Repository preflight and scope lock             | Completed         | Approved by ZACAO through explicit B1 authorization on 2026-08-06                                  |
-| B1       | Backend foundation and contracts                | Completed         | Approved by ZACAO; canonical repository sanity check passed at `ab255d3`                           |
-| B2       | Shopify source adapter                          | Completed         | Approved by ZACAO before B3 authorization                                                          |
-| B3       | Klaviyo Future-Ready Core adapter               | Completed         | Approved by ZACAO before B4 authorization; live credential verification remains deferred           |
-| B4       | Google Drive, Budget, and S&OP adapters         | Completed         | B4.5 approved by ZACAO; live credential verification remains deferred until the Backend Stage gate |
-| B5       | Metric services and certified view models       | Completed         | Approved by ZACAO subject to reconciliation; six remaining metrics confirmed `NOT_V1` before B6    |
-| B6       | Orchestration and caching                       | Completed         | Approved by ZACAO before B7 authorization; no external cache or persistence added                  |
-| B7       | APIs, drill-downs, exports, and source status   | Requires approval | Focused B7 verification passed; frozen Phase 2 contract is ready for review                        |
-| B8       | Backend security, observability, and operations | Not started       | B7 gate approval                                                                                   |
-| B9       | Full backend certification                      | Not started       | B8 gate approval                                                                                   |
+| Subphase | Objective                                       | Status    | Gate dependency                                                                                    |
+| -------- | ----------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------- |
+| B0       | Repository preflight and scope lock             | Completed | Approved by ZACAO through explicit B1 authorization on 2026-08-06                                  |
+| B1       | Backend foundation and contracts                | Completed | Approved by ZACAO; canonical repository sanity check passed at `ab255d3`                           |
+| B2       | Shopify source adapter                          | Completed | Approved by ZACAO before B3 authorization                                                          |
+| B3       | Klaviyo Future-Ready Core adapter               | Completed | Approved by ZACAO before B4 authorization; live credential verification remains deferred           |
+| B4       | Google Drive, Budget, and S&OP adapters         | Completed | B4.5 approved by ZACAO; live credential verification remains deferred until the Backend Stage gate |
+| B5       | Metric services and certified view models       | Completed | Approved by ZACAO subject to reconciliation; six remaining metrics confirmed `NOT_V1` before B6    |
+| B6       | Orchestration and caching                       | Completed | Approved by ZACAO before B7 authorization; no external cache or persistence added                  |
+| B7       | APIs, drill-downs, exports, and source status   | Completed | Approved by ZACAO for Phase 2 frontend development                                                 |
+| B8       | Backend security, observability, and operations | Deferred  | Approved pre-production certification sequence                                                     |
+| B9       | Full backend certification                      | Deferred  | Approved pre-production certification sequence after B8                                            |
 
 ## B0 checklist
 
@@ -70,14 +70,14 @@ After the B0 report is produced, stop. Do not scaffold packages, create source f
 
 ## B7 checklist
 
-| Item                                                                          | Status            | Evidence                                                                  |
-| ----------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------- |
-| Implement versioned Route Handlers without route-level metric calculations    | Completed         | `app/api/v1` and focused handler tests                                    |
-| Publish Zod schemas, shared types, TEST-only fixtures, manifest, and examples | Completed         | `src/application/api` and `docs/architecture/B7_FRONTEND_API_CONTRACT.md` |
-| Enforce date, filter, sort, pagination, export, and field allowlists          | Completed         | Focused B7 query and handler tests                                        |
-| Implement approved PII-safe drill-downs and bounded CSV exports               | Completed         | Focused drill-down/export tests                                           |
-| Preserve detailed-order history as explicit source-limited behavior           | Completed         | Focused source-limited test                                               |
-| Implement separate liveness, readiness, and source-status contracts           | Completed         | Focused health/source-status tests                                        |
-| Verify production-empty behavior and no TEST fallback                         | Completed         | Focused production-runtime isolation test                                 |
-| Record live source credential verification as deferred                        | Completed         | B7 contract and blocker register                                          |
-| Obtain explicit approval before Phase 2                                       | Requires approval | This B7 gate                                                              |
+| Item                                                                          | Status    | Evidence                                                                  |
+| ----------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------- |
+| Implement versioned Route Handlers without route-level metric calculations    | Completed | `app/api/v1` and focused handler tests                                    |
+| Publish Zod schemas, shared types, TEST-only fixtures, manifest, and examples | Completed | `src/application/api` and `docs/architecture/B7_FRONTEND_API_CONTRACT.md` |
+| Enforce date, filter, sort, pagination, export, and field allowlists          | Completed | Focused B7 query and handler tests                                        |
+| Implement approved PII-safe drill-downs and bounded CSV exports               | Completed | Focused drill-down/export tests                                           |
+| Preserve detailed-order history as explicit source-limited behavior           | Completed | Focused source-limited test                                               |
+| Implement separate liveness, readiness, and source-status contracts           | Completed | Focused health/source-status tests                                        |
+| Verify production-empty behavior and no TEST fallback                         | Completed | Focused production-runtime isolation test                                 |
+| Record live source credential verification as deferred                        | Completed | B7 contract and blocker register                                          |
+| Obtain explicit approval before Phase 2                                       | Completed | ZACAO approved B7 and authorized F0 under DEC-014                         |
