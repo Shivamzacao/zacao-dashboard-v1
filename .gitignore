@@ -21,3 +21,9 @@ playwright-report/
 
 # Generated QA artifacts
 tools/docx_qa/
+
+# Local-only live API captures from smoke probes (never committed provider JSON)
+tests/infrastructure/**/fixtures/*-live.json
+
+# Locally generated sample workbooks
+outputs/manual-workbook-sample.xlsx

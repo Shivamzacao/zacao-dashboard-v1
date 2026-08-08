@@ -6,5 +6,6 @@ No implementation ADR has been created in B0. The locked architecture already go
 | ----------------------------------------- | ------------------- | -------- | ---------------------------------------------------------- |
 | [ADR-001](ADR-001-f1-frontend-tooling.md) | F1 frontend tooling | Accepted | Implement the packages fixed by the locked frontend stack. |
 | [ADR-002](ADR-002-f2-data-display-libraries.md) | F2 data-display libraries | Accepted | Implement Recharts 3.x and TanStack Table 8.x fixed by the locked architecture. |
+| [ADR-003](ADR-003-manual-workbook-database.md) | Manual-workbook Supabase Postgres store and dashboard import flow | Accepted (DEC-017) | Durable versioned storage for manual input data plus user-initiated saves; Google Sheets path dropped. |
 
 An ADR cannot silently change scope, phase order, metrics, source permissions, authentication, database use, hosting, or another locked decision. Those changes require ZACAO discussion and versioned baseline approval first.

@@ -13,12 +13,12 @@ import {
 
 const tableResponseSchema = z.object({
   shopifyqlQuery: z.object({
-    tableData: z.object({
-      columns: z.array(
-        z.object({ name: z.string(), dataType: z.string(), displayName: z.string() }),
-      ),
-      rows: z.array(z.record(z.string(), z.unknown())),
-    }),
+    tableData: z
+      .object({
+        columns: z.array(z.object({ name: z.string(), dataType: z.string() })),
+        rows: z.array(z.record(z.string(), z.unknown())),
+      })
+      .nullable(),
     parseErrors: z.array(z.string()).nullable().optional(),
   }),
 });
@@ -28,7 +28,6 @@ export interface ShopifyQlReadResult {
   readonly columns: readonly {
     readonly name: string;
     readonly dataType: string;
-    readonly displayName: string;
   }[];
   readonly history: ShopifyHistory;
   readonly requestId: string | null;
@@ -53,6 +52,9 @@ export class ShopifyQlAdapter {
     const parseErrors = parsed.shopifyqlQuery.parseErrors ?? [];
     if (parseErrors.length > 0) {
       throw new Error("ShopifyQL rejected the audited dataset query");
+    }
+    if (parsed.shopifyqlQuery.tableData === null) {
+      throw new Error("ShopifyQL returned no table data for the audited dataset query");
     }
     return {
       rows: parsed.shopifyqlQuery.tableData.rows,

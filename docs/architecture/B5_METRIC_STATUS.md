@@ -2,7 +2,9 @@
 
 Status: Definitive B5 record. Runtime keys and full machine-readable definitions live in `src/domain/metrics/catalog.ts`.
 
-Classification totals: 13 `CERTIFIABLE`, 36 `DATA_PENDING`, 39 `BUSINESS_RULE_REQUIRED`, 4 `SOURCE_LIMITED`, and 6 `NOT_V1` (98 total).
+Classification totals at the B5 gate: 13 `CERTIFIABLE`, 36 `DATA_PENDING`, 39 `BUSINESS_RULE_REQUIRED`, 4 `SOURCE_LIMITED`, and 6 `NOT_V1` (98 total).
+
+Amendment (2026-08-08, Phase 3 integration): DEC-015 activated the revenue/order/AOV/refund cluster (`commerce.net_sales`, `commerce.orders`, `commerce.average_order_value`, `commerce.sales_trend`, `commerce.gross_sales`, `commerce.discounts`, `commerce.returns`, `commerce.shipping_charges`, `commerce.taxes`, `commerce.total_sales`, `commerce.purchase_heatmap`, `products.sales`, `customers.billing_geography`) and DEC-016 approved the channel/fulfillment/mix defaults. The runtime authority for current statuses remains `src/domain/metrics/catalog.ts`; the table below records the original B5 classifications.
 
 Reconciled before B6: the six metrics outside the four active-status counts are `commerce.predictive_forecast`, `customers.predictive_churn`, `actions.assign`, `recommendations.ai`, `growth.weighted_pipeline`, and `finance.predictive_cashflow`. All six are explicitly `NOT_V1`; no metric was unclassified.
 

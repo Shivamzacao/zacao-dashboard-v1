@@ -15,12 +15,12 @@ export const PRODUCTS_QUERY = `
     products(first: $first, after: $after) {
       nodes {
         id title handle status
-        variants(first: 100) {
+        variants(first: 25) {
           nodes {
             id title sku price inventoryQuantity sellableOnlineQuantity
             inventoryItem {
               id sku tracked unitCost { amount currencyCode }
-              inventoryLevels(first: 100) {
+              inventoryLevels(first: 10) {
                 nodes {
                   id updatedAt
                   location { id name isActive }
@@ -56,7 +56,7 @@ export const ORDERS_QUERY = `
         currentTotalDiscountsSet { shopMoney { amount currencyCode } }
         currentShippingPriceSet { shopMoney { amount currencyCode } }
         currentTotalTaxSet { shopMoney { amount currencyCode } }
-        currentTotalRefundedSet { shopMoney { amount currencyCode } }
+        totalRefundedSet { shopMoney { amount currencyCode } }
         netPaymentSet { shopMoney { amount currencyCode } }
         lineItems(first: 100) {
           nodes {

@@ -15,6 +15,7 @@ import {
   dashboardRouteBySlug,
   dashboardRoutes,
   isDashboardRouteActive,
+  utilityRoutes,
 } from "@/src/presentation/shell/routes";
 
 afterEach(cleanup);
@@ -27,7 +28,8 @@ describe("F1 shell components", () => {
         query="start=2025-08-08&end=2026-08-07&comparison=none"
       />,
     );
-    expect(screen.getAllByRole("link")).toHaveLength(9);
+    // Nine dashboard destinations plus the Data import utility route.
+    expect(screen.getAllByRole("link")).toHaveLength(10);
     expect(
       screen.getByRole("link", { name: /Product intelligence/ }).getAttribute("aria-current"),
     ).toBe("page");
@@ -43,6 +45,7 @@ describe("F1 shell components", () => {
       "/financial",
       "/insights",
     ]);
+    expect(utilityRoutes.map((route) => route.href)).toEqual(["/import"]);
     expect(isDashboardRouteActive("/products/detail", "/products")).toBe(true);
   });
 
@@ -53,8 +56,8 @@ describe("F1 shell components", () => {
     fireEvent.keyDown(links[0] as HTMLElement, { key: "ArrowDown" });
     expect(document.activeElement).toBe(links[1]);
     fireEvent.keyDown(links[1] as HTMLElement, { key: "End" });
-    expect(document.activeElement).toBe(links[8]);
-    fireEvent.keyDown(links[8] as HTMLElement, { key: "Home" });
+    expect(document.activeElement).toBe(links[9]);
+    fireEvent.keyDown(links[9] as HTMLElement, { key: "Home" });
     expect(document.activeElement).toBe(links[0]);
   });
 

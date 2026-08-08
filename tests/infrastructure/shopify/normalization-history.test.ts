@@ -90,7 +90,7 @@ describe("Shopify provider normalization", () => {
       currentTotalDiscountsSet: moneySet("1.00"),
       currentShippingPriceSet: moneySet("2.00"),
       currentTotalTaxSet: moneySet("0.50"),
-      currentTotalRefundedSet: moneySet("4.00"),
+      totalRefundedSet: moneySet("4.00"),
       netPaymentSet: moneySet("17.50"),
       refunds: [
         {

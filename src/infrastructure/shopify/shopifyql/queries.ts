@@ -3,6 +3,7 @@ import { z } from "zod";
 import { dateRangeSchema, type DateRange } from "@/src/domain/contracts/date-range";
 
 export const shopifyQlDatasetSchema = z.enum([
+  "sales_totals",
   "sales_trend",
   "product_sales",
   "product_line_classification",
@@ -23,6 +24,10 @@ export type ShopifyQlDataset = z.infer<typeof shopifyQlDatasetSchema>;
 export type ShopifyQlGrain = "day" | "week" | "month";
 
 const datasets: Record<ShopifyQlDataset, string> = {
+  // Same canonical sales columns as sales_trend, read as one provider
+  // aggregate row so totals and AOV are never locally re-derived.
+  sales_totals:
+    "FROM sales SHOW orders, gross_sales, discounts, returns, net_sales, shipping_charges, taxes, total_sales, average_order_value",
   sales_trend:
     "FROM sales SHOW orders, gross_sales, discounts, returns, net_sales, shipping_charges, taxes, total_sales, average_order_value",
   product_sales: "FROM sales SHOW gross_sales, net_sales, orders GROUP BY product_title",
@@ -69,13 +74,11 @@ export function buildShopifyQlQuery(input: {
 export const SHOPIFYQL_QUERY = `
   query ShopifyQl($query: String!) {
     shopifyqlQuery(query: $query) {
-      ... on TableResponse {
-        tableData {
-          columns { name dataType displayName }
-          rows
-        }
-      }
       parseErrors
+      tableData {
+        columns { name dataType }
+        rows
+      }
     }
   }
 `;

@@ -3,7 +3,13 @@ import { z } from "zod";
 import { isoInstantSchema } from "./primitives";
 import { readinessStateSchema } from "./readiness";
 
-export const sourceKeySchema = z.enum(["shopify", "klaviyo", "google_drive", "google_sheets"]);
+export const sourceKeySchema = z.enum([
+  "shopify",
+  "klaviyo",
+  "google_drive",
+  "google_sheets",
+  "manual_workbook",
+]);
 export const completenessSchema = z.enum(["complete", "partial", "unknown"]);
 
 export const sourceStatusSchema = z

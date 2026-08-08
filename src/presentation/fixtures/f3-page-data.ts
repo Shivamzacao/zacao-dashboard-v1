@@ -3,10 +3,14 @@ import type {
   ChartDatum,
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
+import type {
+  DashboardPageDisplayData,
+  DisplayTableRow,
+} from "@/src/presentation/features/dashboard-pages/display-data";
 
-export type FixtureTableRow = Record<string, string | number | boolean | null>;
+export type FixtureTableRow = DisplayTableRow;
 
-export interface F3PageFixtureData {
+export interface F3PageFixtureData extends DashboardPageDisplayData {
   readonly environment: "test";
   readonly synthetic: true;
   readonly currentValues: Readonly<Record<string, MetricDisplayValue>>;
@@ -19,6 +23,30 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
   environment: "test",
   synthetic: true,
   currentValues: Object.freeze({
+    // DEC-015 activated the canonical revenue pass-through metrics; these are
+    // explicitly synthetic TEST values shaped like the provider aggregates.
+    "commerce.net_sales": { kind: "money", value: { currency: "USD", minorUnits: 1_425_000 } },
+    "commerce.orders": { kind: "count", value: 128 },
+    "commerce.average_order_value": {
+      kind: "money",
+      value: { currency: "USD", minorUnits: 11_133 },
+    },
+    "commerce.gross_sales": { kind: "money", value: { currency: "USD", minorUnits: 1_580_000 } },
+    "commerce.discounts": { kind: "money", value: { currency: "USD", minorUnits: -95_000 } },
+    "commerce.returns": { kind: "money", value: { currency: "USD", minorUnits: -60_000 } },
+    "commerce.total_sales": { kind: "money", value: { currency: "USD", minorUnits: 1_447_500 } },
+    "commerce.sales_trend": { kind: "money", value: { currency: "USD", minorUnits: 1_425_000 } },
+    "commerce.purchase_heatmap": { kind: "count", value: 128 },
+    "products.sales": { kind: "money", value: { currency: "USD", minorUnits: 1_425_000 } },
+    "customers.billing_geography": { kind: "count", value: 120 },
+    // DEC-016 activated channel, fulfillment, and product-mix defaults.
+    "commerce.native_channel_mix": {
+      kind: "money",
+      value: { currency: "USD", minorUnits: 1_425_000 },
+    },
+    "operations.fulfillment_summary": { kind: "count", value: 118 },
+    "products.mix": { kind: "rate_basis_points", value: 4_100 },
+    "quality.unclassified_channel": { kind: "count", value: 3 },
     "customers.returning_rate": { kind: "rate_basis_points", value: 3840 },
     "customers.new_count": { kind: "count", value: 41 },
     "customers.returning_count": { kind: "count", value: 26 },
@@ -33,6 +61,41 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
     "quality.sop_validation": { kind: "status", value: "Source pending" },
   } as const),
   chartData: Object.freeze({
+    "commerce.native_channel_mix": [
+      { key: "online", label: "Online Store", value: 11800 },
+      { key: "pos", label: "Point of Sale", value: 1900 },
+      { key: "unclassified", label: "Unclassified", value: 550 },
+    ],
+    "operations.fulfillment_summary": [
+      { key: "fulfilled", label: "Fulfilled", value: 118 },
+      { key: "shipped", label: "Shipped", value: 112 },
+      { key: "delivered", label: "Delivered", value: 96 },
+    ],
+    "products.mix": [
+      { key: "dark", label: "Dark 70%", value: 41 },
+      { key: "smooth", label: "Smooth 42%", value: 37 },
+      { key: "gift", label: "Gift pack", value: 22 },
+    ],
+    "commerce.sales_trend": [
+      { key: "may", label: "May", value: 4200 },
+      { key: "jun", label: "Jun", value: 4850 },
+      { key: "jul", label: "Jul", value: 5200 },
+    ],
+    "commerce.purchase_heatmap": [
+      { key: "fri-13", label: "Fri 13:00", value: 18 },
+      { key: "sat-10", label: "Sat 10:00", value: 24 },
+      { key: "sun-16", label: "Sun 16:00", value: 15 },
+    ],
+    "products.sales": [
+      { key: "dark", label: "Dark 70%", value: 6400 },
+      { key: "smooth", label: "Smooth 42%", value: 5300 },
+      { key: "gift", label: "Gift pack", value: 2550 },
+    ],
+    "customers.billing_geography": [
+      { key: "ny", label: "New York, United States", value: 64 },
+      { key: "ca", label: "California, United States", value: 31 },
+      { key: "on", label: "Ontario, Canada", value: 25 },
+    ],
     "products.units_sold": [
       { key: "dark", label: "Dark 70%", value: 52 },
       { key: "smooth", label: "Smooth 42%", value: 44 },

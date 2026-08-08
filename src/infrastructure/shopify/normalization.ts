@@ -144,7 +144,7 @@ const providerOrderSchema = z.object({
   currentTotalDiscountsSet: providerMoneySetSchema,
   currentShippingPriceSet: providerMoneySetSchema,
   currentTotalTaxSet: providerMoneySetSchema,
-  currentTotalRefundedSet: providerMoneySetSchema,
+  totalRefundedSet: providerMoneySetSchema,
   netPaymentSet: providerMoneySetSchema,
   refunds: z.array(providerRefundSchema),
   fulfillments: z.array(providerFulfillmentSchema),
@@ -171,7 +171,7 @@ export function normalizeOrder(value: unknown) {
     discounts: normalizeShopifyMoneySet(order.currentTotalDiscountsSet),
     shipping: normalizeShopifyMoneySet(order.currentShippingPriceSet),
     taxes: normalizeShopifyMoneySet(order.currentTotalTaxSet),
-    refunded: normalizeShopifyMoneySet(order.currentTotalRefundedSet),
+    refunded: normalizeShopifyMoneySet(order.totalRefundedSet),
     netPayment: normalizeShopifyMoneySet(order.netPaymentSet),
     refunds: order.refunds.map((refund) => ({
       id: normalizeShopifyId(refund.id),

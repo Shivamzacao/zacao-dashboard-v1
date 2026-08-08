@@ -4,7 +4,11 @@ import Link from "next/link";
 import { useRef } from "react";
 
 import { ShellIcon } from "./shell-icon";
-import { dashboardRoutes, isDashboardRouteActive } from "@/src/presentation/shell/routes";
+import {
+  dashboardRoutes,
+  isDashboardRouteActive,
+  utilityRoutes,
+} from "@/src/presentation/shell/routes";
 
 interface SidebarNavigationProps {
   readonly pathname: string;
@@ -72,6 +76,23 @@ export function SidebarNavigation({ pathname, query, onNavigate }: SidebarNaviga
             </li>
           );
         })}
+      </ul>
+      <p className="sidebar-section-label">Data</p>
+      <ul className="sidebar-navigation-list">
+        {utilityRoutes.map((route) => (
+          <li key={route.href}>
+            <Link
+              data-dashboard-nav-link
+              className="sidebar-navigation-link"
+              href={route.href}
+              aria-current={isDashboardRouteActive(pathname, route.href) ? "page" : undefined}
+              {...(onNavigate ? { onClick: onNavigate } : {})}
+            >
+              <ShellIcon name={route.icon} />
+              <span>{route.title}</span>
+            </Link>
+          </li>
+        ))}
       </ul>
     </nav>
   );

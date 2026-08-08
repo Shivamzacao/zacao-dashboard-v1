@@ -8,9 +8,16 @@ interface DashboardSidebarProps {
   readonly pathname: string;
   readonly query: string;
   readonly onClose: () => void;
+  readonly dataMode?: "fixture" | "live";
 }
 
-export function DashboardSidebar({ open, pathname, query, onClose }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  open,
+  pathname,
+  query,
+  onClose,
+  dataMode = "fixture",
+}: DashboardSidebarProps) {
   return (
     <>
       <button
@@ -46,8 +53,17 @@ export function DashboardSidebar({ open, pathname, query, onClose }: DashboardSi
           <div className="sidebar-source-card">
             <span className="source-dot" />
             <span>
-              <strong>Synthetic TEST data</strong>
-              <small>B7 fixture validated</small>
+              {dataMode === "live" ? (
+                <>
+                  <strong>Live source data</strong>
+                  <small>Read-only connectors</small>
+                </>
+              ) : (
+                <>
+                  <strong>Synthetic TEST data</strong>
+                  <small>B7 fixture validated</small>
+                </>
+              )}
             </span>
           </div>
           <div className="internal-workspace">

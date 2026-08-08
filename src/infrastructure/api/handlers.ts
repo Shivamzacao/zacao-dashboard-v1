@@ -15,7 +15,13 @@ import {
 } from "@/src/application/api";
 import { CONTRACT_SCHEMA_VERSION } from "@/src/domain/contracts";
 
-import { DefaultBackendApiRuntime } from "./default-runtime";
+import { loadKlaviyoConfigurationOrNull } from "@/src/infrastructure/klaviyo/runtime";
+import { loadManualWorkbookConfigurationOrNull } from "@/src/infrastructure/manual-workbook/runtime";
+import { PostgresManualWorkbookStore } from "@/src/infrastructure/manual-workbook/store";
+import { loadShopifyRuntimeSettingsOrNull } from "@/src/infrastructure/shopify/runtime";
+
+import { createImportApiHandlers } from "./import-handlers";
+import { createBackendApiRuntime } from "./live-runtime";
 import { PRIVATE_API_HEADERS, problemResponse, successResponse } from "./serialization";
 
 function bypass(now: string) {
@@ -107,17 +113,41 @@ export function createApiHandlers(service: BackendApiService, now: () => Date) {
           throw new ApiQueryError("Readiness endpoint does not accept query parameters");
         const sources = await service.sourceStatuses();
         const timestamp = now().toISOString();
+        // Readiness reflects the live source probes. Production certification
+        // stays "deferred" until the B8/B9/I4 certification gates are run.
+        const unusable = sources.filter(({ state }) =>
+          ["error", "unavailable", "invalid"].includes(state),
+        );
+        const unconfigured = sources.filter(({ state }) => state === "not_configured");
+        const allConfiguredUsable = unusable.length === 0 && unconfigured.length === 0;
+        const readiness =
+          unusable.length > 0
+            ? {
+                state: "partial" as const,
+                message: `Configured sources are failing: ${unusable
+                  .map(({ source }) => source)
+                  .join(", ")}.`,
+                warningCodes: ["LIVE_SOURCE_FAILURE"],
+              }
+            : allConfiguredUsable
+              ? {
+                  state: "current" as const,
+                  message: "All sources are configured and answering read-only probes.",
+                  warningCodes: [],
+                }
+              : {
+                  state: "partial" as const,
+                  message: `Sources awaiting configuration: ${unconfigured
+                    .map(({ source }) => source)
+                    .join(", ")}.`,
+                  warningCodes: ["LIVE_CREDENTIAL_VERIFICATION_DEFERRED"],
+                };
         return successResponse({
           data: {
             application: "ready",
             frontendDevelopment: "ready",
             productionCertification: "deferred",
-            readiness: {
-              state: "not_configured",
-              message:
-                "Live source verification is deferred and does not block frontend development.",
-              warningCodes: ["LIVE_SOURCE_VERIFICATION_DEFERRED"],
-            },
+            readiness,
           },
           dataSchema: readinessApiDataSchema,
           cache: bypass(timestamp),
@@ -151,7 +181,27 @@ export function createApiHandlers(service: BackendApiService, now: () => Date) {
 }
 
 const now = () => new Date();
-export const apiHandlers = createApiHandlers(
-  new BackendApiService(new DefaultBackendApiRuntime(), now),
+
+function createManualWorkbookStore(): PostgresManualWorkbookStore | null {
+  try {
+    const configuration = loadManualWorkbookConfigurationOrNull();
+    return configuration ? new PostgresManualWorkbookStore(configuration) : null;
+  } catch {
+    // A malformed DATABASE_URL must not crash the API; the manual-workbook
+    // source simply stays not_configured and commits are refused.
+    return null;
+  }
+}
+
+export const manualWorkbookStore = createManualWorkbookStore();
+
+export const backendApiService = new BackendApiService(
+  createBackendApiRuntime({
+    shopify: loadShopifyRuntimeSettingsOrNull,
+    klaviyo: loadKlaviyoConfigurationOrNull,
+    manualWorkbookStore,
+  }),
   now,
 );
+export const apiHandlers = createApiHandlers(backendApiService, now);
+export const importApiHandlers = createImportApiHandlers({ store: manualWorkbookStore, now });

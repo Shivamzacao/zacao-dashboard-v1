@@ -14,9 +14,11 @@ function formatDataAsOf(source: SourceStatus | undefined): string {
 interface PageHeaderProps {
   readonly route: DashboardRouteDefinition;
   readonly source: SourceStatus | undefined;
+  readonly dataMode?: "fixture" | "live";
 }
 
-export function PageHeader({ route, source }: PageHeaderProps) {
+export function PageHeader({ route, source, dataMode = "fixture" }: PageHeaderProps) {
+  const label = dataMode === "live" ? "Live data" : "TEST fixture";
   return (
     <header className="page-heading">
       <div>
@@ -24,9 +26,18 @@ export function PageHeader({ route, source }: PageHeaderProps) {
         <h1>{route.title}</h1>
         <p className="page-description">{route.description}</p>
       </div>
-      <div className="freshness-pill" aria-label="Synthetic TEST data freshness">
+      <div
+        className="freshness-pill"
+        aria-label={dataMode === "live" ? "Live data freshness" : "Synthetic TEST data freshness"}
+      >
         <span className="freshness-dot" />
-        <span>TEST fixture · data as of {formatDataAsOf(source)}</span>
+        {/* Keep the label and date as two text nodes exactly like the F3
+            baseline; extra node splits shift text shaping by a pixel and
+            break the approved visual-regression snapshots. */}
+        <span>
+          {`${label} · data as of `}
+          {formatDataAsOf(source)}
+        </span>
       </div>
     </header>
   );

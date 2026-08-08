@@ -31,8 +31,7 @@ import {
   ExportStatus,
   type ExportState,
 } from "@/src/presentation/components/dashboard/export-status.client";
-import type { F3PageFixtureData, FixtureTableRow } from "@/src/presentation/fixtures/f3-page-data";
-
+import type { DashboardPageDisplayData, DisplayTableRow } from "./display-data";
 import type { DashboardPageSpec, PageChartSpec, PageTableSpec } from "./page-specs";
 
 const catalog = new Map(metricCatalog.map((metric) => [metric.key, metric]));
@@ -43,7 +42,11 @@ function requiredMetric(key: string): MetricCatalogEntry {
   return metric;
 }
 
-function metricState(metric: MetricCatalogEntry, fixture: F3PageFixtureData): DisplayState {
+function metricState(metric: MetricCatalogEntry, fixture: DashboardPageDisplayData): DisplayState {
+  // Live data carries certified per-metric readiness; fixtures fall back to
+  // catalog-derived inference so Phase 2 snapshots stay byte-identical.
+  const liveState = fixture.states?.[metric.key];
+  if (liveState) return liveState;
   if (fixture.currentValues[metric.key]) return "current";
   if (metric.status === "BUSINESS_RULE_REQUIRED") return "business_rule_required";
   if (metric.status === "SOURCE_LIMITED") return "source_limited";
@@ -53,12 +56,17 @@ function metricState(metric: MetricCatalogEntry, fixture: F3PageFixtureData): Di
   return "no_activity";
 }
 
-function stateReason(metric: MetricCatalogEntry): string {
+function stateReason(metric: MetricCatalogEntry, fixture: DashboardPageDisplayData): string {
+  const liveReason = fixture.stateReasons?.[metric.key];
+  if (liveReason) return liveReason;
   if (metric.status === "NOT_V1") return "This capability is outside the approved V1 scope.";
-  return metric.blockingReason ?? "No validated TEST records are available for this metric.";
+  if (fixture.synthetic) {
+    return metric.blockingReason ?? "No validated TEST records are available for this metric.";
+  }
+  return metric.blockingReason ?? "No genuine activity in the selected period.";
 }
 
-function kpi(metricKey: string, fixture: F3PageFixtureData): KpiDisplayModel {
+function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayModel {
   const metric = requiredMetric(metricKey);
   const value = fixture.currentValues[metricKey] ?? null;
   return {
@@ -66,8 +74,11 @@ function kpi(metricKey: string, fixture: F3PageFixtureData): KpiDisplayModel {
     value,
     state: metricState(metric, fixture),
     helpText: `${metric.sources}. ${metric.calculation}`,
-    ...(!value ? { unavailableReason: stateReason(metric) } : {}),
-    ...(value && ["count", "quantity", "rate_basis_points"].includes(value.kind)
+    ...(!value ? { unavailableReason: stateReason(metric, fixture) } : {}),
+    // Sparklines are illustrative and only ever shown on synthetic fixtures.
+    ...(fixture.synthetic &&
+    value &&
+    ["count", "quantity", "rate_basis_points"].includes(value.kind)
       ? { sparkline: [6, 8, 7, 10, 9, 12] }
       : {}),
   };
@@ -78,7 +89,7 @@ function Chart({
   fixture,
 }: {
   readonly spec: PageChartSpec;
-  readonly fixture: F3PageFixtureData;
+  readonly fixture: DashboardPageDisplayData;
 }) {
   const metric = requiredMetric(spec.metricKey);
   const state = metricState(metric, fixture);
@@ -111,7 +122,7 @@ function Chart({
   );
 }
 
-function csv(rows: readonly FixtureTableRow[]): string {
+function csv(rows: readonly DisplayTableRow[]): string {
   const columns = rows.length ? Object.keys(rows[0] ?? {}) : [];
   return [
     columns.join(","),
@@ -124,13 +135,13 @@ function TableCard({
   fixture,
 }: {
   readonly spec: PageTableSpec;
-  readonly fixture: F3PageFixtureData;
+  readonly fixture: DashboardPageDisplayData;
 }) {
   const metric = requiredMetric(spec.metricKey);
   const state = metricState(metric, fixture);
   const rows = spec.dataset ? (fixture.rowsByDataset[spec.dataset] ?? []) : [];
   const first = rows[0];
-  const columns: readonly DashboardTableColumn<FixtureTableRow>[] = first
+  const columns: readonly DashboardTableColumn<DisplayTableRow>[] = first
     ? Object.keys(first).map((key) => ({
         key,
         label: key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase()),
@@ -138,7 +149,7 @@ function TableCard({
         numeric: typeof first[key] === "number",
       }))
     : [];
-  const [openRow, setOpenRow] = useState<FixtureTableRow | null>(null);
+  const [openRow, setOpenRow] = useState<DisplayTableRow | null>(null);
   const [exportState, setExportState] = useState<ExportState>(rows.length ? "idle" : "unsupported");
   const tableState: DisplayState = rows.length ? "current" : state;
 
@@ -149,7 +160,7 @@ function TableCard({
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${spec.dataset}-synthetic-test.csv`;
+    link.download = `${spec.dataset}${fixture.synthetic ? "-synthetic-test" : ""}.csv`;
     link.click();
     URL.revokeObjectURL(url);
     setExportState("success");
@@ -202,7 +213,7 @@ export function DashboardPageView({
   fixture,
 }: {
   readonly spec: DashboardPageSpec;
-  readonly fixture: F3PageFixtureData;
+  readonly fixture: DashboardPageDisplayData;
 }) {
   return (
     <div className={`intelligence-page intelligence-${spec.slug}`} data-page={spec.slug}>

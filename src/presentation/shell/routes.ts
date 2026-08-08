@@ -11,7 +11,8 @@ export type ShellIconName =
   | "marketing"
   | "growth"
   | "financial"
-  | "insights";
+  | "insights"
+  | "import";
 
 export interface DashboardRouteDefinition {
   readonly slug: DashboardSlug;
@@ -101,6 +102,21 @@ export const dashboardRoutes = Object.freeze([
     "Deterministic alerts, source readiness, and data-quality evidence.",
   ),
 ] satisfies readonly DashboardRouteDefinition[]);
+
+export interface UtilityRouteDefinition {
+  readonly href: string;
+  readonly title: string;
+  readonly icon: ShellIconName;
+}
+
+/**
+ * Non-dashboard shell destinations. Kept separate from `dashboardRoutes`
+ * because those are typed to approved dashboard slugs and drive the metric
+ * catalog; utility pages carry no metrics or sections.
+ */
+export const utilityRoutes: readonly UtilityRouteDefinition[] = Object.freeze([
+  Object.freeze({ href: "/import", title: "Data import", icon: "import" as const }),
+]);
 
 export function dashboardRouteBySlug(slug: string): DashboardRouteDefinition | undefined {
   return dashboardRoutes.find((item) => item.slug === slug);

@@ -809,7 +809,10 @@ select {
   width: var(--sidebar-width);
   flex-direction: column;
   padding: 24px 16px 18px;
-  overflow: hidden;
+  /* Scroll the whole rail when navigation groups exceed the viewport so no
+     destination is ever unreachable on short screens. */
+  overflow-x: hidden;
+  overflow-y: auto;
   color: var(--cream);
   background: var(--sidebar);
 }
@@ -891,6 +894,12 @@ select {
 .sidebar-navigation {
   min-height: 0;
   margin-top: 25px;
+  flex: 0 0 auto;
+}
+
+/* Spacing before a second navigation group (for example Data). */
+.sidebar-navigation-list + .sidebar-section-label {
+  margin-top: 20px;
 }
 
 .sidebar-section-label {
@@ -1575,4 +1584,92 @@ select {
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
   }
+}
+
+/* Data import page */
+.data-import-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.import-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.import-file-row input[type="file"] {
+  font-size: 12px;
+  color: var(--forest-dark);
+}
+.import-file-name {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--forest-dark);
+}
+.import-save-button {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--paper);
+  background: var(--forest-dark);
+  font-size: 11px;
+  font-weight: 650;
+}
+.import-save-button:disabled {
+  opacity: 0.45;
+  color: var(--forest-dark);
+  background: var(--paper);
+}
+.import-problem {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--terracotta, #b4553c);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.import-problem strong {
+  display: block;
+  margin-bottom: 4px;
+}
+.import-problem ul {
+  margin: 6px 0 0 16px;
+  font-size: 11px;
+}
+.import-tab-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.import-tab-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+.import-tab-item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.import-tab-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  cursor: pointer;
+}
+.import-tab-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--forest-dark);
+}
+.import-tab-counts {
+  font-size: 11px;
+  color: var(--forest-dark);
+  opacity: 0.75;
 }

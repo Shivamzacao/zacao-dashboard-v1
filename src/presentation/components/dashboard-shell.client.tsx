@@ -16,12 +16,14 @@ interface DashboardShellClientProps {
   readonly children: React.ReactNode;
   readonly supportedFilters: FilterOptions;
   readonly today: IsoDate;
+  readonly dataMode?: "fixture" | "live";
 }
 
 export function DashboardShellClient({
   children,
   supportedFilters,
   today,
+  dataMode = "fixture",
 }: DashboardShellClientProps) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const pathname = usePathname();
@@ -58,6 +60,7 @@ export function DashboardShellClient({
           pathname={pathname}
           query={state.query}
           onClose={closeNavigation}
+          dataMode={dataMode}
         />
       </div>
       <div className="dashboard-main">

@@ -13,7 +13,9 @@ const trackedFiles = execFileSync(
 
 const patterns = [
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
-  /(?:SHOPIFY_ADMIN_ACCESS_TOKEN|KLAVIYO_PRIVATE_API_KEY|GOOGLE_PRIVATE_KEY|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL)\s*=\s*[^\s#][^\n]*/,
+  // Horizontal-only whitespace: `\s*` would span the newline after an empty
+  // `KEY=` placeholder and match the following line's name as its "value".
+  /(?:SHOPIFY_ADMIN_ACCESS_TOKEN|KLAVIYO_PRIVATE_API_KEY|SHOPIFY_CLIENT_SECRET|GOOGLE_PRIVATE_KEY|SUPABASE_SERVICE_ROLE_KEY|DATABASE_URL|DATABASE_MIGRATE_URL)[^\S\n]*=[^\S\n]*[^\s#][^\n]*/,
   /\bshpat_[A-Za-z0-9]{20,}\b/,
   /\bpk_[A-Za-z0-9]{20,}\b/,
 ];

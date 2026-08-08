@@ -151,12 +151,8 @@ describe("Klaviyo Future-Ready Core adapter", () => {
       data: {
         type: "metric-aggregate",
         attributes: {
-          data: [
-            {
-              dates: ["2026-08-01T04:00:00Z"],
-              measurements: { count: [0], unique: [0], sum_value: [0] },
-            },
-          ],
+          dates: ["2026-08-01T04:00:00Z"],
+          data: [{ measurements: { count: [0], unique: [0], sum_value: [0] } }],
         },
       },
     });
@@ -176,12 +172,8 @@ describe("Klaviyo Future-Ready Core adapter", () => {
       data: {
         type: "metric-aggregate",
         attributes: {
-          data: [
-            {
-              dates: ["2026-08-01T04:00:00Z"],
-              measurements: { count: [4], unique: [3], sum_value: [0] },
-            },
-          ],
+          dates: ["2026-08-01T04:00:00Z"],
+          data: [{ measurements: { count: [4], unique: [3], sum_value: [0] } }],
         },
       },
     });

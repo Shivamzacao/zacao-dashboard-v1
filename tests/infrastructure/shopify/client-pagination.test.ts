@@ -8,12 +8,15 @@ import {
 
 const configuration = {
   storeDomain: "example-store.myshopify.com",
-  adminAccessToken: "sanitized-test-token",
   apiVersion: "2026-07",
   grantedScopes: [...REQUIRED_SHOPIFY_READ_SCOPES],
   timeoutMs: 5_000,
   maxRetries: 2,
 };
+
+function staticAccessToken(token = "sanitized-test-token") {
+  return { getToken: async () => token, invalidate: () => undefined };
+}
 
 function response(body: unknown, status = 200, requestId = "request-1"): Response {
   return new Response(JSON.stringify(body), {
@@ -38,7 +41,7 @@ describe("Shopify GraphQL client", () => {
         },
       }),
     );
-    const client = new ShopifyGraphQlClient(configuration, {
+    const client = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
       fetch: fetchMock,
       sleep: vi.fn().mockResolvedValue(undefined),
     });
@@ -65,7 +68,7 @@ describe("Shopify GraphQL client", () => {
       .mockResolvedValueOnce(response({}, 429))
       .mockResolvedValueOnce(response({}, 503))
       .mockResolvedValueOnce(response({ data: { shop: { name: "Zacao" } } }));
-    const retryingClient = new ShopifyGraphQlClient(configuration, {
+    const retryingClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
       fetch: retryingFetch,
       sleep,
     });
@@ -75,8 +78,26 @@ describe("Shopify GraphQL client", () => {
     expect(retryingFetch).toHaveBeenCalledTimes(3);
     expect(sleep).toHaveBeenCalledTimes(2);
 
+    // A ShopifyQL cost-budget rejection arrives as HTTP 200 with a GraphQL
+    // error; it must be retried after a long throttle pause, never failed.
+    const throttledSleep = vi.fn().mockResolvedValue(undefined);
+    const throttledFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        response({ data: {}, errors: [{ message: "Rate limited. Please retry later." }] }),
+      )
+      .mockResolvedValueOnce(response({ data: { shop: { name: "Zacao" } } }));
+    const throttledClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
+      fetch: throttledFetch,
+      sleep: throttledSleep,
+    });
+    await expect(
+      throttledClient.execute({ document: "query Shop { shop { name } }" }),
+    ).resolves.toMatchObject({ data: { shop: { name: "Zacao" } } });
+    expect(throttledSleep).toHaveBeenCalledWith(10_000);
+
     const forbiddenFetch = vi.fn<typeof fetch>().mockResolvedValue(response({}, 403));
-    const forbiddenClient = new ShopifyGraphQlClient(configuration, {
+    const forbiddenClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
       fetch: forbiddenFetch,
       sleep,
     });
@@ -94,6 +115,7 @@ describe("Shopify GraphQL client", () => {
     for (const testCase of cases) {
       const client = new ShopifyGraphQlClient(
         { ...configuration, maxRetries: 0 },
+        staticAccessToken(),
         { fetch: vi.fn<typeof fetch>().mockRejectedValue(testCase.failure) },
       );
       await expect(
@@ -103,6 +125,7 @@ describe("Shopify GraphQL client", () => {
 
     const malformedClient = new ShopifyGraphQlClient(
       { ...configuration, maxRetries: 0 },
+      staticAccessToken(),
       { fetch: vi.fn<typeof fetch>().mockResolvedValue(new Response("not-json")) },
     );
     await expect(
@@ -111,6 +134,7 @@ describe("Shopify GraphQL client", () => {
 
     const graphqlClient = new ShopifyGraphQlClient(
       { ...configuration, maxRetries: 0 },
+      staticAccessToken(),
       {
         fetch: vi
           .fn<typeof fetch>()
@@ -125,6 +149,7 @@ describe("Shopify GraphQL client", () => {
     controller.abort();
     const cancelledClient = new ShopifyGraphQlClient(
       { ...configuration, maxRetries: 0 },
+      staticAccessToken(),
       { fetch: vi.fn<typeof fetch>().mockRejectedValue(new DOMException("aborted", "AbortError")) },
     );
     await expect(

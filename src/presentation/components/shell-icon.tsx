@@ -84,6 +84,13 @@ export function ShellIcon({ name, size = 18 }: ShellIconProps) {
         <path d="m19 15 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z" />
       </svg>
     );
+  if (name === "import")
+    return (
+      <svg {...common}>
+        <path d="M12 3v10M8 9l4 4 4-4" />
+        <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+      </svg>
+    );
   if (name === "calendar")
     return (
       <svg {...common}>
