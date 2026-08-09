@@ -84,6 +84,14 @@ function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayMo
   };
 }
 
+function chartValueFormat(
+  valueKind: MetricCatalogEntry["valueKind"],
+): "money" | "percent" | "count" {
+  if (valueKind === "money") return "money";
+  if (valueKind === "rate_basis_points") return "percent";
+  return "count";
+}
+
 function Chart({
   spec,
   fixture,
@@ -94,7 +102,13 @@ function Chart({
   const metric = requiredMetric(spec.metricKey);
   const state = metricState(metric, fixture);
   const data = fixture.chartData[spec.metricKey] ?? null;
-  const props = { title: spec.title, summary: spec.description, data, state };
+  const props = {
+    title: spec.title,
+    summary: spec.description,
+    data,
+    state,
+    valueFormat: chartValueFormat(metric.valueKind),
+  };
   const series = spec.secondaryMetricKey
     ? [
         { key: "value" as const, label: metric.label, tone: "forest" as const },

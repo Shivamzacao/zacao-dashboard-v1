@@ -31,6 +31,28 @@ import { StateSurface } from "./state-surface";
 
 const tones = { forest: "#005d45", gold: "#c8a86b", terracotta: "#b5532f" } as const;
 
+export type ChartValueFormat = "money" | "percent" | "count";
+
+const tickFormatters: Record<ChartValueFormat, (value: number) => string> = {
+  money: (value) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      notation: Math.abs(value) >= 1000 ? "compact" : "standard",
+      maximumFractionDigits: Math.abs(value) >= 1000 ? 1 : 0,
+    }).format(value),
+  percent: (value) => `${value}%`,
+  count: (value) => new Intl.NumberFormat("en-US").format(value),
+};
+
+const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
+  money: (value) =>
+    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value),
+  percent: (value) =>
+    `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)}%`,
+  count: (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value),
+};
+
 interface BaseChartProps {
   readonly title: string;
   readonly summary: string;
@@ -38,6 +60,7 @@ interface BaseChartProps {
   readonly state?: DisplayState;
   readonly height?: number;
   readonly legend?: readonly LegendItem[];
+  readonly valueFormat?: ChartValueFormat;
 }
 
 interface SeriesChartProps extends BaseChartProps {
@@ -51,6 +74,7 @@ function ChartFrame({
   state = "current",
   height = 260,
   legend,
+  valueFormat = "count",
   children,
 }: BaseChartProps & { readonly children: React.ReactNode }) {
   const usableData = data?.filter((item) => item.value !== null) ?? [];
@@ -69,7 +93,7 @@ function ChartFrame({
           <div className="chart-visual" aria-hidden="true">
             {children}
           </div>
-          <AccessibleChartTable title={title} data={data ?? []} />
+          <AccessibleChartTable title={title} data={data ?? []} valueFormat={valueFormat} />
         </>
       ) : (
         <StateSurface state={dataState === "current" ? "empty" : dataState} />
@@ -88,10 +112,14 @@ function slug(value: string): string {
 function AccessibleChartTable({
   title,
   data,
+  valueFormat,
 }: {
   readonly title: string;
   readonly data: readonly ChartDatum[];
+  readonly valueFormat: ChartValueFormat;
 }) {
+  const format = (value: number | null | undefined) =>
+    value === null || value === undefined ? "Unavailable" : valueFormatters[valueFormat](value);
   return (
     <table className="sr-only">
       <caption>{title} data</caption>
@@ -106,8 +134,8 @@ function AccessibleChartTable({
         {data.map((item) => (
           <tr key={item.key}>
             <th scope="row">{item.label}</th>
-            <td>{item.value ?? "Unavailable"}</td>
-            <td>{item.secondaryValue ?? "Unavailable"}</td>
+            <td>{format(item.value)}</td>
+            <td>{format(item.secondaryValue)}</td>
           </tr>
         ))}
       </tbody>
@@ -129,6 +157,7 @@ const commonAxis = {
 
 export function LineChartView(props: SeriesChartProps) {
   const series = seriesOrDefault(props.series);
+  const format = props.valueFormat ?? "count";
   return (
     <ChartFrame {...props}>
       <ResponsiveContainer width="100%" height="100%">
@@ -139,13 +168,18 @@ export function LineChartView(props: SeriesChartProps) {
         >
           <CartesianGrid stroke="#e7e9e2" vertical={false} />
           <XAxis dataKey="label" {...commonAxis} />
-          <YAxis {...commonAxis} width={42} />
+          <YAxis
+            {...commonAxis}
+            width={format === "money" ? 56 : 42}
+            tickFormatter={tickFormatters[format]}
+          />
           <RechartsTooltip
             contentStyle={{
               border: "1px solid #e7e9e2",
               borderRadius: 9,
               boxShadow: "0 10px 32px #12342c14",
             }}
+            formatter={(value) => valueFormatters[format](Number(value))}
           />
           {series.map((item) => (
             <Line
@@ -168,6 +202,7 @@ export function LineChartView(props: SeriesChartProps) {
 
 export function AreaChartView(props: SeriesChartProps) {
   const series = seriesOrDefault(props.series);
+  const format = props.valueFormat ?? "count";
   return (
     <ChartFrame {...props}>
       <ResponsiveContainer width="100%" height="100%">
@@ -178,8 +213,12 @@ export function AreaChartView(props: SeriesChartProps) {
         >
           <CartesianGrid stroke="#e7e9e2" vertical={false} />
           <XAxis dataKey="label" {...commonAxis} />
-          <YAxis {...commonAxis} width={42} />
-          <RechartsTooltip />
+          <YAxis
+            {...commonAxis}
+            width={format === "money" ? 56 : 42}
+            tickFormatter={tickFormatters[format]}
+          />
+          <RechartsTooltip formatter={(value) => valueFormatters[format](Number(value))} />
           {series.map((item) => (
             <Area
               key={item.key}
@@ -203,15 +242,21 @@ function BarChartView(
   props: SeriesChartProps & { readonly horizontal?: boolean; readonly stacked?: boolean },
 ) {
   const series = seriesOrDefault(props.series);
+  const format = props.valueFormat ?? "count";
   const xAxis = props.horizontal ? (
-    <XAxis {...commonAxis} type="number" />
+    <XAxis {...commonAxis} type="number" tickFormatter={tickFormatters[format]} />
   ) : (
     <XAxis {...commonAxis} type="category" dataKey="label" />
   );
   const yAxis = props.horizontal ? (
     <YAxis {...commonAxis} width={74} type="category" dataKey="label" />
   ) : (
-    <YAxis {...commonAxis} width={42} type="number" />
+    <YAxis
+      {...commonAxis}
+      width={format === "money" ? 56 : 42}
+      type="number"
+      tickFormatter={tickFormatters[format]}
+    />
   );
   return (
     <ChartFrame {...props}>
@@ -229,7 +274,7 @@ function BarChartView(
           />
           {xAxis}
           {yAxis}
-          <RechartsTooltip />
+          <RechartsTooltip formatter={(value) => valueFormatters[format](Number(value))} />
           {series.map((item) =>
             props.stacked ? (
               <Bar
@@ -270,6 +315,7 @@ export function StackedBarChartView(props: SeriesChartProps) {
 
 export function DonutChartView(props: BaseChartProps) {
   const palette = [tones.forest, tones.gold, tones.terracotta, "#6c7b75"];
+  const format = props.valueFormat ?? "count";
   return (
     <ChartFrame {...props}>
       <ResponsiveContainer width="100%" height="100%">
@@ -288,7 +334,7 @@ export function DonutChartView(props: BaseChartProps) {
               <Cell key={item.key} fill={palette[index % palette.length] ?? tones.forest} />
             ))}
           </Pie>
-          <RechartsTooltip />
+          <RechartsTooltip formatter={(value) => valueFormatters[format](Number(value))} />
         </PieChart>
       </ResponsiveContainer>
     </ChartFrame>
@@ -296,11 +342,12 @@ export function DonutChartView(props: BaseChartProps) {
 }
 
 export function FunnelChartView(props: BaseChartProps) {
+  const format = props.valueFormat ?? "count";
   return (
     <ChartFrame {...props}>
       <ResponsiveContainer width="100%" height="100%">
         <FunnelChart accessibilityLayer={false}>
-          <RechartsTooltip />
+          <RechartsTooltip formatter={(value) => valueFormatters[format](Number(value))} />
           <Funnel dataKey="value" data={props.data ?? []} isAnimationActive={false}>
             <LabelList position="right" fill="#1b2925" stroke="none" dataKey="label" />
             {(props.data ?? []).map((item, index) => (
@@ -320,6 +367,7 @@ export function FunnelChartView(props: BaseChartProps) {
 
 export function HeatmapChartView(props: BaseChartProps) {
   const max = Math.max(...(props.data ?? []).map((item) => Math.abs(item.value ?? 0)), 1);
+  const format = props.valueFormat ?? "count";
   return (
     <ChartFrame {...props}>
       <div className="heatmap-grid">
@@ -334,7 +382,7 @@ export function HeatmapChartView(props: BaseChartProps) {
             }
           >
             <span>{item.label}</span>
-            <strong>{item.value ?? "—"}</strong>
+            <strong>{item.value === null ? "—" : valueFormatters[format](item.value)}</strong>
           </div>
         ))}
       </div>

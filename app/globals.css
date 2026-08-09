@@ -38,6 +38,12 @@
   --danger: #b34d3d;
   --font-ui: "Avenir Next", Avenir, "Helvetica Neue", Arial, sans-serif;
   --font-display: Georgia, "Times New Roman", serif;
+  /* Numeric companion to --font-display. Georgia ships only old-style figures
+     (6/8 ride above the baseline, 3/4/5/7/9 dip below) and has no `lnum`
+     feature to switch off, so figures never line up across cards. Charter is
+     the closest sibling face that has lining figures; Times New Roman covers
+     platforms without Charter. Use this for any displayed number. */
+  --font-numeric: Charter, "Bitstream Charter", "Times New Roman", Georgia, serif;
   --sidebar-width: 260px;
   --topbar-height: 70px;
   --control-height: 35px;
@@ -153,7 +159,10 @@ select {
 }
 .kpi-card-label-row {
   display: flex;
-  min-height: 20px;
+  /* Reserves room for a two-line label so the value line below sits at the
+     same height across every card in a row, even when one label wraps and
+     its neighbors don't. */
+  min-height: 32px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
@@ -163,6 +172,7 @@ select {
   color: var(--forest-dark);
   font-size: 11px;
   font-weight: 650;
+  line-height: 15px;
   letter-spacing: 0.2px;
 }
 .help-marker {
@@ -180,8 +190,8 @@ select {
   margin: 13px 0 14px;
   overflow: hidden;
   color: var(--forest-deep);
-  font: 400 28px/1 var(--font-display);
-  font-variant-numeric: tabular-nums;
+  font: 400 28px/1 var(--font-numeric);
+  font-variant-numeric: lining-nums tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -405,7 +415,8 @@ select {
   background: var(--cream-soft);
 }
 .trend-comparison strong {
-  font: 500 18px/1 var(--font-display);
+  font: 500 18px/1 var(--font-numeric);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .trend-comparison span {
   color: var(--muted);
@@ -484,8 +495,8 @@ select {
   font-size: 9px;
 }
 .heatmap-cell strong {
-  font: 500 15px/1 var(--font-display);
-  font-variant-numeric: tabular-nums;
+  font: 500 15px/1 var(--font-numeric);
+  font-variant-numeric: lining-nums tabular-nums;
 }
 
 .tooltip-root {
@@ -556,7 +567,7 @@ select {
 }
 .numeric-cell {
   text-align: right !important;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
 }
 .sort-control {
   display: inline-flex;
