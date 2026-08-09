@@ -392,90 +392,142 @@ export function DonutChartView(props: BaseChartProps) {
   );
 }
 
-/** Progression ramp: entry green through to the converting stage. */
-const funnelRamp = ["#005d45", "#15835f", "#3f9e7c", "#c8a86b", "#b5532f"] as const;
+/**
+ * One hue per stage rather than a ramp of near-identical greens: the bands sit
+ * edge to edge, so neighbours have to be told apart at a glance. Every colour
+ * clears 4.5:1 against the white value printed on it.
+ */
+const funnelPalette = [
+  "#005d45",
+  "#0f7f6c",
+  "#2f6f9f",
+  "#7a5aa8",
+  "#8f6a15",
+  "#b5532f",
+  "#5d6b65",
+] as const;
+
+function stageColour(index: number): string {
+  return funnelPalette[index % funnelPalette.length] ?? funnelPalette[0];
+}
 
 function stageShare(value: number, reference: number): number {
   return reference > 0 ? value / reference : 0;
 }
 
-/**
- * Narrowest a band may draw, as a share of the entry stage. Real funnels span
- * two orders of magnitude (6,210 sessions to 67 checkouts), so the closing
- * stages would otherwise taper to a sub-pixel line. The floor keeps the
- * silhouette continuous; the exact counts sit beside every band.
- */
-const FUNNEL_MINIMUM_SHARE = 0.07;
+/** Width the closing edge tapers to, as a share of the entry band. */
+const FUNNEL_TIP_SHARE = 0.14;
 
 /**
- * A funnel silhouette beside a readable stage column. The polygon carries the
- * shape — where the drop-off happens — while the counts and step-over-step
- * conversion live in text, because at this data's range no width encoding can
- * be both proportional and legible for the closing stages.
+ * How much of each edge width comes from the data rather than from a fixed
+ * cone. A purely proportional funnel collapses once the stages span two orders
+ * of magnitude (1,280 sessions to 18 orders): every closing stage lands on the
+ * same sub-pixel floor, and the bands draw as straight vertical sides instead
+ * of a taper. Blending with a cone keeps each band strictly narrower than the
+ * one above it, so the silhouette always reads as a funnel; the exact counts
+ * and the step-over-step conversion sit on every band.
+ */
+const FUNNEL_DATA_WEIGHT = 0.45;
+
+/**
+ * Edge widths, as shares of the frame, from the entry band's top edge down to
+ * the tip — one more entry than there are stages, since band `i` spans edges
+ * `i` and `i + 1`.
+ */
+function funnelEdges(stages: readonly ChartDatum[]): readonly number[] {
+  const entry = stages[0]?.value ?? 0;
+  let ceiling = 1;
+  const shares = stages.map((item) => {
+    // Clamp non-monotone data: no stage may draw wider than the one above it.
+    ceiling = Math.min(ceiling, stageShare(Math.abs(item.value ?? 0), entry));
+    return ceiling;
+  });
+  const closing = (shares[shares.length - 1] ?? 0) / 2;
+  return [...shares, closing].map((share, index) => {
+    const cone = 1 - (index / stages.length) * (1 - FUNNEL_TIP_SHARE);
+    return FUNNEL_DATA_WEIGHT * share + (1 - FUNNEL_DATA_WEIGHT) * cone;
+  });
+}
+
+/**
+ * Whether a band is wide enough to carry its own value. Narrow closing bands
+ * print the count beside the shape instead, where it cannot be clipped.
+ */
+function bandFitsValue(midWidth: number, text: string): boolean {
+  return midWidth >= text.length * 3.4 + 10;
+}
+
+/**
+ * The count for a band too narrow to carry it, printed just past the taper.
+ * `edge` is the band's widest side, so the box clears the shape at every
+ * height rather than only where the two meet. The start is capped and the box
+ * bounded by the space beside it, so a long money value is ellipsised inside
+ * the frame instead of escaping it.
+ */
+function FunnelOutsideValue({ edge, text }: { readonly edge: number; readonly text: string }) {
+  const start = Math.min(edge, 60);
+  return (
+    <span
+      className="funnel-band-value funnel-band-value-outside"
+      style={{ left: `${start}%`, maxWidth: `calc(${100 - start}% - 8px)` }}
+      title={text}
+    >
+      {text}
+    </span>
+  );
+}
+
+/**
+ * A tapering funnel: one trapezoid band per stage, each in its own colour,
+ * narrowing to a tip. The stage name and its step-over-step conversion sit
+ * beside the band and the count rides on it, so the shape shows where the
+ * drop-off happens while the text carries the numbers the widths cannot.
  */
 export function FunnelChartView(props: BaseChartProps) {
   const format = props.valueFormat ?? "count";
   const stages = (props.data ?? []).filter((item) => item.value !== null);
-  const entry = stages[0]?.value ?? 0;
-  const widths = stages.map(
-    (item) => Math.max(stageShare(item.value ?? 0, entry), FUNNEL_MINIMUM_SHARE) * 100,
-  );
-  const band = stages.length > 0 ? 100 / stages.length : 100;
+  const edges = funnelEdges(stages);
   return (
     <ChartFrame {...props}>
-      <div className="funnel-layout">
-        <svg
-          className="funnel-shape"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-          role="presentation"
-          focusable="false"
-        >
-          {stages.map((item, index) => {
-            const top = widths[index] ?? 0;
-            // The closing band keeps a flat base rather than a point.
-            const bottom = widths[index + 1] ?? top;
-            const y = index * band;
-            return (
-              <polygon
-                key={item.key}
-                points={[
-                  `${50 - top / 2},${y}`,
-                  `${50 + top / 2},${y}`,
-                  `${50 + bottom / 2},${y + band}`,
-                  `${50 - bottom / 2},${y + band}`,
-                ].join(" ")}
-                fill={funnelRamp[Math.min(index, funnelRamp.length - 1)]}
-              />
-            );
-          })}
-        </svg>
-        <ol className="funnel-stages">
-          {stages.map((item, index) => {
-            const value = item.value ?? 0;
-            const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
-            const step = previous === null ? null : stageShare(value, previous);
-            return (
-              <li key={item.key} className="funnel-stage">
+      <ol className="funnel-chart">
+        {stages.map((item, index) => {
+          const value = item.value ?? 0;
+          const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
+          const step = previous === null ? null : stageShare(value, previous);
+          const top = (edges[index] ?? 1) * 100;
+          const bottom = (edges[index + 1] ?? top) * 100;
+          const colour = stageColour(index);
+          const text = valueFormatters[format](value);
+          const inside = bandFitsValue((top + bottom) / 2, text);
+          return (
+            <li key={item.key} className="funnel-row">
+              <span className="funnel-row-head">
+                <span className="funnel-row-label" title={item.label}>
+                  {item.label}
+                </span>
+                <span className="funnel-row-step">
+                  {step === null ? "entry" : `${(step * 100).toFixed(1)}% of previous`}
+                </span>
+              </span>
+              <span className="funnel-row-band">
                 <span
-                  className="funnel-stage-swatch"
-                  style={{ background: funnelRamp[Math.min(index, funnelRamp.length - 1)] }}
+                  className="funnel-band-shape"
+                  style={{
+                    background: colour,
+                    clipPath: `polygon(${50 - top / 2}% 0%, ${50 + top / 2}% 0%, ${50 + bottom / 2}% 100%, ${50 - bottom / 2}% 100%)`,
+                  }}
                   aria-hidden="true"
                 />
-                <span className="funnel-stage-label">{item.label}</span>
-                <span className="funnel-stage-value">
-                  <strong>{valueFormatters[format](value)}</strong>
-                  {step === null ? (
-                    <em>entry</em>
-                  ) : (
-                    <em>{`${(step * 100).toFixed(1)}% of previous`}</em>
-                  )}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
-      </div>
+                {inside ? (
+                  <span className="funnel-band-value">{text}</span>
+                ) : (
+                  <FunnelOutsideValue edge={50 + Math.max(top, bottom) / 2} text={text} />
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </ChartFrame>
   );
 }
