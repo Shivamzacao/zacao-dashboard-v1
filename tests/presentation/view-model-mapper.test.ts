@@ -27,13 +27,16 @@ const klaviyoNoActivity: SourceStatus = {
   warningCodes: ["KLAVIYO_NO_ACTIVITY"],
 };
 
-function pageWith(metrics: readonly MetricViewModel[]) {
+function pageWith(
+  metrics: readonly MetricViewModel[],
+  sourceStatuses: readonly SourceStatus[] = [shopifyCurrent, klaviyoNoActivity],
+) {
   return composeDashboardPage({
     section: "Customer Intelligence",
     context: {
       environment: "production",
       dataPeriod,
-      sourceStatuses: [shopifyCurrent, klaviyoNoActivity],
+      sourceStatuses,
     },
     metrics,
   });
@@ -149,5 +152,42 @@ describe("mapDashboardPageToDisplayData", () => {
       label: "vs previous year",
       value: null,
     });
+  });
+
+  it("states a source problem in plain language instead of printing warning codes", () => {
+    const degraded: SourceStatus = {
+      ...shopifyCurrent,
+      state: "partial",
+      completeness: "partial",
+      warningCodes: ["DATASET_UNAVAILABLE", "DATASET:shopify-geography", "PARTIAL_DATASET_FAILURE"],
+    };
+    const display = mapDashboardPageToDisplayData(pageWith([], [degraded]), "production");
+    const shopify = display.sources.find((source) => source.label === "Shopify");
+
+    expect(shopify?.detail).toBe("Some figures could not be loaded");
+    // The dataset tag is log telemetry and must never reach the surface.
+    expect(shopify?.detail).not.toContain("DATASET");
+    expect(shopify?.detail).not.toContain("_");
+  });
+
+  it("leaves a healthy source uncaptioned rather than restating completeness", () => {
+    const display = mapDashboardPageToDisplayData(pageWith([], [shopifyCurrent]), "production");
+    const shopify = display.sources.find((source) => source.label === "Shopify");
+
+    expect(shopify?.state).toBe("current");
+    expect(shopify?.detail).toBeUndefined();
+  });
+
+  it("discloses a cached fallback without exposing the cache mechanism", () => {
+    const stale: SourceStatus = {
+      ...shopifyCurrent,
+      state: "stale",
+      warningCodes: ["CACHE_STALE_FALLBACK"],
+    };
+    const display = mapDashboardPageToDisplayData(pageWith([], [stale]), "production");
+
+    expect(display.sources.find((source) => source.label === "Shopify")?.detail).toBe(
+      "Showing the last confirmed values",
+    );
   });
 });

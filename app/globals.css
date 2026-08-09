@@ -440,6 +440,72 @@ select {
 .chart-visual-auto {
   height: auto;
 }
+.funnel-layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  height: 100%;
+}
+.funnel-shape {
+  flex: 0 0 34%;
+  height: 100%;
+  min-width: 0;
+}
+.funnel-stages {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+  list-style: none;
+}
+.funnel-stage {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+.funnel-stage:last-child {
+  border-bottom: none;
+}
+.funnel-stage-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.funnel-stage-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--forest-dark);
+  font-size: 11px;
+  line-height: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.funnel-stage-value {
+  display: flex;
+  flex-shrink: 0;
+  align-items: baseline;
+  gap: 6px;
+}
+.funnel-stage-value strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+}
+.funnel-stage-value em {
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+}
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1277,16 +1343,16 @@ select {
   gap: 13px;
 }
 
+/* Single column while the source-readiness pills are withheld: the second
+   track would otherwise leave the insight card beside a permanent gap. */
 .intelligence-decision-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 13px;
 }
 
-/* The indicators are already self-contained pills, so no card wrapper: a
-   bordered box around one pill left a mostly-empty panel. align-self keeps
-   the pills at the top of the grid row instead of stretching to match the
-   insight card beside them. */
+/* Retained for the component fixture page and for restoring the per-source
+   panel later; no dashboard page renders it today. */
 .source-readiness-panel {
   display: flex;
   flex-wrap: wrap;
