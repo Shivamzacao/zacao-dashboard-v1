@@ -627,6 +627,32 @@ select {
   font: 500 15px/1 var(--font-numeric);
   font-variant-numeric: lining-nums tabular-nums;
 }
+.heatmap-grid-2d {
+  display: grid;
+  grid-template-columns: 34px repeat(var(--heatmap-columns), minmax(9px, 1fr));
+  gap: 2px;
+  align-items: center;
+  overflow-x: auto;
+}
+.heatmap-corner {
+  min-width: 34px;
+}
+.heatmap-col-label {
+  font-size: 9px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1;
+}
+.heatmap-row-label {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1;
+}
+.heatmap-cell-2d {
+  min-height: 16px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--forest) calc(var(--heat-opacity) * 100%), var(--paper));
+}
 
 .tooltip-root {
   position: relative;
