@@ -272,6 +272,8 @@ export function mapInventoryFacts(
         Object.entries(level.quantities).map(([quantityName, quantity]) => ({
           locationId: level.location.id,
           locationName: level.location.name,
+          product: product.title,
+          variant: variant.title,
           sku: inventoryItem.sku ?? variant.sku,
           quantityName,
           quantity,

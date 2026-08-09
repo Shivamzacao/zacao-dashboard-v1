@@ -18,6 +18,7 @@ import type {
   ProductUnitsFact,
   ShopifyFunnelFact,
 } from "./types";
+import { productBreakdownKey, productDisplayLabel } from "./product-identity";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -114,10 +115,15 @@ export function buildProductUnitsBreakdown(
   facts: readonly ProductUnitsFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise }) => merchandise);
-  const grouped = new Map<string, number[]>();
+  const grouped = new Map<string, { label: string; units: number[] }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `UNMAPPED:${fact.product}:${fact.variant ?? ""}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), fact.units]);
+    const key = productBreakdownKey(fact);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.units.push(fact.units);
+      continue;
+    }
+    grouped.set(key, { label: productDisplayLabel(fact), units: [fact.units] });
   }
   const total = sumSafeNumbers(merchandise.map(({ units }) => units));
   const warnings = facts.length === merchandise.length ? [] : ["NON_MERCHANDISE_ROWS_EXCLUDED"];
@@ -130,10 +136,10 @@ export function buildProductUnitsBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, values]) => ({
+    items: [...grouped.entries()].map(([key, { label, units }]) => ({
       key,
-      label: key,
-      values: [{ kind: "count", value: sumSafeNumbers(values) }],
+      label,
+      values: [{ kind: "count", value: sumSafeNumbers(units) }],
       warnings: key.startsWith("UNMAPPED:") ? ["MISSING_SKU"] : [],
     })),
   });
@@ -239,8 +245,8 @@ export function buildInventoryBreakdown(
   context: MetricServiceContext,
   facts: readonly InventoryFact[],
 ): MetricBreakdownViewModel {
-  // Location GIDs stay in the grouping key — they keep it unique — but never
-  // in the label: a chart axis reading `gid://shopify/Location/111934701875`
+  // Location GIDs and SKUs stay in the grouping key — they keep it unique — but
+  // never in the label: a chart axis reading `gid://shopify/Location/111934701875`
   // tells a reader nothing. The location name only earns its space once more
   // than one location reports.
   const multipleLocations = new Set(facts.map(({ locationId }) => locationId)).size > 1;
@@ -254,7 +260,7 @@ export function buildInventoryBreakdown(
     }
     const parts = [
       ...(multipleLocations ? [fact.locationName] : []),
-      fact.sku ?? "Unmapped SKU",
+      productDisplayLabel(fact),
       inventoryQuantityLabel(fact.quantityName),
     ];
     grouped.set(key, {
