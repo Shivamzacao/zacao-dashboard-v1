@@ -231,6 +231,18 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "horizontal",
         },
         {
+          title: "Fulfillment trend",
+          description: "Provider orders fulfilled per reporting month.",
+          metricKey: "operations.fulfillment_trend",
+          kind: "area",
+        },
+        {
+          title: "Units sold by SKU",
+          description: "Merchandise units the provider reported for the selected period.",
+          metricKey: "products.units_sold",
+          kind: "horizontal",
+        },
+        {
           title: "Combined inventory",
           description: "SNAPL and YBYD inventory after validated workbook records are available.",
           metricKey: "inventory.combined",
@@ -250,6 +262,13 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
       ],
       tables: [
+        {
+          title: "Units sold detail",
+          description:
+            "Observed merchandise units per SKU for the selected period. Descriptive only; not an inventory-planning velocity.",
+          metricKey: "products.units_velocity",
+          dataset: "product-velocity",
+        },
         {
           title: "Inventory lots & FEFO",
           description: "Lot, best-by, and FEFO readiness from validated source rows.",

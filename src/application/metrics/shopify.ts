@@ -208,29 +208,47 @@ export function buildMissingCostMetric(
   );
 }
 
+/**
+ * The provider reports several quantity states per location and SKU, and they
+ * overlap: `on_hand` already contains `available` and `committed`. Summing them
+ * produces a number that means nothing, so the headline is the sellable
+ * `available` state only (DEC-018) and every other state stays visible in the
+ * breakdown rather than being folded into the total.
+ */
+const HEADLINE_QUANTITY_NAME = "available";
+
 export function buildInventoryBreakdown(
   context: MetricServiceContext,
   facts: readonly InventoryFact[],
 ): MetricBreakdownViewModel {
-  const grouped = new Map<string, number[]>();
+  const grouped = new Map<string, { readonly label: string; readonly quantities: number[] }>();
   for (const fact of facts) {
     const key = `${fact.locationId}:${fact.sku ?? "UNMAPPED"}:${fact.quantityName}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), fact.quantity]);
+    const label = `${fact.locationName} · ${fact.sku ?? "Unmapped SKU"} · ${fact.quantityName}`;
+    const existing = grouped.get(key);
+    grouped.set(key, {
+      label,
+      quantities: [...(existing?.quantities ?? []), fact.quantity],
+    });
   }
-  const total = sumSafeNumbers(facts.map(({ quantity }) => quantity));
+  const available = sumSafeNumbers(
+    facts
+      .filter(({ quantityName }) => quantityName === HEADLINE_QUANTITY_NAME)
+      .map(({ quantity }) => quantity),
+  );
   const base = metric(
     context,
     "inventory.shopify_current",
-    facts.length === 0 ? null : { kind: "count", value: total },
-    ["SHOPIFY_LOCATIONS_ONLY"],
+    facts.length === 0 ? null : { kind: "count", value: available },
+    ["SHOPIFY_LOCATIONS_ONLY", "INVENTORY_AVAILABLE_STATE_ONLY"],
   );
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "location_sku_quantity",
-    items: [...grouped.entries()].map(([key, values]) => ({
+    items: [...grouped.entries()].map(([key, { label, quantities }]) => ({
       key,
-      label: key,
-      values: [{ kind: "count", value: sumSafeNumbers(values) }],
+      label,
+      values: [{ kind: "count", value: sumSafeNumbers(quantities) }],
       warnings: key.includes(":UNMAPPED:") ? ["MISSING_SKU"] : [],
     })),
   });

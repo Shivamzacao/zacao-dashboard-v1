@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildBillingGeographyBreakdown,
+  buildFulfillmentTrendSeries,
   buildProductSalesBreakdown,
   buildPurchaseHeatmapBreakdown,
   buildSalesTotalsMetrics,
   buildSalesTrendSeries,
+  buildShippedDeliveredBreakdown,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type { SourceStatus } from "@/src/domain/contracts";
@@ -164,5 +166,45 @@ describe("product sales breakdown", () => {
     });
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items).toHaveLength(1);
+  });
+});
+
+describe("DEC-016 fulfillment pass-through", () => {
+  const facts = [
+    { period: "2026-06", ordersFulfilled: 60, ordersShipped: 55, ordersDelivered: 48 },
+    { period: "2026-07", ordersFulfilled: 52, ordersShipped: 47, ordersDelivered: 41 },
+    { period: "2026-08", ordersFulfilled: 45, ordersShipped: 40, ordersDelivered: 34 },
+  ] as const;
+
+  it("headlines delivered and keeps shipped beside it, with coverage disclosed", () => {
+    const breakdown = buildShippedDeliveredBreakdown(context, facts);
+    expect(breakdown.metric.value).toEqual({ kind: "count", value: 123 });
+    expect(breakdown.metric.warnings).toContain("CARRIER_EVENT_COVERAGE_VARIES");
+    expect(breakdown.items.map(({ key, values }) => [key, values[0]])).toEqual([
+      ["shipped", { kind: "count", value: 142 }],
+      ["delivered", { kind: "count", value: 123 }],
+    ]);
+  });
+
+  it("activates rather than suppressing: a populated provider result yields a value", () => {
+    expect(buildShippedDeliveredBreakdown(context, facts).metric.implementationStatus).toBe(
+      "CERTIFIABLE",
+    );
+  });
+
+  it("returns one trend point per provider period without collapsing them", () => {
+    const series = buildFulfillmentTrendSeries(context, facts, "month");
+    expect(series.grain).toBe("month");
+    expect(series.points).toEqual([
+      { period: "2026-06", value: { kind: "count", value: 60 } },
+      { period: "2026-07", value: { kind: "count", value: 52 } },
+      { period: "2026-08", value: { kind: "count", value: 45 } },
+    ]);
+    expect(series.metric.value).toEqual({ kind: "count", value: 157 });
+  });
+
+  it("returns null, never zero, when the provider reported no fulfillment rows", () => {
+    expect(buildShippedDeliveredBreakdown(context, []).metric.value).toBeNull();
+    expect(buildFulfillmentTrendSeries(context, [], "month").metric.value).toBeNull();
   });
 });

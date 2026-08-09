@@ -278,7 +278,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "products.units_sold",
     label: "Units sold",
-    sections: ["Revenue Intelligence", "Product Intelligence"],
+    sections: ["Revenue Intelligence", "Product Intelligence", "Operations Intelligence"],
     v1Class: "core",
     valueKind: "count",
     sourceKeys: ["shopify"],
@@ -478,7 +478,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "products.units_velocity",
     label: "Units-sold velocity trend",
-    sections: ["Product Intelligence"],
+    sections: ["Product Intelligence", "Operations Intelligence"],
     v1Class: "core",
     valueKind: "count",
     sourceKeys: ["shopify"],
@@ -490,14 +490,15 @@ export const metricCatalog = Object.freeze([
   }),
   entry({
     key: "inventory.shopify_current",
-    label: "Current Shopify inventory",
+    label: "Current Shopify inventory (available)",
     sections: ["Product Intelligence", "Operations Intelligence"],
     v1Class: "core",
     valueKind: "count",
     sourceKeys: ["shopify"],
     sources: "Shopify Admin GraphQL InventoryLevel",
     sourceFields: "location, quantities available/on_hand/incoming/committed",
-    calculation: "Return provider quantities for represented Shopify locations only.",
+    calculation:
+      "Headline is the provider available quantity for represented Shopify locations only (DEC-018); overlapping states are never summed and stay in the breakdown.",
     status: "CERTIFIABLE",
     blockingReason: null,
   }),
@@ -578,9 +579,24 @@ export const metricCatalog = Object.freeze([
     sourceKeys: ["shopify"],
     sources: "Shopify fulfillment analytics",
     sourceFields: "orders_shipped, orders_delivered",
-    calculation: "Return provider aggregates with an explicit partial-coverage warning.",
-    status: "SOURCE_LIMITED",
-    blockingReason: "Carrier event coverage is not complete enough for a complete-company claim.",
+    calculation:
+      "Pass through provider orders_shipped/orders_delivered aggregates with the carrier-coverage limit disclosed (DEC-016); delivered is the headline. Not a complete-company delivery claim.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
+    key: "operations.fulfillment_trend",
+    label: "Fulfillment trend",
+    sections: ["Operations Intelligence"],
+    v1Class: "core",
+    valueKind: "count",
+    sourceKeys: ["shopify"],
+    sources: "Shopify fulfillment analytics",
+    sourceFields: "period, orders_fulfilled",
+    calculation:
+      "Pass through provider orders_fulfilled per provider reporting period with event-dated semantics (DEC-016); descriptive only.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "inventory.combined",

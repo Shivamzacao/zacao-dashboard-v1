@@ -120,4 +120,46 @@ describe("B5 Shopify metric services", () => {
     expect(inventory.metric.value).toEqual({ kind: "count", value: 25 });
     expect(inventory.metric.warnings).toContain("SHOPIFY_LOCATIONS_ONLY");
   });
+
+  it("headlines available inventory only, because provider quantity states overlap", () => {
+    // The audited SNAPL figures: summing every state reported 120, which
+    // double-counted because on_hand already contains available and committed.
+    const level = (quantityName: string, quantity: number) => ({
+      locationId: "location-snapl",
+      locationName: "SNAPL",
+      sku: "ZAC-MC-42-10PK",
+      quantityName,
+      quantity,
+      updatedAt: "2026-08-09T12:00:00.000Z",
+    });
+    const inventory = buildInventoryBreakdown(context(), [
+      level("available", 56),
+      level("committed", 4),
+      level("on_hand", 60),
+    ]);
+    expect(inventory.metric.value).toEqual({ kind: "count", value: 56 });
+    expect(inventory.metric.warnings).toContain("INVENTORY_AVAILABLE_STATE_ONLY");
+    // Every state stays visible; only the headline is narrowed.
+    expect(inventory.items).toHaveLength(3);
+    expect(inventory.items.map(({ label }) => label)).toEqual([
+      "SNAPL · ZAC-MC-42-10PK · available",
+      "SNAPL · ZAC-MC-42-10PK · committed",
+      "SNAPL · ZAC-MC-42-10PK · on_hand",
+    ]);
+  });
+
+  it("labels unmapped inventory rows without leaking provider global ids", () => {
+    const inventory = buildInventoryBreakdown(context(), [
+      {
+        locationId: "gid://shopify/Location/123",
+        locationName: "SNAPL",
+        sku: null,
+        quantityName: "available",
+        quantity: 7,
+        updatedAt: "2026-08-09T12:00:00.000Z",
+      },
+    ]);
+    expect(inventory.items[0]?.label).toBe("SNAPL · Unmapped SKU · available");
+    expect(inventory.items[0]?.warnings).toContain("MISSING_SKU");
+  });
 });

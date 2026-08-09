@@ -66,14 +66,19 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       value: { currency: "USD", minorUnits: 1_425_000 },
     },
     "operations.fulfillment_summary": { kind: "count", value: 118 },
+    // Delivered is the headline; the shipped/delivered gap is in the breakdown.
+    "operations.shipped_delivered": { kind: "count", value: 96 },
+    "operations.fulfillment_trend": { kind: "count", value: 118 },
     "products.mix": { kind: "rate_basis_points", value: 4_100 },
     "quality.unclassified_channel": { kind: "count", value: 3 },
     "customers.returning_rate": { kind: "rate_basis_points", value: 3840 },
     "customers.new_count": { kind: "count", value: 41 },
     "customers.returning_count": { kind: "count", value: 26 },
     "products.units_sold": { kind: "count", value: 128 },
-    "products.units_velocity": { kind: "quantity", value: 4.3 },
-    "inventory.shopify_current": { kind: "quantity", value: 436 },
+    "products.units_velocity": { kind: "count", value: 128 },
+    // Available-only, matching buildInventoryBreakdown: the overlapping states
+    // below are shown but never summed into this headline.
+    "inventory.shopify_current": { kind: "count", value: 208 },
     "quality.missing_sku_cost": { kind: "count", value: 1 },
     "commerce.web_funnel": { kind: "count", value: 18 },
     "sources.freshness": { kind: "status", value: "3 sources checked" },
@@ -91,6 +96,15 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       { key: "fulfilled", label: "Fulfilled", value: 118 },
       { key: "shipped", label: "Shipped", value: 112 },
       { key: "delivered", label: "Delivered", value: 96 },
+    ],
+    "operations.shipped_delivered": [
+      { key: "shipped", label: "Shipped", value: 112 },
+      { key: "delivered", label: "Delivered", value: 96 },
+    ],
+    "operations.fulfillment_trend": [
+      { key: "2026-05", label: "May", value: 36 },
+      { key: "2026-06", label: "Jun", value: 41 },
+      { key: "2026-07", label: "Jul", value: 41 },
     ],
     "products.mix": [
       { key: "dark", label: "Dark 70%", value: 41 },
@@ -118,10 +132,25 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       { key: "smooth", label: "Smooth 42%", value: 44 },
       { key: "gift", label: "Gift pack", value: 32 },
     ],
+    // Location · SKU · quantity-state, as buildInventoryBreakdown emits. The
+    // available rows (112 + 96) are the headline; on_hand overlaps them.
     "inventory.shopify_current": [
-      { key: "dark", label: "Dark 70%", value: 182 },
-      { key: "smooth", label: "Smooth 42%", value: 164 },
-      { key: "gift", label: "Gift pack", value: 90 },
+      {
+        key: "snapl:SYNTH-DARK-70:available",
+        label: "SNAPL · SYNTH-DARK-70 · available",
+        value: 112,
+      },
+      { key: "snapl:SYNTH-DARK-70:on_hand", label: "SNAPL · SYNTH-DARK-70 · on_hand", value: 118 },
+      {
+        key: "snapl:SYNTH-SMOOTH-42:available",
+        label: "SNAPL · SYNTH-SMOOTH-42 · available",
+        value: 96,
+      },
+      {
+        key: "snapl:SYNTH-SMOOTH-42:on_hand",
+        label: "SNAPL · SYNTH-SMOOTH-42 · on_hand",
+        value: 104,
+      },
     ],
     "customers.new_count": [
       { key: "may", label: "May", value: 30, secondaryValue: 18 },
@@ -154,10 +183,32 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       },
       { product: "Synthetic Gift Pack", sku: "SYNTH-GIFT-01", status: "Active", price: "$36.00" },
     ],
+    // Mirrors buildProductVelocityTable's contract exactly: observed units per
+    // provider reporting period. There is no per-day rate column, because the
+    // provider period is a range label and a derived daily rate would read as
+    // the inventory-planning velocity that stays BUSINESS_RULE_REQUIRED.
     "product-velocity": [
-      { sku: "SYNTH-DARK-70", units: 52, days: 30, dailyVelocity: 1.73 },
-      { sku: "SYNTH-SMOOTH-42", units: 44, days: 30, dailyVelocity: 1.47 },
-      { sku: "SYNTH-GIFT-01", units: 32, days: 30, dailyVelocity: 1.07 },
+      {
+        period: "2025-08-01..2026-07-31",
+        product: "Synthetic Dark Bar",
+        variant: "10 Pack",
+        sku: "SYNTH-DARK-70",
+        units: 52,
+      },
+      {
+        period: "2025-08-01..2026-07-31",
+        product: "Synthetic Smooth Bar",
+        variant: "10 Pack",
+        sku: "SYNTH-SMOOTH-42",
+        units: 44,
+      },
+      {
+        period: "2025-08-01..2026-07-31",
+        product: "Synthetic Gift Pack",
+        variant: "Single",
+        sku: "SYNTH-GIFT-01",
+        units: 32,
+      },
     ],
   }),
   sources: [

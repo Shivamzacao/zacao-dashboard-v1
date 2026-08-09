@@ -268,6 +268,72 @@ export function buildFulfillmentSummaryBreakdown(
   });
 }
 
+/**
+ * DEC-016 approves passing these two provider counts through with the carrier
+ * limit disclosed, so the tile discloses rather than withholds. Delivered is the
+ * headline because it is the terminal state; shipped stays beside it because the
+ * gap between them is the operational signal.
+ */
+export function buildShippedDeliveredBreakdown(
+  context: MetricServiceContext,
+  facts: readonly FulfillmentTrendFact[],
+): MetricBreakdownViewModel {
+  const shipped = sumSafeNumbers(facts.map(({ ordersShipped }) => ordersShipped));
+  const delivered = sumSafeNumbers(facts.map(({ ordersDelivered }) => ordersDelivered));
+  const base = metric(
+    context,
+    "operations.shipped_delivered",
+    facts.length === 0 ? null : { kind: "count", value: delivered },
+    ["CARRIER_EVENT_COVERAGE_VARIES"],
+  );
+  return metricBreakdownViewModelSchema.parse({
+    metric: base,
+    dimension: "fulfillment_status",
+    items: [
+      {
+        key: "shipped",
+        label: "Shipped",
+        values: [{ kind: "count", value: shipped }],
+        warnings: [],
+      },
+      {
+        key: "delivered",
+        label: "Delivered",
+        values: [{ kind: "count", value: delivered }],
+        warnings: ["CARRIER_EVENT_COVERAGE_VARIES"],
+      },
+    ],
+  });
+}
+
+/**
+ * The provider already returns fulfillment counts per period and the summary
+ * collapses them, so the trend costs no extra request. It plots fulfilled: the
+ * chart layer draws one series, and fulfilled is the count least distorted by
+ * incomplete carrier delivery events.
+ */
+export function buildFulfillmentTrendSeries(
+  context: MetricServiceContext,
+  facts: readonly FulfillmentTrendFact[],
+  grain: "day" | "week" | "month",
+): MetricSeriesViewModel {
+  const fulfilled = sumSafeNumbers(facts.map(({ ordersFulfilled }) => ordersFulfilled));
+  const base = metric(
+    context,
+    "operations.fulfillment_trend",
+    facts.length === 0 ? null : { kind: "count", value: fulfilled },
+    ["CARRIER_EVENT_COVERAGE_VARIES"],
+  );
+  return metricSeriesViewModelSchema.parse({
+    metric: base,
+    grain,
+    points: facts.map((fact) => ({
+      period: fact.period,
+      value: { kind: "count", value: fact.ordersFulfilled },
+    })),
+  });
+}
+
 /** DEC-016 net-sales basis: merchandise share of the merchandise total. */
 export function buildProductMixBreakdown(
   context: MetricServiceContext,

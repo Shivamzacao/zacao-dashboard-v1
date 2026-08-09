@@ -2,6 +2,7 @@ import {
   buildBillingGeographyBreakdown,
   buildCatalogTable,
   buildFulfillmentSummaryBreakdown,
+  buildFulfillmentTrendSeries,
   buildNativeChannelMixBreakdown,
   buildProductMixBreakdown,
   buildUnclassifiedChannelMetric,
@@ -15,6 +16,7 @@ import {
   buildPurchaseHeatmapBreakdown,
   buildSalesTotalsMetrics,
   buildSalesTrendSeries,
+  buildShippedDeliveredBreakdown,
   buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
 } from "@/src/application/metrics";
@@ -332,12 +334,13 @@ export function createShopifyContributors(input: {
         grain: "month",
       });
       const status = currentStatus(now().toISOString(), result.history);
+      const metrics = metricContext(context, [status]);
+      const facts = mapFulfillmentTrendFacts(result.rows);
       return {
+        series: [buildFulfillmentTrendSeries(metrics, facts, "month")],
         breakdowns: [
-          buildFulfillmentSummaryBreakdown(
-            metricContext(context, [status]),
-            mapFulfillmentTrendFacts(result.rows),
-          ),
+          buildFulfillmentSummaryBreakdown(metrics, facts),
+          buildShippedDeliveredBreakdown(metrics, facts),
         ],
         sourceStatuses: [status],
       };

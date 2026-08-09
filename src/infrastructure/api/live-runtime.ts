@@ -100,6 +100,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
   "Operations Intelligence": [
     "shopify-catalog-inventory",
     "shopify-fulfillment",
+    "shopify-product-units",
     "manual-operations",
     "deferred-google_drive",
   ],

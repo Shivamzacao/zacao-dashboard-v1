@@ -80,6 +80,40 @@ describe("B5 metric classification and certified view models", () => {
     expect(unavailable.readiness.state).toBe("unavailable");
   });
 
+  it("activates the shipped/delivered counts DEC-016 approved for disclosure", () => {
+    // The tile used to be SOURCE_LIMITED, which nulled the value regardless of
+    // what the provider returned. DEC-016 calls for disclosure, not suppression.
+    const definition = metricCatalog.find(({ key }) => key === "operations.shipped_delivered");
+    expect(definition?.status).toBe("CERTIFIABLE");
+    expect(definition?.blockingReason).toBeNull();
+    const activated = createMetricViewModel({
+      metricKey: "operations.shipped_delivered",
+      environment: "production",
+      dataPeriod: PERIOD,
+      sources: [source("shopify")],
+      value: { kind: "count", value: 123 },
+      warnings: ["CARRIER_EVENT_COVERAGE_VARIES"],
+    });
+    expect(activated.value).toEqual({ kind: "count", value: 123 });
+    expect(activated.warnings).toContain("CARRIER_EVENT_COVERAGE_VARIES");
+  });
+
+  it("keeps the Shopify-sourced operations metrics on the operations section", () => {
+    const keys = new Set(
+      metricCatalog
+        .filter(({ sections }) => sections.includes("Operations Intelligence"))
+        .map(({ key }) => key),
+    );
+    for (const key of [
+      "operations.shipped_delivered",
+      "operations.fulfillment_trend",
+      "products.units_sold",
+      "products.units_velocity",
+    ]) {
+      expect(keys).toContain(key);
+    }
+  });
+
   it("composes every metric in a section once without provider records", () => {
     const page = composeDashboardPage({
       section: "Executive Health",
