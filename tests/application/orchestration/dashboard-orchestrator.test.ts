@@ -338,4 +338,77 @@ describe("B6 dashboard orchestration", () => {
     });
     expect(result.page.warnings).toContain("CACHE_STALE_FALLBACK");
   });
+
+  it("fetches the shifted comparison period and attaches it to the matching metric", async () => {
+    const calls = { value: 0 };
+    const revenue = contributor({
+      dataset: "shopify_revenue",
+      calls,
+      load: async (context) => ({
+        sourceStatuses: [status("shopify")],
+        metrics: [
+          createMetricViewModel({
+            metricKey: "products.units_sold",
+            environment: context.environment,
+            dataPeriod: context.dataPeriod,
+            sources: [status("shopify")],
+            value: {
+              kind: "count",
+              value: context.dataPeriod.startDate === FILTERS.startDate ? 20 : 10,
+            },
+          }),
+        ],
+      }),
+    });
+    const { orchestrator } = setup([revenue], {
+      "Product Intelligence": ["shopify_revenue"],
+    });
+    const result = await orchestrator.loadPage({
+      section: "Product Intelligence",
+      environment: "production",
+      filters: { ...FILTERS, comparison: "previous_period" },
+    });
+
+    expect(calls.value).toBe(2);
+    const metric = result.page.metrics.find(({ key }) => key === "products.units_sold");
+    expect(metric).toMatchObject({
+      value: { kind: "count", value: 20 },
+      comparison: { mode: "previous_period", value: { kind: "count", value: 10 } },
+    });
+    expect((metric?.comparison?.dataPeriod.endDate ?? "") < FILTERS.startDate).toBe(true);
+    // Only the primary fetch's cache metadata is reported.
+    expect(result.cache).toHaveLength(1);
+  });
+
+  it("omits comparison data when the request asks for none", async () => {
+    const calls = { value: 0 };
+    const revenue = contributor({
+      dataset: "shopify_revenue",
+      calls,
+      load: async (context) => ({
+        sourceStatuses: [status("shopify")],
+        metrics: [
+          createMetricViewModel({
+            metricKey: "products.units_sold",
+            environment: context.environment,
+            dataPeriod: context.dataPeriod,
+            sources: [status("shopify")],
+            value: { kind: "count", value: 20 },
+          }),
+        ],
+      }),
+    });
+    const { orchestrator } = setup([revenue], {
+      "Product Intelligence": ["shopify_revenue"],
+    });
+    const result = await orchestrator.loadPage({
+      section: "Product Intelligence",
+      environment: "production",
+      filters: FILTERS,
+    });
+
+    expect(calls.value).toBe(1);
+    const metric = result.page.metrics.find(({ key }) => key === "products.units_sold");
+    expect(metric?.comparison).toBeUndefined();
+  });
 });

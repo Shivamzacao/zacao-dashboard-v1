@@ -1,6 +1,7 @@
 import type { MetricDisplayValue } from "@/src/application/view-models";
 import type {
   ChartDatum,
+  DisplayComparison,
   DisplayState,
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
@@ -23,4 +24,6 @@ export interface DashboardPageDisplayData {
   readonly states?: Readonly<Record<string, DisplayState>>;
   /** Live unavailable/blocked explanations per metric key. */
   readonly stateReasons?: Readonly<Record<string, string>>;
+  /** Live previous-period/previous-year comparison per metric key. */
+  readonly comparisonValues?: Readonly<Record<string, DisplayComparison>>;
 }
