@@ -79,7 +79,9 @@ describe("Shopify GraphQL client", () => {
     expect(sleep).toHaveBeenCalledTimes(2);
 
     // A ShopifyQL cost-budget rejection arrives as HTTP 200 with a GraphQL
-    // error; it must be retried after a long throttle pause, never failed.
+    // error; it must be retried, never failed. The quota refills continuously,
+    // so the pause stays near a second and carries jitter to keep a fanned-out
+    // page from re-colliding on the next wave.
     const throttledSleep = vi.fn().mockResolvedValue(undefined);
     const throttledFetch = vi
       .fn<typeof fetch>()
@@ -90,11 +92,29 @@ describe("Shopify GraphQL client", () => {
     const throttledClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
       fetch: throttledFetch,
       sleep: throttledSleep,
+      random: () => 0,
     });
     await expect(
       throttledClient.execute({ document: "query Shop { shop { name } }" }),
     ).resolves.toMatchObject({ data: { shop: { name: "Zacao" } } });
-    expect(throttledSleep).toHaveBeenCalledWith(10_000);
+    // random() === 0 selects the floor of the jitter window.
+    expect(throttledSleep).toHaveBeenCalledWith(500);
+
+    const jitteredSleep = vi.fn().mockResolvedValue(undefined);
+    const jitteredClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(
+          response({ data: {}, errors: [{ message: "Rate limited. Please retry later." }] }),
+        )
+        .mockResolvedValueOnce(response({ data: { shop: { name: "Zacao" } } })),
+      sleep: jitteredSleep,
+      random: () => 1,
+    });
+    await expect(
+      jitteredClient.execute({ document: "query Shop { shop { name } }" }),
+    ).resolves.toMatchObject({ data: { shop: { name: "Zacao" } } });
+    expect(jitteredSleep).toHaveBeenCalledWith(1_000);
 
     const forbiddenFetch = vi.fn<typeof fetch>().mockResolvedValue(response({}, 403));
     const forbiddenClient = new ShopifyGraphQlClient(configuration, staticAccessToken(), {

@@ -66,6 +66,8 @@ export interface ShopifyGraphQlResult<T> {
 export interface ShopifyClientDependencies {
   readonly fetch: typeof fetch;
   readonly sleep: (milliseconds: number) => Promise<void>;
+  /** Injected so retry jitter stays deterministic under test. */
+  readonly random: () => number;
 }
 
 export interface ShopifyClientAccessToken {
@@ -76,7 +78,24 @@ export interface ShopifyClientAccessToken {
 const defaultDependencies: ShopifyClientDependencies = {
   fetch,
   sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  random: Math.random,
 };
+
+/**
+ * ShopifyQL enforces a per-minute analytics quota separate from the GraphQL
+ * cost budget, and it refills continuously rather than in fixed windows — so
+ * a throttled query recovers in about a second, not a minute. Backoff stays
+ * short and carries full jitter because a dashboard page fans several queries
+ * out at once; identical delays would just re-collide on the next wave.
+ */
+function retryDelayMilliseconds(
+  kind: ShopifyFailureKind,
+  attempt: number,
+  random: () => number,
+): number {
+  const base = kind === "throttled" ? 1_000 * 2 ** attempt : 100 * 2 ** attempt;
+  return Math.round(base * (0.5 + random() * 0.5));
+}
 
 function statusKind(status: number): ShopifyFailureKind {
   if (status === 401) return "authentication";
@@ -123,10 +142,8 @@ export class ShopifyGraphQlClient {
         if (!clientError.retryable || attempt === this.configuration.maxRetries) {
           throw clientError;
         }
-        // The ShopifyQL cost budget refills on a one-minute window, so a
-        // throttled query needs a much longer pause than a transient failure.
         await this.dependencies.sleep(
-          clientError.kind === "throttled" ? 10_000 * (attempt + 1) : 100 * 2 ** attempt,
+          retryDelayMilliseconds(clientError.kind, attempt, this.dependencies.random),
         );
       }
     }

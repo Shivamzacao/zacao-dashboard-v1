@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { dashboardSlugToSection } from "@/src/application/api/catalog";
-import { parseDashboardFilters } from "@/src/application/api/query";
-import type { SourceStatus } from "@/src/domain/contracts";
+import type { DashboardFilters, IsoDate, SourceStatus } from "@/src/domain/contracts";
 import { dateInTimeZone } from "@/src/domain/utilities/time";
+import { parseFrontendFilterState } from "@/src/presentation/filters/url-filter-state";
 import { backendApiService } from "@/src/infrastructure/api/handlers";
 import { PageHeader } from "@/src/presentation/components/page-header";
 import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/dashboard-page.client";
@@ -34,28 +34,21 @@ export async function generateMetadata({ params }: DashboardPageProps): Promise<
   return route ? { title: route.title } : {};
 }
 
-/** Rolling last-12-months window ending on today's reporting date. */
-function defaultReportingRange(): { start: string; end: string } {
-  const end = dateInTimeZone(new Date(), "America/New_York");
-  const [year = 0, month = 0, day = 0] = end.split("-").map(Number);
-  const startInstant = new Date(Date.UTC(year - 1, month - 1, day + 1));
-  return { start: startInstant.toISOString().slice(0, 10), end };
+function toSearchParams(
+  searchParams: Record<string, string | string[] | undefined>,
+): URLSearchParams {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    const single = Array.isArray(value) ? value[0] : value;
+    if (single !== undefined) query.set(key, single);
+  }
+  return query;
 }
 
 async function loadLiveDisplayData(
   slug: keyof typeof dashboardSlugToSection,
-  searchParams: Record<string, string | string[] | undefined>,
+  filters: DashboardFilters,
 ): Promise<{ display: DashboardPageDisplayData; headerSource: SourceStatus | undefined }> {
-  const defaults = defaultReportingRange();
-  const query = new URLSearchParams();
-  const single = (value: string | string[] | undefined) =>
-    Array.isArray(value) ? value[0] : value;
-  query.set("start", single(searchParams["start"]) ?? defaults.start);
-  query.set("end", single(searchParams["end"]) ?? defaults.end);
-  const comparison = single(searchParams["comparison"]);
-  if (comparison) query.set("comparison", comparison);
-
-  const filters = parseDashboardFilters(query, backendApiService.supportedFilters);
   const result = await backendApiService.dashboard(dashboardSlugToSection[slug], filters);
   return {
     display: mapDashboardPageToDisplayData(result.data.page, "production"),
@@ -68,11 +61,27 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
   const route = dashboardRouteBySlug(dashboard);
   if (!route) notFound();
 
+  // Canonicalise the filter query here rather than letting the client hook
+  // rewrite it after mount: that rewrite re-ran the whole dynamic render, so
+  // every navigation paid for its upstream reads twice. Both sides derive the
+  // reporting date from the same layout clock and share this parser, so the
+  // redirect settles in one hop.
+  const requested = toSearchParams(await searchParams);
+  const today = dateInTimeZone(new Date(), "America/New_York") as IsoDate;
+  const filterState = parseFrontendFilterState(
+    requested,
+    backendApiService.supportedFilters,
+    today,
+  );
+  if (requested.toString() !== filterState.query) {
+    redirect(`/${route.slug}?${filterState.query}`);
+  }
+
   // Live mode renders certified backend view models; fixture mode preserves
   // the Phase 2 synthetic contract for tests, previews, and visual baselines.
   const liveMode = process.env["ZACAO_DATA_MODE"] === "live";
   if (liveMode) {
-    const { display, headerSource } = await loadLiveDisplayData(route.slug, await searchParams);
+    const { display, headerSource } = await loadLiveDisplayData(route.slug, filterState.filters);
     return (
       <main className="dashboard-content">
         <PageHeader route={route} source={headerSource} dataMode="live" />
