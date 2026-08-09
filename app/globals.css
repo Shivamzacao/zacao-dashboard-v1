@@ -1205,13 +1205,16 @@ select {
   gap: 13px;
 }
 
+/* The indicators are already self-contained pills, so no card wrapper: a
+   bordered box around one pill left a mostly-empty panel. align-self keeps
+   the pills at the top of the grid row instead of stretching to match the
+   insight card beside them. */
 .source-readiness-panel {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: start;
+  align-self: start;
   gap: 8px;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  background: var(--paper);
 }
 
 .detail-record {
