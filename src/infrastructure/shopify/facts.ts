@@ -178,11 +178,45 @@ export function mapSalesTrendPoints(
   }));
 }
 
+/**
+ * ShopifyQL's documented `day_of_week` schema returns the weekday name
+ * ("Monday".."Sunday"), but live accounts have been observed returning a
+ * numeric day code instead. Accept either: names pass through unchanged,
+ * numeric codes are translated to a name so the purchase-timing heatmap never
+ * shows a bare digit as a row label.
+ *
+ * The numeric convention (0 = Sunday .. 6 = Saturday, matching JS
+ * `Date.getDay()`) is not confirmed against a live account — verify against
+ * real order timestamps once live Shopify access is available, and correct
+ * `WEEKDAY_BY_NUMBER` below if the mapping is off by a day.
+ */
+const WEEKDAY_BY_NUMBER = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+const WEEKDAY_NAMES = new Set<string>(WEEKDAY_BY_NUMBER);
+
+function normalizeDayOfWeek(value: string): string {
+  const trimmed = value.trim();
+  if (WEEKDAY_NAMES.has(trimmed)) return trimmed;
+  if (/^\d+$/.test(trimmed)) {
+    const index = Number(trimmed) % WEEKDAY_BY_NUMBER.length;
+    return WEEKDAY_BY_NUMBER[index] ?? trimmed;
+  }
+  return trimmed;
+}
+
 export function mapPurchaseTimingFacts(
   rows: readonly ShopifyQlRow[],
 ): readonly PurchaseTimingFact[] {
   return rows.map((row) => ({
-    dayOfWeek: String(requireColumn(row, "day_of_week")),
+    dayOfWeek: normalizeDayOfWeek(String(requireColumn(row, "day_of_week"))),
     hourOfDay: String(requireColumn(row, "hour_of_day")),
     orders: parseShopifyQlCount(requireColumn(row, "orders"), "orders"),
   }));
