@@ -1547,6 +1547,91 @@ select {
   cursor: pointer;
 }
 
+/* Filter changes re-render the page on the server. The controls move
+   optimistically, so the view below them is stale until that render lands:
+   fade it out, block clicks on numbers that are about to change, and float a
+   status pill. Everything is delayed by --filter-pending-delay so navigations
+   that resolve quickly never flash a loader. */
+.dashboard-view {
+  --filter-pending-delay: 140ms;
+  position: relative;
+}
+
+.dashboard-view .dashboard-content {
+  transition: opacity 160ms ease;
+}
+
+.dashboard-view[data-pending] .dashboard-content {
+  opacity: 0.4;
+  transition-delay: var(--filter-pending-delay);
+  pointer-events: none;
+}
+
+.topbar-controls[data-pending] select {
+  opacity: 0.55;
+}
+
+.filter-pending-overlay {
+  position: fixed;
+  z-index: 40;
+  top: calc(var(--topbar-height) + 18px);
+  left: calc(50% + var(--sidebar-width) / 2);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--forest-dark);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translate(-50%, -6px);
+  animation: filter-pending-in 160ms ease var(--filter-pending-delay) forwards;
+  pointer-events: none;
+}
+
+/* Clear the sticky filter bar in the sections that render one. */
+.dashboard-main:has(.global-filter-bar) .filter-pending-overlay {
+  top: calc(var(--topbar-height) + 69px);
+}
+
+.filter-pending-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--line);
+  border-top-color: var(--forest);
+  border-radius: 50%;
+  animation: state-spin 720ms linear infinite;
+}
+
+@keyframes filter-pending-in {
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (max-width: 780px) {
+  .filter-pending-overlay {
+    left: 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filter-pending-spinner {
+    animation-duration: 2s;
+  }
+
+  .filter-pending-overlay {
+    transform: translate(-50%, 0);
+    animation-duration: 1ms;
+  }
+}
+
 .skeleton {
   border-radius: 8px;
   background: var(--line);

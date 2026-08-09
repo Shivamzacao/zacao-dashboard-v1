@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 import { DashboardSidebar } from "./dashboard-sidebar";
+import { FilterPendingOverlay } from "./filter-pending-overlay";
 import { GlobalFilterBar } from "./global-filter-bar";
 import { TopBar } from "./top-bar";
 import { useDashboardUrlFilters } from "@/src/presentation/filters/use-dashboard-url-filters.client";
@@ -28,7 +29,7 @@ export function DashboardShellClient({
   const [navigationOpen, setNavigationOpen] = useState(false);
   const pathname = usePathname();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const { state, push, selectPreset } = useDashboardUrlFilters(supportedFilters, today);
+  const { state, push, selectPreset, pending } = useDashboardUrlFilters(supportedFilters, today);
   const activeRoute = dashboardRouteByPath(pathname);
   const exportDataset = activeRoute ? exportDatasetsForRoute(activeRoute.slug)[0] : undefined;
   const exportHref = exportDataset ? "/api/v1/exports/" + exportDataset + "?" + state.query : null;
@@ -73,13 +74,17 @@ export function DashboardShellClient({
           menuButtonRef={menuButtonRef}
           exportHref={exportHref}
           supportedComparisons={supportedFilters.comparisons}
+          pending={pending}
         />
         <GlobalFilterBar
           filters={state.filters}
           supported={supportedFilters}
           onFilterChange={push}
         />
-        {children}
+        <div className="dashboard-view" data-pending={pending ? "" : undefined} aria-busy={pending}>
+          {children}
+          {pending ? <FilterPendingOverlay /> : null}
+        </div>
       </div>
     </div>
   );
