@@ -91,13 +91,13 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
         {
           title: "Product revenue",
-          description: "Approved merchandise revenue by product or SKU.",
+          description: "Approved merchandise revenue by product.",
           metricKey: "products.sales",
           kind: "horizontal",
         },
         {
           title: "Units sold",
-          description: "Net merchandise items sold by approved SKU.",
+          description: "Net merchandise items sold by approved product.",
           metricKey: "products.units_sold",
           kind: "bar",
         },
@@ -167,7 +167,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
       charts: [
         {
           title: "Product demand",
-          description: "Certified net units sold by approved SKU.",
+          description: "Certified net units sold by approved product.",
           metricKey: "products.units_sold",
           kind: "horizontal",
         },
@@ -181,8 +181,8 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           title: "Inventory position",
           description: "Current inventory available from verified Shopify locations.",
           metricKey: "inventory.shopify_current",
-          // SKU-and-state categories read left-to-right; upright bars force the
-          // axis to drop most of their labels.
+          // Product-and-state categories read left-to-right; upright bars force
+          // the axis to drop most of their labels.
           kind: "horizontal",
         },
         {
