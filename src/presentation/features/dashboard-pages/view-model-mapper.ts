@@ -7,6 +7,7 @@ import type {
 import type { SourceStatus } from "@/src/domain/contracts";
 import type {
   ChartDatum,
+  ChartValueFormat,
   DisplayComparison,
   DisplayState,
   SourceIndicatorModel,
@@ -146,6 +147,7 @@ export function mapDashboardPageToDisplayData(
   for (const metric of page.metrics) registerMetric(metric);
 
   const chartData: Record<string, readonly ChartDatum[]> = {};
+  const chartValueFormats: Record<string, ChartValueFormat> = {};
 
   for (const series of page.series) {
     registerMetric(series.metric);
@@ -172,7 +174,9 @@ export function mapDashboardPageToDisplayData(
     if (dataset) {
       rowsByDataset[dataset] = table.rows;
     }
-    // A stage/count table doubles as funnel chart input.
+    // A stage/count table doubles as funnel chart input. Those plotted values
+    // are stage counts, not the metric's own unit (the funnel metric's value
+    // is a conversion rate), so the unit is declared alongside the data.
     if (
       table.columns.length === 2 &&
       table.columns[0] === "stage" &&
@@ -183,6 +187,7 @@ export function mapDashboardPageToDisplayData(
         label: String(row["stage"]),
         value: typeof row["count"] === "number" ? row["count"] : null,
       }));
+      chartValueFormats[table.metric.key] = "count";
     }
   }
 
@@ -191,6 +196,7 @@ export function mapDashboardPageToDisplayData(
     synthetic: false,
     currentValues,
     chartData,
+    chartValueFormats,
     rowsByDataset,
     sources: page.sources.map(sourceIndicator),
     states,

@@ -11,6 +11,7 @@ import {
 import type { DashboardFilters, SourceKey, SourceStatus } from "@/src/domain/contracts";
 import type { DashboardSection } from "@/src/domain/metrics/catalog";
 import { InMemoryCache } from "@/src/infrastructure/cache";
+import { ConsoleLogger } from "@/src/infrastructure/logging";
 import { KlaviyoAdapter } from "@/src/infrastructure/klaviyo/adapter";
 import { KlaviyoClient } from "@/src/infrastructure/klaviyo/client";
 import type { KlaviyoConfiguration } from "@/src/infrastructure/klaviyo/config";
@@ -242,6 +243,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       new CacheCoordinator(new InMemoryCache(this.clock, 200), this.clock),
       this.clock,
       4,
+      new ConsoleLogger(),
     );
   }
 

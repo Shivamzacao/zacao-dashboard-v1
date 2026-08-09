@@ -32,6 +32,9 @@ export interface ChartDatum {
   readonly group?: string;
 }
 
+/** How a chart's plotted numbers are rendered on axes, tooltips, and labels. */
+export type ChartValueFormat = "money" | "percent" | "count";
+
 export interface ChartSeriesDefinition {
   readonly key: "value" | "secondaryValue";
   readonly label: string;

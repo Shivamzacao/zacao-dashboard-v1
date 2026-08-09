@@ -1,5 +1,5 @@
 import { composeDashboardPage } from "@/src/application/metrics";
-import type { ClockPort } from "@/src/application/ports";
+import type { ClockPort, LoggerPort } from "@/src/application/ports";
 import type {
   DashboardPageViewModel,
   MetricBreakdownViewModel,
@@ -102,9 +102,28 @@ function staleContribution(
   };
 }
 
+/**
+ * Classifies a dataset failure into a short, non-sensitive code. Adapter
+ * errors expose a `kind` discriminator (for example Shopify's `timeout` or
+ * `throttled`); anything else falls back to the error's constructor name.
+ * Only the classification is disclosed — raw messages can carry request
+ * detail and never enter an API response.
+ */
+function failureKind(error: unknown): string {
+  const candidate =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { readonly kind: unknown }).kind
+      : error instanceof Error
+        ? error.name
+        : null;
+  const kind = typeof candidate === "string" ? candidate.trim() : "";
+  return kind === "" ? "unknown" : kind.slice(0, 40);
+}
+
 function unavailableContribution(
   contributor: DashboardDatasetContributor,
   checkedAt: string,
+  kind: string,
 ): DashboardContribution {
   return {
     sourceStatuses: [
@@ -115,10 +134,14 @@ function unavailableContribution(
         lastSuccessfulAt: null,
         dataAsOf: null,
         completeness: "unknown",
-        warningCodes: ["DATASET_UNAVAILABLE", `DATASET:${contributor.dataset}`],
+        warningCodes: [
+          "DATASET_UNAVAILABLE",
+          `DATASET:${contributor.dataset}`,
+          `DATASET_FAILURE_KIND:${kind}`,
+        ],
       }),
     ],
-    warnings: [`DATASET_UNAVAILABLE:${contributor.dataset}`],
+    warnings: [`DATASET_UNAVAILABLE:${contributor.dataset}:${kind}`],
   };
 }
 
@@ -230,6 +253,7 @@ export class DashboardOrchestrator {
     private readonly cache: CacheCoordinator,
     private readonly clock: ClockPort,
     private readonly maxConcurrency = 4,
+    private readonly logger: LoggerPort | null = null,
   ) {
     if (!Number.isInteger(maxConcurrency) || maxConcurrency < 1 || maxConcurrency > 16) {
       throw new TypeError("Orchestration concurrency must be an integer from 1 to 16");
@@ -295,9 +319,24 @@ export class DashboardOrchestrator {
               cache: result.cache,
             } satisfies DatasetCacheMetadata,
           };
-        } catch {
+        } catch (error) {
+          // A failed dataset renders as an empty panel, so it must never be
+          // silent: without this the page is indistinguishable from one that
+          // genuinely has no data.
+          const kind = failureKind(error);
+          this.logger?.error("dashboard.dataset_failed", {
+            dataset: contributor.dataset,
+            source: contributor.source,
+            section: request.section,
+            kind,
+            message: error instanceof Error ? error.message : String(error),
+          });
           return {
-            contribution: unavailableContribution(contributor, this.clock.now().toISOString()),
+            contribution: unavailableContribution(
+              contributor,
+              this.clock.now().toISOString(),
+              kind,
+            ),
             cache: {
               dataset: contributor.dataset,
               source: contributor.source,

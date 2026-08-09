@@ -91,6 +91,9 @@ describe("mapDashboardPageToDisplayData", () => {
       { key: "Sessions", label: "Sessions", value: 2_053 },
       { key: "Completed checkout", label: "Completed checkout", value: 22 },
     ]);
+    // Stage counts must not inherit the metric's own rate unit, or 2,053
+    // sessions render as "2,053%".
+    expect(display.chartValueFormats?.["commerce.web_funnel"]).toBe("count");
   });
 
   it("maps source statuses onto indicator models with truthful states", () => {

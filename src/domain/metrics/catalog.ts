@@ -312,7 +312,8 @@ export const metricCatalog = Object.freeze([
     sourceFields: "order and line-item history",
     calculation: "Return sanitized detailed records only when the requested range is complete.",
     status: "SOURCE_LIMITED",
-    blockingReason: "read_all_orders or a validated controlled export is not available.",
+    blockingReason:
+      "The order-level drill-down dataset has not been implemented. The read_all_orders scope it depends on is granted, so this is an implementation gap, not a source limit.",
   }),
   entry({
     key: "commerce.predictive_forecast",
@@ -405,7 +406,8 @@ export const metricCatalog = Object.freeze([
     sourceFields: "customer identity, first order, subsequent orders",
     calculation: "Cohort retention over complete history.",
     status: "SOURCE_LIMITED",
-    blockingReason: "Detailed order history is incomplete.",
+    blockingReason:
+      "Cohort retention has not been implemented. The read_all_orders scope needed for complete order history is granted, so this is an implementation gap, not a source limit.",
   }),
   entry({
     key: "customers.realized_ltv",

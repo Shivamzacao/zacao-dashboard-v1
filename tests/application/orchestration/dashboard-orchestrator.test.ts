@@ -411,4 +411,46 @@ describe("B6 dashboard orchestration", () => {
     const metric = result.page.metrics.find(({ key }) => key === "products.units_sold");
     expect(metric?.comparison).toBeUndefined();
   });
+
+  it("discloses and logs why a dataset failed instead of silently blanking it", async () => {
+    const logged: { event: string; context?: Record<string, unknown> }[] = [];
+    const logger = {
+      debug: () => undefined,
+      info: () => undefined,
+      warn: () => undefined,
+      error: (event: string, context?: Record<string, unknown>) => {
+        logged.push({ event, ...(context ? { context } : {}) });
+      },
+    };
+    const timingOut: DashboardDatasetContributor = {
+      dataset: "shopify_units",
+      source: "shopify",
+      sourceIdentity: "shopify-units-source",
+      cachePolicy: { freshForSeconds: 30, staleForSeconds: 30 },
+      load: async () => {
+        throw Object.assign(new Error("Shopify request timed out"), { kind: "timeout" });
+      },
+    };
+    const clock = new MutableClock();
+    const orchestrator = new DashboardOrchestrator(
+      [timingOut],
+      { "Product Intelligence": ["shopify_units"] },
+      new CacheCoordinator(new InMemoryCache(clock), clock),
+      clock,
+      2,
+      logger,
+    );
+
+    const result = await orchestrator.loadPage({
+      section: "Product Intelligence",
+      environment: "production",
+      filters: FILTERS,
+    });
+
+    // The cause must survive into the response, not vanish into an empty panel.
+    expect(result.page.warnings).toContain("DATASET_UNAVAILABLE:shopify_units:timeout");
+    expect(result.page.sources[0]?.warningCodes).toContain("DATASET_FAILURE_KIND:timeout");
+    expect(logged[0]?.event).toBe("dashboard.dataset_failed");
+    expect(logged[0]?.context).toMatchObject({ dataset: "shopify_units", kind: "timeout" });
+  });
 });

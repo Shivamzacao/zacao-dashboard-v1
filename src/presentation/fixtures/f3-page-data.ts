@@ -123,6 +123,9 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       { key: "sheets", label: "Google Sheets", value: 0 },
     ],
   }),
+  // The funnel plots stage counts while its metric's own value is a conversion
+  // rate; without this the counts would render as percentages.
+  chartValueFormats: Object.freeze({ "commerce.web_funnel": "count" as const }),
   rowsByDataset: Object.freeze({
     "product-catalog": [
       { product: "Synthetic Dark Bar", sku: "SYNTH-DARK-70", status: "Active", price: "$12.00" },
