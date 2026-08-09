@@ -110,7 +110,12 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "manual-marketing",
   ],
   "Growth Intelligence": ["manual-growth"],
-  "Financial Intelligence": ["manual-financial", "deferred-google_sheets", "deferred-google_drive"],
+  "Financial Intelligence": [
+    "shopify-sales",
+    "manual-financial",
+    "deferred-google_sheets",
+    "deferred-google_drive",
+  ],
   "Insights and Data Quality": [
     "shopify-history",
     "shopify-catalog-inventory",
