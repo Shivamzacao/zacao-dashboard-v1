@@ -352,26 +352,68 @@ function stageShare(value: number, reference: number): number {
 }
 
 /**
- * Stage bands rather than a width-tapered funnel polygon. Real funnels span
- * two orders of magnitude (6,210 sessions to 67 checkouts), which collapses a
- * proportional funnel's lower stages into invisible slivers and pushes their
- * labels off-canvas. Bands keep every stage legible, always show the count,
- * and disclose both the share of entry and the step-over-step conversion.
+ * Narrowest a band may draw, as a share of the entry stage. Real funnels span
+ * two orders of magnitude (6,210 sessions to 67 checkouts), so the closing
+ * stages would otherwise taper to a sub-pixel line. The floor keeps the
+ * silhouette continuous; the exact counts sit beside every band.
+ */
+const FUNNEL_MINIMUM_SHARE = 0.07;
+
+/**
+ * A funnel silhouette beside a readable stage column. The polygon carries the
+ * shape — where the drop-off happens — while the counts and step-over-step
+ * conversion live in text, because at this data's range no width encoding can
+ * be both proportional and legible for the closing stages.
  */
 export function FunnelChartView(props: BaseChartProps) {
   const format = props.valueFormat ?? "count";
   const stages = (props.data ?? []).filter((item) => item.value !== null);
   const entry = stages[0]?.value ?? 0;
+  const widths = stages.map(
+    (item) => Math.max(stageShare(item.value ?? 0, entry), FUNNEL_MINIMUM_SHARE) * 100,
+  );
+  const band = stages.length > 0 ? 100 / stages.length : 100;
   return (
     <ChartFrame {...props}>
-      <ol className="funnel-stages">
-        {stages.map((item, index) => {
-          const value = item.value ?? 0;
-          const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
-          const step = previous === null ? null : stageShare(value, previous);
-          return (
-            <li key={item.key} className="funnel-stage">
-              <div className="funnel-stage-head">
+      <div className="funnel-layout">
+        <svg
+          className="funnel-shape"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          role="presentation"
+          focusable="false"
+        >
+          {stages.map((item, index) => {
+            const top = widths[index] ?? 0;
+            // The closing band keeps a flat base rather than a point.
+            const bottom = widths[index + 1] ?? top;
+            const y = index * band;
+            return (
+              <polygon
+                key={item.key}
+                points={[
+                  `${50 - top / 2},${y}`,
+                  `${50 + top / 2},${y}`,
+                  `${50 + bottom / 2},${y + band}`,
+                  `${50 - bottom / 2},${y + band}`,
+                ].join(" ")}
+                fill={funnelRamp[Math.min(index, funnelRamp.length - 1)]}
+              />
+            );
+          })}
+        </svg>
+        <ol className="funnel-stages">
+          {stages.map((item, index) => {
+            const value = item.value ?? 0;
+            const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
+            const step = previous === null ? null : stageShare(value, previous);
+            return (
+              <li key={item.key} className="funnel-stage">
+                <span
+                  className="funnel-stage-swatch"
+                  style={{ background: funnelRamp[Math.min(index, funnelRamp.length - 1)] }}
+                  aria-hidden="true"
+                />
                 <span className="funnel-stage-label">{item.label}</span>
                 <span className="funnel-stage-value">
                   <strong>{valueFormatters[format](value)}</strong>
@@ -381,22 +423,11 @@ export function FunnelChartView(props: BaseChartProps) {
                     <em>{`${(step * 100).toFixed(1)}% of previous`}</em>
                   )}
                 </span>
-              </div>
-              <div className="funnel-stage-track">
-                <div
-                  className="funnel-stage-bar"
-                  style={{
-                    // A floor keeps the smallest stage visible instead of
-                    // rendering a sub-pixel bar the reader cannot see.
-                    width: `${Math.max(stageShare(value, entry) * 100, 1.5)}%`,
-                    background: funnelRamp[Math.min(index, funnelRamp.length - 1)],
-                  }}
-                />
-              </div>
-            </li>
-          );
-        })}
-      </ol>
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </ChartFrame>
   );
 }

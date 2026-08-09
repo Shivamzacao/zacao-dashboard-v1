@@ -437,29 +437,46 @@ select {
   height: var(--chart-height);
   min-height: 58px;
 }
+.funnel-layout {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  height: 100%;
+}
+.funnel-shape {
+  flex: 0 0 34%;
+  height: 100%;
+  min-width: 0;
+}
 .funnel-stages {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  justify-content: center;
-  gap: 12px;
   height: 100%;
   margin: 0;
   padding: 0;
+  min-width: 0;
   list-style: none;
 }
 .funnel-stage {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
+  border-bottom: 1px solid var(--line);
 }
-.funnel-stage-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+.funnel-stage:last-child {
+  border-bottom: none;
+}
+.funnel-stage-swatch {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 .funnel-stage-label {
+  flex: 1 1 auto;
   overflow: hidden;
   color: var(--forest-dark);
   font-size: 11px;
@@ -485,17 +502,6 @@ select {
   font-style: normal;
   font-variant-numeric: tabular-nums;
   line-height: 15px;
-}
-.funnel-stage-track {
-  width: 100%;
-  height: 9px;
-  border-radius: 999px;
-  background: var(--line);
-}
-.funnel-stage-bar {
-  height: 100%;
-  min-width: 3px;
-  border-radius: 999px;
 }
 .chart-legend {
   display: flex;

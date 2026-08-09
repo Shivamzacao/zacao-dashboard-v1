@@ -212,10 +212,18 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getByText("3.0% of previous")).toBeTruthy();
     expect(screen.getByText("35.8% of previous")).toBeTruthy();
     expect(screen.getByText("entry")).toBeTruthy();
-    // The smallest stage keeps a visible floor rather than a sub-pixel sliver.
-    const bars = document.querySelectorAll<HTMLElement>(".funnel-stage-bar");
-    expect(bars).toHaveLength(3);
-    expect(Number.parseFloat(bars[2]?.style.width ?? "0")).toBeGreaterThanOrEqual(1.5);
+    // The silhouette keeps one band per stage, and the closing band stays wide
+    // enough to read rather than tapering to a sub-pixel line.
+    const bands = document.querySelectorAll<SVGPolygonElement>(".funnel-shape polygon");
+    expect(bands).toHaveLength(3);
+    const widthOf = (band: SVGPolygonElement | null) => {
+      const xs = (band?.getAttribute("points") ?? "")
+        .split(" ")
+        .map((point) => Number.parseFloat(point.split(",")[0] ?? "0"));
+      return Math.max(...xs) - Math.min(...xs);
+    };
+    expect(widthOf(bands[0] ?? null)).toBeCloseTo(100, 1);
+    expect(widthOf(bands[2] ?? null)).toBeGreaterThanOrEqual(7);
   });
 
   it("omits the in-frame summary when the enclosing card already carries the copy", () => {
