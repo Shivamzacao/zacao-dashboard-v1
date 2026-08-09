@@ -380,6 +380,17 @@ describe("LiveBackendApiRuntime", () => {
     expect(healthScore.readiness.warningCodes).toContain("BUSINESS_RULE_REQUIRED");
   });
 
+  it("includes commerce.total_sales on Financial Intelligence, not just Revenue", async () => {
+    const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
+      fetchImplementation: stubFetch(),
+    });
+    const result = await runtime.loadDashboard("Financial Intelligence", filters);
+
+    const totalSales = metricByKey(result.page, "commerce.total_sales");
+    expect(totalSales.value).not.toBeNull();
+    expect(totalSales.readiness.state).toBe("current");
+  });
+
   it("returns truthful no-activity Klaviyo states for an empty account", async () => {
     const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
       fetchImplementation: stubFetch(),

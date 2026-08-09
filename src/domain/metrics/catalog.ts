@@ -251,7 +251,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "commerce.total_sales",
     label: "Total sales",
-    sections: ["Revenue Intelligence"],
+    sections: ["Revenue Intelligence", "Financial Intelligence"],
     v1Class: "core",
     valueKind: "money",
     sourceKeys: ["shopify"],
