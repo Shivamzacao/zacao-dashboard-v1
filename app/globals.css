@@ -440,6 +440,57 @@ select {
 .chart-visual-auto {
   height: auto;
 }
+.ranked-bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ranked-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 11rem) 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+.ranked-bar-label {
+  overflow: hidden;
+  color: var(--forest-dark);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ranked-bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--line);
+}
+.ranked-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--forest);
+}
+.ranked-bar-value {
+  color: var(--ink);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 16px;
+}
+.ranked-bar-rest .ranked-bar-label,
+.ranked-bar-rest .ranked-bar-value {
+  color: var(--muted);
+  font-weight: 400;
+  font-style: italic;
+}
+.ranked-bar-rest .ranked-bar-track {
+  background: none;
+}
 .funnel-layout {
   display: flex;
   gap: 16px;
