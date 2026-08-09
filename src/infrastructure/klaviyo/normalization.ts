@@ -95,17 +95,24 @@ export function normalizeKlaviyoReportRows(value: unknown) {
 }
 
 const aggregateAttributesSchema = z.object({
+  dates: z.array(z.string()),
   data: z.array(
     z.object({
       dimensions: z.array(z.string()).optional(),
-      dates: z.array(z.string()),
       measurements: z.record(z.string(), z.array(z.number().nullable())),
     }),
   ),
 });
 
 export function normalizeKlaviyoAggregate(value: unknown) {
-  return aggregateAttributesSchema.parse(value).data;
+  // The live API returns one shared `dates` axis at the attributes level;
+  // attach it to every series entry so consumers stay per-series.
+  const attributes = aggregateAttributesSchema.parse(value);
+  return attributes.data.map((entry) => ({
+    ...(entry.dimensions === undefined ? {} : { dimensions: entry.dimensions }),
+    dates: attributes.dates,
+    measurements: entry.measurements,
+  }));
 }
 
 const piiKeys =

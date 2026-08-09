@@ -11,12 +11,16 @@ import { createMetricViewModel } from "./view-model";
 export function buildSourceFreshnessTable(
   context: MetricServiceContext,
   sources: readonly SourceStatus[],
+  options: { readonly metricSources?: readonly SourceStatus[] } = {},
 ): MetricTableViewModel {
+  // The table lists every source's state — including unconfigured ones — so
+  // the metric's own readiness may be driven by the sources that actually
+  // answered rather than being nulled by a deliberately absent integration.
   const base = createMetricViewModel({
     metricKey: "sources.freshness",
     environment: context.environment,
     dataPeriod: context.dataPeriod,
-    sources,
+    sources: options.metricSources ?? sources,
     value: sources.length === 0 ? null : { kind: "status", value: "Source status available" },
   });
   return metricTableViewModelSchema.parse({

@@ -12,7 +12,6 @@ import {
 
 const validConfiguration = {
   storeDomain: "example-store.myshopify.com",
-  adminAccessToken: "sanitized-test-token",
   apiVersion: "2026-07",
   grantedScopes: [...REQUIRED_SHOPIFY_READ_SCOPES],
   timeoutMs: 5_000,

@@ -1,5 +1,6 @@
 export * from "./admin-graphql/adapter";
 export * from "./admin-graphql/queries";
+export * from "./auth";
 export * from "./client";
 export * from "./config";
 export * from "./history";

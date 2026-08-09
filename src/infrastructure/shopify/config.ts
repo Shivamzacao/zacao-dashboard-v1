@@ -19,7 +19,6 @@ export const shopifyConfigurationSchema = z
       .trim()
       .toLowerCase()
       .regex(/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/),
-    adminAccessToken: z.string().min(8),
     apiVersion: z.string().regex(/^20\d{2}-(01|04|07|10)$/),
     grantedScopes: z.array(shopifyScopeSchema),
     timeoutMs: z.number().int().min(1_000).max(30_000),

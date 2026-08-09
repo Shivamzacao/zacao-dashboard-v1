@@ -3,5 +3,6 @@ export * from "./clock";
 export * from "./google-files";
 export * from "./klaviyo";
 export * from "./logger";
+export * from "./manual-workbook";
 export * from "./refresh-scheduler";
 export * from "./shopify";

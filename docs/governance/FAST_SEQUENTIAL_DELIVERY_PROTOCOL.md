@@ -16,6 +16,12 @@ The three major stages remain strictly sequential:
 2. Stage 2 — Frontend, only after the Backend Stage gate passes and ZACAO authorizes it.
 3. Stage 3 — Integration, UAT, and Release, only after the Frontend Stage gate passes and ZACAO authorizes it.
 
+Sequencing amendment DEC-014 permits Phase 2 frontend development after approved B7 using the frozen
+B7 contracts, readiness states, and synthetic TEST fixtures. B8, B9, and deferred live source
+verification move to the approved pre-production certification sequence and do not block F0–F5.
+They remain mandatory before production certification. This changes timing only, not V1 scope,
+architecture, source permissions, data contracts, or production gates.
+
 Subphases remain in their documented dependency order. Work that depends on an unfinished subphase is not parallelized.
 
 ## Normal subphase protocol

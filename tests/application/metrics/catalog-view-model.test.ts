@@ -23,8 +23,10 @@ describe("B5 metric classification and certified view models", () => {
   });
 
   it("never emits a numeric value for an unresolved business rule", () => {
+    // commerce.net_sales was activated by the approved DEC-015 revenue policy;
+    // the business-health score remains a blocked exemplar (weights/thresholds).
     const result = createMetricViewModel({
-      metricKey: "commerce.net_sales",
+      metricKey: "executive.business_health_score",
       environment: "test",
       dataPeriod: PERIOD,
       sources: [source("shopify")],

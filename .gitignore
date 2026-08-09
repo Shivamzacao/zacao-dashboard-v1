@@ -1,6 +1,7 @@
 # Dependencies and builds
 node_modules/
 .next/
+next-env.d.ts
 out/
 coverage/
 test-results/
@@ -17,6 +18,14 @@ playwright-report/
 *.log
 .vercel/
 .trigger/
+# Agent scratch space, including throwaway worktrees of this repository
+.claude/
 
 # Generated QA artifacts
 tools/docx_qa/
+
+# Local-only live API captures from smoke probes (never committed provider JSON)
+tests/infrastructure/**/fixtures/*-live.json
+
+# Locally generated sample workbooks
+outputs/manual-workbook-sample.xlsx

@@ -81,7 +81,8 @@ export class KlaviyoAdapter {
   }
 
   async readFlows(signal?: AbortSignal) {
-    return this.discover("/api/flows?page[size]=100", normalizeKlaviyoFlow, signal);
+    // The flows collection caps page[size] at 50 (campaigns/metrics allow 100).
+    return this.discover("/api/flows?page[size]=50", normalizeKlaviyoFlow, signal);
   }
 
   async readCampaignReport(

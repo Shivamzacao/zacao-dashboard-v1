@@ -39,6 +39,16 @@ export const metricDisplayValueSchema = z.discriminatedUnion("kind", [
 
 export type MetricDisplayValue = z.infer<typeof metricDisplayValueSchema>;
 
+export const metricComparisonSchema = z
+  .object({
+    mode: z.enum(["previous_period", "previous_year"]),
+    dataPeriod: dateRangeSchema,
+    value: metricDisplayValueSchema.nullable(),
+  })
+  .strict();
+
+export type MetricComparison = z.infer<typeof metricComparisonSchema>;
+
 export const metricViewModelSchema = z
   .object({
     key: z.string().min(1),
@@ -51,6 +61,8 @@ export const metricViewModelSchema = z
     sources: z.array(sourceStatusSchema),
     warnings: z.array(z.string().trim().min(1).max(120)),
     unavailableReason: z.string().trim().min(1).max(500).nullable(),
+    /** Present only when the request asked for a comparison period. */
+    comparison: metricComparisonSchema.optional(),
   })
   .strict();
 
@@ -77,6 +89,9 @@ export const metricBreakdownItemSchema = z
   .object({
     key: z.string().min(1),
     label: z.string().min(1),
+    // Second dimension for breakdowns that form a matrix (weekday x hour); the
+    // item then reads as one cell of `group` by `label`.
+    group: z.string().min(1).optional(),
     values: z.array(metricDisplayValueSchema),
     warnings: z.array(z.string().min(1)),
   })

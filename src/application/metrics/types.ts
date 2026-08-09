@@ -55,6 +55,59 @@ export interface InventoryFact {
   readonly updatedAt: string;
 }
 
+/** Canonical ShopifyQL sales aggregates for one period — provider values only. */
+export interface ShopifySalesTotalsFact {
+  readonly orders: number;
+  readonly grossSalesMinorUnits: number;
+  readonly discountsMinorUnits: number;
+  readonly returnsMinorUnits: number;
+  readonly netSalesMinorUnits: number;
+  readonly shippingChargesMinorUnits: number;
+  readonly taxesMinorUnits: number;
+  readonly totalSalesMinorUnits: number;
+  readonly averageOrderValueMinorUnits: number;
+}
+
+export interface ShopifySalesTrendPoint {
+  readonly period: string;
+  readonly netSalesMinorUnits: number;
+}
+
+export interface PurchaseTimingFact {
+  readonly dayOfWeek: string;
+  readonly hourOfDay: string;
+  readonly orders: number;
+}
+
+export interface BillingGeographyFact {
+  readonly country: string;
+  readonly region: string | null;
+  readonly orders: number;
+  readonly totalSalesMinorUnits: number;
+}
+
+export interface ProductSalesFact {
+  readonly product: string;
+  readonly variant: string | null;
+  readonly sku: string | null;
+  readonly merchandise: boolean;
+  readonly netSalesMinorUnits: number;
+}
+
+export interface NativeChannelFact {
+  readonly channel: string;
+  readonly orders: number;
+  readonly netSalesMinorUnits: number;
+  readonly totalSalesMinorUnits: number;
+}
+
+export interface FulfillmentTrendFact {
+  readonly period: string;
+  readonly ordersFulfilled: number;
+  readonly ordersShipped: number;
+  readonly ordersDelivered: number;
+}
+
 export interface KlaviyoPerformanceFact {
   readonly recipients: number | null;
   readonly delivered: number | null;
