@@ -94,8 +94,19 @@ function retryDelayMilliseconds(
   random: () => number,
 ): number {
   const base = kind === "throttled" ? 1_000 * 2 ** attempt : 100 * 2 ** attempt;
-  return Math.round(base * (0.5 + random() * 0.5));
+  return Math.round(Math.min(base, MAX_RETRY_DELAY_MS) * (0.5 + random() * 0.5));
 }
+
+const MAX_RETRY_DELAY_MS = 4_000;
+
+/**
+ * Throttling gets its own, larger budget than `maxRetries`. A quota dip is
+ * transient and shared across the page's queries, so giving up after two
+ * attempts degraded a healthy dataset to "unavailable" and published partial
+ * figures. Waiting a few seconds for real data beats disclosing a gap that
+ * was never a gap.
+ */
+const MAX_THROTTLE_RETRIES = 3;
 
 function statusKind(status: number): ShopifyFailureKind {
   if (status === 401) return "authentication";
@@ -127,7 +138,9 @@ export class ShopifyGraphQlClient {
     assertReadOnlyGraphQl(input.document);
 
     let refreshedExpiredToken = false;
-    for (let attempt = 0; attempt <= this.configuration.maxRetries; attempt += 1) {
+    let throttleRetries = 0;
+    let transientRetries = 0;
+    for (;;) {
       try {
         return await this.executeAttempt<T>(input);
       } catch (error) {
@@ -136,19 +149,20 @@ export class ShopifyGraphQlClient {
           // A cached token may have expired mid-window; mint once and retry.
           refreshedExpiredToken = true;
           this.accessToken.invalidate();
-          attempt -= 1;
           continue;
         }
-        if (!clientError.retryable || attempt === this.configuration.maxRetries) {
-          throw clientError;
-        }
+        if (!clientError.retryable) throw clientError;
+        const throttled = clientError.kind === "throttled";
+        const used = throttled ? throttleRetries : transientRetries;
+        const budget = throttled ? MAX_THROTTLE_RETRIES : this.configuration.maxRetries;
+        if (used >= budget) throw clientError;
+        if (throttled) throttleRetries += 1;
+        else transientRetries += 1;
         await this.dependencies.sleep(
-          retryDelayMilliseconds(clientError.kind, attempt, this.dependencies.random),
+          retryDelayMilliseconds(clientError.kind, used, this.dependencies.random),
         );
       }
     }
-
-    throw new ShopifyClientError("network", "Shopify request failed", false, null);
   }
 
   private async executeAttempt<T>(input: {

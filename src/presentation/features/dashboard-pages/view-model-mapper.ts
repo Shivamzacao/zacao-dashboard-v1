@@ -105,16 +105,54 @@ function compactPeriodLabel(period: string): string {
   return match ? `${match[1]}-${match[2]}` : period;
 }
 
+/**
+ * Warning codes are backend telemetry. Readers of this dashboard are
+ * executives, so the indicator says what the code means for the numbers on
+ * screen rather than printing the identifier.
+ */
+const SOURCE_WARNING_COPY: Readonly<Record<string, string>> = {
+  DATASET_UNAVAILABLE: "Some figures could not be loaded",
+  PARTIAL_DATASET_FAILURE: "Some figures could not be loaded",
+  DATASET_NOT_CONFIGURED: "Not connected yet",
+  SOURCE_NOT_CONFIGURED: "Not connected yet",
+  LIVE_CREDENTIAL_VERIFICATION_DEFERRED: "Not connected yet",
+  CACHE_STALE_FALLBACK: "Showing the last confirmed values",
+  DETAILED_HISTORY_INCOMPLETE: "History does not cover the full period",
+  PARTIAL_HISTORY: "History does not cover the full period",
+  SOURCE_LIMITED: "The source cannot supply this in full",
+  BILLING_GEOGRAPHY_AGGREGATE_ONLY: "Regional detail is aggregated",
+  CARRIER_EVENT_COVERAGE_VARIES: "Carrier coverage varies",
+  KLAVIYO_NO_ACTIVITY: "No activity recorded",
+  STALE_SOURCE: "Showing the last confirmed values",
+  SOURCE_UNAVAILABLE: "The source could not be reached",
+  REQUEST_FAILED: "The source could not be reached",
+};
+
+function sourceDetail(status: SourceStatus): string | undefined {
+  const phrases = [
+    ...new Set(
+      status.warningCodes
+        // `DATASET:<name>` tags which dataset failed; that is for the logs.
+        .filter((code) => !code.startsWith("DATASET:"))
+        .map((code) => SOURCE_WARNING_COPY[code])
+        .filter((copy): copy is string => copy !== undefined),
+    ),
+  ];
+  if (phrases.length > 0) return phrases.slice(0, 2).join(" · ");
+  // A healthy, complete source needs no caption beyond its state and date.
+  if (status.completeness === "complete") return undefined;
+  return status.completeness === "partial"
+    ? "Some figures could not be loaded"
+    : "Coverage could not be confirmed";
+}
+
 function sourceIndicator(status: SourceStatus): SourceIndicatorModel {
-  const detail =
-    status.warningCodes.length > 0
-      ? status.warningCodes.slice(0, 3).join(" · ")
-      : `completeness: ${status.completeness}`;
+  const detail = sourceDetail(status);
   return {
     label: SOURCE_LABELS[status.source],
     state: status.state,
     dataAsOf: status.dataAsOf,
-    detail,
+    ...(detail ? { detail } : {}),
   };
 }
 
