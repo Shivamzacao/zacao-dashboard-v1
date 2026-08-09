@@ -11,7 +11,10 @@ import {
   ReadinessCard,
   SourceIndicator,
 } from "@/src/presentation/components/dashboard/cards";
-import { LineChartView } from "@/src/presentation/components/dashboard/charts.client";
+import {
+  FunnelChartView,
+  LineChartView,
+} from "@/src/presentation/components/dashboard/charts.client";
 import {
   DataTable,
   type DashboardTableColumn,
@@ -187,6 +190,47 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getByLabelText("Chart legend").textContent).toContain("Actual");
     expect(screen.getByLabelText(/Shopify: Data is stale/)).toBeTruthy();
     expect(screen.getByText("No activity")).toBeTruthy();
+  });
+
+  it("keeps every funnel stage readable when volumes span two orders of magnitude", () => {
+    render(
+      <FunnelChartView
+        title="Store funnel"
+        valueFormat="count"
+        data={[
+          { key: "sessions", label: "Sessions", value: 6210 },
+          { key: "cart", label: "Cart additions", value: 187 },
+          { key: "purchase", label: "Completed checkout", value: 67 },
+        ]}
+      />,
+    );
+    // Counts must be on screen: a 67-wide stage is invisible as a shape alone.
+    expect(screen.getAllByText("6,210").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("187").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("67").length).toBeGreaterThan(0);
+    // Step-over-step conversion carries the drop-off the bar widths cannot.
+    expect(screen.getByText("3.0% of previous")).toBeTruthy();
+    expect(screen.getByText("35.8% of previous")).toBeTruthy();
+    expect(screen.getByText("entry")).toBeTruthy();
+    // The smallest stage keeps a visible floor rather than a sub-pixel sliver.
+    const bars = document.querySelectorAll<HTMLElement>(".funnel-stage-bar");
+    expect(bars).toHaveLength(3);
+    expect(Number.parseFloat(bars[2]?.style.width ?? "0")).toBeGreaterThanOrEqual(1.5);
+  });
+
+  it("omits the in-frame summary when the enclosing card already carries the copy", () => {
+    const { container, rerender } = render(
+      <FunnelChartView title="Store funnel" data={[{ key: "a", label: "A", value: 5 }]} />,
+    );
+    expect(container.querySelectorAll(".chart-summary")).toHaveLength(0);
+    rerender(
+      <FunnelChartView
+        title="Store funnel"
+        summary="Standalone description."
+        data={[{ key: "a", label: "A", value: 5 }]}
+      />,
+    );
+    expect(screen.getByText("Standalone description.")).toBeTruthy();
   });
 
   it("has no automated WCAG violations in representative F2 primitives", async () => {

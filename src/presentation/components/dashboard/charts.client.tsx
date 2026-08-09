@@ -7,9 +7,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Funnel,
-  FunnelChart,
-  LabelList,
   Line,
   LineChart,
   Pie,
@@ -55,7 +52,11 @@ const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
 
 interface BaseChartProps {
   readonly title: string;
-  readonly summary: string;
+  /**
+   * Optional in-frame description. Omit it when the surrounding card already
+   * carries the same copy, or the page renders the sentence twice.
+   */
+  readonly summary?: string;
   readonly data: readonly ChartDatum[] | null;
   readonly state?: DisplayState;
   readonly height?: number;
@@ -84,9 +85,11 @@ function ChartFrame({
       className={`chart-frame state-${dataState}`}
       style={{ "--chart-height": `${height}px` } as React.CSSProperties}
     >
-      <p className="chart-summary" id={`${slug(title)}-summary`}>
-        {summary}
-      </p>
+      {summary ? (
+        <p className="chart-summary" id={`${slug(title)}-summary`}>
+          {summary}
+        </p>
+      ) : null}
       {legend?.length ? <ChartLegend items={legend} /> : null}
       {["current", "partial", "stale"].includes(dataState) && usableData.length ? (
         <>
@@ -341,26 +344,59 @@ export function DonutChartView(props: BaseChartProps) {
   );
 }
 
+/** Progression ramp: entry green through to the converting stage. */
+const funnelRamp = ["#005d45", "#15835f", "#3f9e7c", "#c8a86b", "#b5532f"] as const;
+
+function stageShare(value: number, reference: number): number {
+  return reference > 0 ? value / reference : 0;
+}
+
+/**
+ * Stage bands rather than a width-tapered funnel polygon. Real funnels span
+ * two orders of magnitude (6,210 sessions to 67 checkouts), which collapses a
+ * proportional funnel's lower stages into invisible slivers and pushes their
+ * labels off-canvas. Bands keep every stage legible, always show the count,
+ * and disclose both the share of entry and the step-over-step conversion.
+ */
 export function FunnelChartView(props: BaseChartProps) {
   const format = props.valueFormat ?? "count";
+  const stages = (props.data ?? []).filter((item) => item.value !== null);
+  const entry = stages[0]?.value ?? 0;
   return (
     <ChartFrame {...props}>
-      <ResponsiveContainer width="100%" height="100%">
-        <FunnelChart accessibilityLayer={false}>
-          <RechartsTooltip formatter={(value) => valueFormatters[format](Number(value))} />
-          <Funnel dataKey="value" data={props.data ?? []} isAnimationActive={false}>
-            <LabelList position="right" fill="#1b2925" stroke="none" dataKey="label" />
-            {(props.data ?? []).map((item, index) => (
-              <Cell
-                key={item.key}
-                fill={
-                  [tones.forest, "#15835f", tones.gold, tones.terracotta][index % 4] ?? tones.forest
-                }
-              />
-            ))}
-          </Funnel>
-        </FunnelChart>
-      </ResponsiveContainer>
+      <ol className="funnel-stages">
+        {stages.map((item, index) => {
+          const value = item.value ?? 0;
+          const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
+          const step = previous === null ? null : stageShare(value, previous);
+          return (
+            <li key={item.key} className="funnel-stage">
+              <div className="funnel-stage-head">
+                <span className="funnel-stage-label">{item.label}</span>
+                <span className="funnel-stage-value">
+                  <strong>{valueFormatters[format](value)}</strong>
+                  {step === null ? (
+                    <em>entry</em>
+                  ) : (
+                    <em>{`${(step * 100).toFixed(1)}% of previous`}</em>
+                  )}
+                </span>
+              </div>
+              <div className="funnel-stage-track">
+                <div
+                  className="funnel-stage-bar"
+                  style={{
+                    // A floor keeps the smallest stage visible instead of
+                    // rendering a sub-pixel bar the reader cannot see.
+                    width: `${Math.max(stageShare(value, entry) * 100, 1.5)}%`,
+                    background: funnelRamp[Math.min(index, funnelRamp.length - 1)],
+                  }}
+                />
+              </div>
+            </li>
+          );
+        })}
+      </ol>
     </ChartFrame>
   );
 }
@@ -392,7 +428,13 @@ export function HeatmapChartView(props: BaseChartProps) {
 
 export function SparklineChartView({ title, summary, data, state = "current" }: BaseChartProps) {
   return (
-    <ChartFrame title={title} summary={summary} data={data} state={state} height={58}>
+    <ChartFrame
+      title={title}
+      {...(summary === undefined ? {} : { summary })}
+      data={data}
+      state={state}
+      height={58}
+    >
       <ResponsiveContainer width="100%" height="100%">
         <LineChart accessibilityLayer={false} data={data ?? []}>
           <Line

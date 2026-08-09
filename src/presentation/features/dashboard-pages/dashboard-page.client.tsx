@@ -106,7 +106,8 @@ function Chart({
   const data = fixture.chartData[spec.metricKey] ?? null;
   const props = {
     title: spec.title,
-    summary: spec.description,
+    // No `summary`: the enclosing ChartCard header already renders
+    // spec.description, and passing it here printed the sentence twice.
     data,
     state,
     // A declared unit from the data producer wins: some charts plot values in
