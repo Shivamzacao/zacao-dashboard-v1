@@ -1009,20 +1009,15 @@ select {
   padding: 0 10px;
 }
 
-.brand-mark {
-  display: grid;
-  width: 32px;
-  height: 32px;
-  place-items: center;
-  border: 1px solid #f4ecdb73;
-  border-radius: 999px;
-  font: italic 17px/1 var(--font-display);
-}
-
-.brand-word {
-  color: var(--cream);
-  font: 500 15px/1 var(--font-display);
-  letter-spacing: 4px;
+/* The primary logo artwork ships as a dark-on-transparent PNG, so mask it and
+   paint through the background colour — that keeps the mark legible on the
+   dark sidebar and lets any future surface retint it. */
+.brand-logo {
+  display: block;
+  width: 128px;
+  aspect-ratio: 1362 / 404;
+  background-color: var(--cream);
+  mask: url("/brand/zacao-logo.png") no-repeat center / contain;
 }
 
 .workspace-tile {
@@ -1643,8 +1638,8 @@ select {
 }
 
 .skeleton-brand {
-  width: 112px;
-  height: 32px;
+  width: 128px;
+  height: 38px;
 }
 
 .skeleton-workspace {

@@ -29,9 +29,8 @@ export function DashboardSidebar({
         onClick={onClose}
       />
       <aside className="dashboard-sidebar" data-open={open} aria-label="ZACAO dashboard">
-        <div className="brand-lockup" aria-label="ZACAO">
-          <span className="brand-mark">Z</span>
-          <span className="brand-word">ZACAO</span>
+        <div className="brand-lockup">
+          <span className="brand-logo" role="img" aria-label="ZACAO" />
         </div>
         <button
           className="sidebar-close"
