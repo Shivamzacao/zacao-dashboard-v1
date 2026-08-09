@@ -213,18 +213,57 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getByText("3.0% of previous")).toBeTruthy();
     expect(screen.getByText("35.8% of previous")).toBeTruthy();
     expect(screen.getByText("entry")).toBeTruthy();
-    // The silhouette keeps one band per stage, and the closing band stays wide
-    // enough to read rather than tapering to a sub-pixel line.
-    const bands = document.querySelectorAll<SVGPolygonElement>(".funnel-shape polygon");
+    // One band per stage, each clipped to a trapezoid.
+    const bands = [...document.querySelectorAll<HTMLElement>(".funnel-band-shape")];
     expect(bands).toHaveLength(3);
-    const widthOf = (band: SVGPolygonElement | null) => {
-      const xs = (band?.getAttribute("points") ?? "")
-        .split(" ")
-        .map((point) => Number.parseFloat(point.split(",")[0] ?? "0"));
-      return Math.max(...xs) - Math.min(...xs);
+    const edgesOf = (band: HTMLElement | undefined) => {
+      const points = /polygon\(([^)]*)\)/.exec(band?.getAttribute("style") ?? "")?.[1] ?? "";
+      const xs = points.split(",").map((pair) => Number.parseFloat(pair.trim()));
+      // A trapezoid is two top corners then two bottom corners, so its top and
+      // bottom widths are the spans of the first and last pair of x values.
+      return [(xs[1] ?? 0) - (xs[0] ?? 0), (xs[2] ?? 0) - (xs[3] ?? 0)];
     };
-    expect(widthOf(bands[0] ?? null)).toBeCloseTo(100, 1);
-    expect(widthOf(bands[2] ?? null)).toBeGreaterThanOrEqual(7);
+    const edges = bands.flatMap((band, index) =>
+      index === 0 ? edgesOf(band) : edgesOf(band).slice(1),
+    );
+    // Every edge is narrower than the one above it: the silhouette tapers the
+    // whole way down instead of dropping to a floor and drawing straight sides.
+    expect(edges[0]).toBeCloseTo(100, 1);
+    edges.slice(1).forEach((width, index) => {
+      expect(width).toBeLessThan(edges[index] ?? 0);
+    });
+    expect(edges[edges.length - 1]).toBeGreaterThan(0);
+    // Neighbouring stages never share a colour.
+    const colours = bands.map(
+      (band) => /background:\s*([^;]+)/.exec(band.getAttribute("style") ?? "")?.[1] ?? "",
+    );
+    expect(new Set(colours).size).toBe(bands.length);
+  });
+
+  it("keeps the funnel tapering when the stages barely move", () => {
+    // Flat stages are the other end of the range: proportional widths alone
+    // would draw a straight-sided tube rather than a funnel.
+    render(
+      <FunnelChartView
+        title="Flat funnel"
+        valueFormat="count"
+        data={[
+          { key: "a", label: "A", value: 100 },
+          { key: "b", label: "B", value: 100 },
+          { key: "c", label: "C", value: 99 },
+        ]}
+      />,
+    );
+    const widths = [...document.querySelectorAll<HTMLElement>(".funnel-band-shape")].flatMap(
+      (band) => {
+        const points = /polygon\(([^)]*)\)/.exec(band.getAttribute("style") ?? "")?.[1] ?? "";
+        const xs = points.split(",").map((pair) => Number.parseFloat(pair.trim()));
+        return [(xs[1] ?? 0) - (xs[0] ?? 0), (xs[2] ?? 0) - (xs[3] ?? 0)];
+      },
+    );
+    widths.forEach((width, index) => {
+      if (index % 2 === 1) expect(width).toBeLessThan(widths[index - 1] ?? 0);
+    });
   });
 
   it("ranks a long-tail breakdown, binds each label to its own value, and discloses the tail", () => {
