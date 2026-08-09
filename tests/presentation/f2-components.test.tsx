@@ -13,6 +13,7 @@ import {
 } from "@/src/presentation/components/dashboard/cards";
 import {
   FunnelChartView,
+  HorizontalBarChartView,
   LineChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
 import {
@@ -224,6 +225,40 @@ describe("F2 reusable dashboard components", () => {
     };
     expect(widthOf(bands[0] ?? null)).toBeCloseTo(100, 1);
     expect(widthOf(bands[2] ?? null)).toBeGreaterThanOrEqual(7);
+  });
+
+  it("ranks a long-tail breakdown, binds each label to its own value, and discloses the tail", () => {
+    const regions = [
+      { key: "ny", label: "New York, United States", value: 71 },
+      { key: "ca", label: "California, United States", value: 41 },
+      { key: "nj", label: "New Jersey, United States", value: 11 },
+      { key: "fl", label: "Florida, United States", value: 9 },
+      { key: "ct", label: "Connecticut, United States", value: 5 },
+      { key: "mo", label: "Missouri, United States", value: 3 },
+      { key: "ga", label: "Georgia, United States", value: 3 },
+      { key: "nc", label: "North Carolina, United States", value: 3 },
+      { key: "tx", label: "Texas, United States", value: 2 },
+      { key: "ab", label: "Alberta, Canada", value: 1 },
+    ];
+    // Deliberately unsorted input: the view ranks, so a label can never be
+    // painted beside a bar that belongs to a different category.
+    render(
+      <HorizontalBarChartView title="Customer geography" valueFormat="count" data={regions} />,
+    );
+
+    const rows = [...document.querySelectorAll(".ranked-bar")];
+    expect(rows).toHaveLength(9);
+    expect(rows[0]?.textContent).toContain("New York, United States");
+    expect(rows[0]?.textContent).toContain("71");
+    // The two smallest fall past the row limit and are summarised, not dropped.
+    expect(rows[8]?.textContent).toContain("2 more");
+    expect(rows[8]?.textContent).toContain("3");
+    // The widest bar belongs to the largest value.
+    const fills = [...document.querySelectorAll<HTMLElement>(".ranked-bar-fill")];
+    expect(fills[0]?.style.width).toBe("100%");
+    expect(Number.parseFloat(fills[1]?.style.width ?? "0")).toBeCloseTo(57.7, 0);
+    // Every category still reaches assistive tech through the data table.
+    expect(screen.getAllByText("Alberta, Canada").length).toBeGreaterThan(0);
   });
 
   it("omits the in-frame summary when the enclosing card already carries the copy", () => {

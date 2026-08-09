@@ -309,8 +309,52 @@ function BarChartView(
 export function VerticalBarChartView(props: SeriesChartProps) {
   return <BarChartView {...props} />;
 }
+/** Rows that fit the default frame without crushing the type. */
+const RANKED_ROW_LIMIT = 8;
+
+/**
+ * Ranked rows rather than a category axis. A long-tail breakdown (24 billing
+ * regions in a 260px frame) leaves Recharts ~10px per band, so it wraps long
+ * category names onto colliding lines and thins the ticks — which silently
+ * prints a label next to a bar it does not belong to. Rows bind each label to
+ * its own value, and the tail is summarised rather than dropped in silence.
+ */
 export function HorizontalBarChartView(props: SeriesChartProps) {
-  return <BarChartView {...props} horizontal />;
+  const format = props.valueFormat ?? "count";
+  const ranked = [...(props.data ?? [])]
+    .filter((item) => item.value !== null)
+    .sort((left, right) => (right.value ?? 0) - (left.value ?? 0));
+  const shown = ranked.slice(0, RANKED_ROW_LIMIT);
+  const rest = ranked.slice(RANKED_ROW_LIMIT);
+  const peak = Math.max(...shown.map((item) => Math.abs(item.value ?? 0)), 1);
+  const restTotal = rest.reduce((sum, item) => sum + (item.value ?? 0), 0);
+  return (
+    <ChartFrame {...props}>
+      <ol className="ranked-bars">
+        {shown.map((item) => (
+          <li key={item.key} className="ranked-bar">
+            <span className="ranked-bar-label" title={item.label}>
+              {item.label}
+            </span>
+            <span className="ranked-bar-track">
+              <span
+                className="ranked-bar-fill"
+                style={{ width: `${Math.max((Math.abs(item.value ?? 0) / peak) * 100, 1)}%` }}
+              />
+            </span>
+            <span className="ranked-bar-value">{valueFormatters[format](item.value ?? 0)}</span>
+          </li>
+        ))}
+        {rest.length > 0 ? (
+          <li className="ranked-bar ranked-bar-rest">
+            <span className="ranked-bar-label">{`${rest.length} more`}</span>
+            <span className="ranked-bar-track" />
+            <span className="ranked-bar-value">{valueFormatters[format](restTotal)}</span>
+          </li>
+        ) : null}
+      </ol>
+    </ChartFrame>
+  );
 }
 export function StackedBarChartView(props: SeriesChartProps) {
   return <BarChartView {...props} stacked />;
