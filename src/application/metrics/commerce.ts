@@ -18,6 +18,7 @@ import type {
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
 } from "./types";
+import { productBreakdownKey, productDisplayLabel } from "./product-identity";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -225,14 +226,14 @@ export function buildProductMixBreakdown(
   facts: readonly ProductSalesFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise: isMerchandise }) => isMerchandise);
-  const grouped = new Map<string, { product: string; netSales: number }>();
+  const grouped = new Map<string, { label: string; netSales: number }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `UNMAPPED:${fact.product}:${fact.variant ?? ""}`;
+    const key = productBreakdownKey(fact);
     const existing = grouped.get(key);
     if (existing) {
       existing.netSales += fact.netSalesMinorUnits;
     } else {
-      grouped.set(key, { product: fact.product, netSales: fact.netSalesMinorUnits });
+      grouped.set(key, { label: productDisplayLabel(fact), netSales: fact.netSalesMinorUnits });
     }
   }
   const total = sumSafeNumbers([...grouped.values()].map(({ netSales }) => netSales));
@@ -254,9 +255,9 @@ export function buildProductMixBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, { product, netSales }]) => ({
+    items: [...grouped.entries()].map(([key, { label, netSales }]) => ({
       key,
-      label: key.startsWith("UNMAPPED:") ? key : product,
+      label,
       values:
         total === 0
           ? [money(netSales)]
@@ -277,14 +278,14 @@ export function buildProductSalesBreakdown(
   facts: readonly ProductSalesFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise: isMerchandise }) => isMerchandise);
-  const grouped = new Map<string, { product: string; values: number[] }>();
+  const grouped = new Map<string, { label: string; values: number[] }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `UNMAPPED:${fact.product}:${fact.variant ?? ""}`;
+    const key = productBreakdownKey(fact);
     const existing = grouped.get(key);
     if (existing) {
       existing.values.push(fact.netSalesMinorUnits);
     } else {
-      grouped.set(key, { product: fact.product, values: [fact.netSalesMinorUnits] });
+      grouped.set(key, { label: productDisplayLabel(fact), values: [fact.netSalesMinorUnits] });
     }
   }
   const total = sumSafeNumbers(merchandise.map(({ netSalesMinorUnits }) => netSalesMinorUnits));
@@ -298,9 +299,9 @@ export function buildProductSalesBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, { product, values }]) => ({
+    items: [...grouped.entries()].map(([key, { label, values }]) => ({
       key,
-      label: key.startsWith("UNMAPPED:") ? key : product,
+      label,
       values: [money(sumSafeNumbers(values))],
       warnings: key.startsWith("UNMAPPED:") ? ["MISSING_SKU"] : [],
     })),

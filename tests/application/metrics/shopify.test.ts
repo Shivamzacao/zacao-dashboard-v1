@@ -85,6 +85,11 @@ describe("B5 Shopify metric services", () => {
     expect(breakdown.metric.value).toEqual({ kind: "count", value: 14 });
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items.some(({ warnings }) => warnings.includes("MISSING_SKU"))).toBe(true);
+    // Keys stay on the SKU identity; labels read as product names.
+    expect(breakdown.items.map(({ key, label }) => [key, label])).toEqual([
+      ["SKU-A", "Bar — 4 Pack"],
+      ["UNMAPPED:Bar:Single", "Bar — Single"],
+    ]);
     expect(velocity.rows).toHaveLength(2);
   });
 
@@ -108,6 +113,8 @@ describe("B5 Shopify metric services", () => {
       {
         locationId: "location-1",
         locationName: "Synthetic Warehouse",
+        product: "Synthetic Bar",
+        variant: "4 Pack",
         sku: "SKU-A",
         quantityName: "available",
         quantity: 25,
@@ -119,6 +126,10 @@ describe("B5 Shopify metric services", () => {
     expect(missingCost.warnings).toContain("MISSING_COST:SKU-A");
     expect(inventory.metric.value).toEqual({ kind: "count", value: 25 });
     expect(inventory.metric.warnings).toContain("SHOPIFY_LOCATIONS_ONLY");
+    expect(inventory.items[0]).toMatchObject({
+      key: "location-1:SKU-A:available",
+      label: "Synthetic Bar — 4 Pack · Available",
+    });
   });
 
   it("keeps provider identifiers out of the catalog table", () => {
@@ -151,10 +162,12 @@ describe("B5 Shopify metric services", () => {
     });
   });
 
-  it("labels inventory groups by SKU and quantity state rather than location GID", () => {
+  it("labels inventory groups by product and quantity state rather than location GID or SKU", () => {
     const fact = (sku: string | null, quantityName: string, quantity: number) => ({
       locationId: "gid://shopify/Location/111934701875",
       locationName: "Zacao Fulfillment",
+      product: "70% Cacao Dark Chocolate",
+      variant: "4-Pack",
       sku,
       quantityName,
       quantity,
@@ -162,13 +175,15 @@ describe("B5 Shopify metric services", () => {
     });
     const single = buildInventoryBreakdown(context(), [
       fact("ZAC-DC-70-4PK", "reserved", 2),
-      fact("ZAC-MC-42-10PK", "safety_stock", 58),
+      { ...fact("ZAC-MC-42-10PK", "safety_stock", 58), product: "42% Cacao", variant: "10-Pack" },
       fact(null, "available", 4),
     ]);
     expect(single.items.map(({ label }) => label)).toEqual([
-      "ZAC-DC-70-4PK · Reserved",
-      "ZAC-MC-42-10PK · Safety stock",
-      "Unmapped SKU · Available",
+      "70% Cacao Dark Chocolate — 4-Pack · Reserved",
+      "42% Cacao — 10-Pack · Safety stock",
+      // An unmapped SKU still has a product title, so the label stays readable
+      // and only the warning discloses the missing mapping.
+      "70% Cacao Dark Chocolate — 4-Pack · Available",
     ]);
     // The grouping key still carries the location GID, so groups stay distinct.
     expect(single.items[0]?.key).toContain("gid://shopify/Location/111934701875");
@@ -179,8 +194,8 @@ describe("B5 Shopify metric services", () => {
       { ...fact("ZAC-DC-70-4PK", "available", 9), locationId: "loc-2", locationName: "Retail" },
     ]);
     expect(multiple.items.map(({ label }) => label)).toEqual([
-      "Zacao Fulfillment · ZAC-DC-70-4PK · Available",
-      "Retail · ZAC-DC-70-4PK · Available",
+      "Zacao Fulfillment · 70% Cacao Dark Chocolate — 4-Pack · Available",
+      "Retail · 70% Cacao Dark Chocolate — 4-Pack · Available",
     ]);
   });
 });

@@ -138,5 +138,9 @@ describe("product sales breakdown", () => {
     });
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items).toHaveLength(1);
+    expect(breakdown.items[0]).toMatchObject({
+      key: "ZAC-DC-70-10PK",
+      label: "70% Cacao — 10-Pack",
+    });
   });
 });

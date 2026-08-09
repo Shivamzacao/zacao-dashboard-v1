@@ -240,6 +240,8 @@ describe("catalog and inventory facts from normalized admin products", () => {
       {
         locationId: "gid://shopify/Location/41",
         locationName: "SNAPL",
+        product: "70% Cacao Dark Chocolate",
+        variant: "10-Pack",
         sku: "ZAC-DC-70-10PK",
         quantityName: "available",
         quantity: 100,
@@ -248,6 +250,8 @@ describe("catalog and inventory facts from normalized admin products", () => {
       {
         locationId: "gid://shopify/Location/41",
         locationName: "SNAPL",
+        product: "70% Cacao Dark Chocolate",
+        variant: "10-Pack",
         sku: "ZAC-DC-70-10PK",
         quantityName: "committed",
         quantity: 20,
