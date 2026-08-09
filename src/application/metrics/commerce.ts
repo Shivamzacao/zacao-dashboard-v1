@@ -225,15 +225,25 @@ export function buildProductMixBreakdown(
   facts: readonly ProductSalesFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise: isMerchandise }) => isMerchandise);
-  const grouped = new Map<string, number>();
+  const grouped = new Map<string, { product: string; netSales: number }>();
   for (const fact of merchandise) {
     const key = fact.sku ?? `UNMAPPED:${fact.product}:${fact.variant ?? ""}`;
-    grouped.set(key, (grouped.get(key) ?? 0) + fact.netSalesMinorUnits);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.netSales += fact.netSalesMinorUnits;
+    } else {
+      grouped.set(key, { product: fact.product, netSales: fact.netSalesMinorUnits });
+    }
   }
-  const total = sumSafeNumbers([...grouped.values()]);
+  const total = sumSafeNumbers([...grouped.values()].map(({ netSales }) => netSales));
   // The headline value is the leading SKU's share of merchandise net sales.
   const leadingShare =
-    total === 0 ? null : Math.round((Math.max(0, ...grouped.values()) * 10_000) / total);
+    total === 0
+      ? null
+      : Math.round(
+          (Math.max(0, ...[...grouped.values()].map(({ netSales }) => netSales)) * 10_000) /
+            total,
+        );
   const base = metric(
     context,
     "products.mix",
@@ -244,9 +254,9 @@ export function buildProductMixBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, netSales]) => ({
+    items: [...grouped.entries()].map(([key, { product, netSales }]) => ({
       key,
-      label: key,
+      label: key.startsWith("UNMAPPED:") ? key : product,
       values:
         total === 0
           ? [money(netSales)]
