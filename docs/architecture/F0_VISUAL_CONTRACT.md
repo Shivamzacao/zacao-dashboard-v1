@@ -46,7 +46,8 @@ There are no authentication, account, admin, settings, or editing routes in V1.
 
 ## Global control contract
 
-- Default period is rolling last 12 months, replacing the demo's mock 90-day default.
+- Default period is rolling last 30 days on every section, replacing the demo's mock 90-day default.
+  Rolling last 12 months remains a selectable preset but is no longer the cold-load period.
 - Period, comparison, channel, SKU/product, and location controls appear only when B7 reports support.
 - Comparison and dimension filters reuse the demo's 35 px date-control visual pattern.
 - Filters are URL-backed in F1; no browser parameter selects TEST versus PRODUCTION.

@@ -97,7 +97,9 @@ export function parseFrontendFilterState(
   supported: FilterOptions,
   today: IsoDate,
 ): FrontendFilterState {
-  const fallback = dateRangeForPreset("last_12_months", today);
+  // Every section loads on the rolling 30-day window unless the URL asks for
+  // something else, so a cold visit to any tab reads the cheapest period.
+  const fallback = dateRangeForPreset("last_30_days", today);
   const requestedStart = search.get("start");
   const requestedEnd = search.get("end");
   const validRange =
