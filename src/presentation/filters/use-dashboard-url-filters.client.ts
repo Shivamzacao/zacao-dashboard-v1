@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useOptimistic, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -23,6 +23,13 @@ export function useDashboardUrlFilters(supported: FilterOptions, today: IsoDate)
     [rawQuery, supported, today],
   );
 
+  // The controls read their value from the URL, which only settles once the
+  // server has re-rendered the page. Optimistic state lets a selection show up
+  // on the current frame, and `pending` stays true for the whole navigation so
+  // the shell can say the numbers are still being fetched.
+  const [optimisticState, applyOptimisticState] = useOptimistic(state);
+  const [pending, startTransition] = useTransition();
+
   useEffect(() => {
     if (rawQuery !== state.query) {
       router.replace(pathname + "?" + state.query, { scroll: false });
@@ -31,10 +38,17 @@ export function useDashboardUrlFilters(supported: FilterOptions, today: IsoDate)
 
   const push = useCallback(
     (patch: Partial<DashboardFilters>) => {
-      const next = updateFilterState(state, patch, supported, today);
-      router.push(pathname + "?" + next.query, { scroll: false });
+      // Patch the optimistic state, not the committed one: a second change made
+      // while the first navigation is still in flight must build on it rather
+      // than silently drop it.
+      const next = updateFilterState(optimisticState, patch, supported, today);
+      if (next.query === optimisticState.query) return;
+      startTransition(() => {
+        applyOptimisticState(next);
+        router.push(pathname + "?" + next.query, { scroll: false });
+      });
     },
-    [pathname, router, state, supported, today],
+    [applyOptimisticState, optimisticState, pathname, router, supported, today],
   );
 
   const selectPreset = useCallback(
@@ -42,5 +56,5 @@ export function useDashboardUrlFilters(supported: FilterOptions, today: IsoDate)
     [push, today],
   );
 
-  return { state, push, selectPreset };
+  return { state: optimisticState, push, selectPreset, pending };
 }

@@ -30,6 +30,8 @@ interface TopBarProps {
   readonly menuButtonRef: React.RefObject<HTMLButtonElement | null>;
   readonly exportHref: string | null;
   readonly supportedComparisons: readonly DashboardFilters["comparison"][];
+  /** A filter change is still waiting on the server render. */
+  readonly pending?: boolean;
 }
 
 export function TopBar({
@@ -41,6 +43,7 @@ export function TopBar({
   menuButtonRef,
   exportHref,
   supportedComparisons,
+  pending = false,
 }: TopBarProps) {
   return (
     <header className="dashboard-topbar">
@@ -56,7 +59,7 @@ export function TopBar({
         <ShellIcon name="menu" />
       </button>
       <div className="topbar-spacer" />
-      <div className="topbar-controls">
+      <div className="topbar-controls" data-pending={pending ? "" : undefined}>
         <label className="control-field date-control">
           <span className="sr-only">Reporting period</span>
           <ShellIcon name="calendar" size={16} />
@@ -81,6 +84,7 @@ export function TopBar({
           <span className="sr-only">Comparison period</span>
           <select
             aria-label="Comparison period"
+            aria-busy={pending}
             value={state.filters.comparison}
             onChange={(event) =>
               onFilterChange({
