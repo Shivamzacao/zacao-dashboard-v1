@@ -100,4 +100,51 @@ describe("mapDashboardPageToDisplayData", () => {
       expect.objectContaining({ label: "Klaviyo", state: "no_activity" }),
     ]);
   });
+
+  it("formats a comparison metric into a signed percent change with a direction", () => {
+    const returningRate = createMetricViewModel({
+      metricKey: "customers.returning_rate",
+      environment: "production",
+      dataPeriod,
+      sources: [shopifyCurrent],
+      value: { kind: "rate_basis_points", value: 1_200 },
+    });
+    const withComparison: MetricViewModel = {
+      ...returningRate,
+      comparison: {
+        mode: "previous_period",
+        dataPeriod: { startDate: "2025-07-08", endDate: "2025-08-07" },
+        value: { kind: "rate_basis_points", value: 1_000 },
+      },
+    };
+    const display = mapDashboardPageToDisplayData(pageWith([withComparison]), "production");
+    expect(display.comparisonValues?.["customers.returning_rate"]).toEqual({
+      label: "vs previous period",
+      value: "+20.0%",
+      direction: "up",
+    });
+  });
+
+  it("reports a comparison as unavailable rather than dividing by a zero baseline", () => {
+    const returningRate = createMetricViewModel({
+      metricKey: "customers.returning_rate",
+      environment: "production",
+      dataPeriod,
+      sources: [shopifyCurrent],
+      value: { kind: "rate_basis_points", value: 500 },
+    });
+    const withComparison: MetricViewModel = {
+      ...returningRate,
+      comparison: {
+        mode: "previous_year",
+        dataPeriod: { startDate: "2024-08-08", endDate: "2025-08-07" },
+        value: { kind: "rate_basis_points", value: 0 },
+      },
+    };
+    const display = mapDashboardPageToDisplayData(pageWith([withComparison]), "production");
+    expect(display.comparisonValues?.["customers.returning_rate"]).toEqual({
+      label: "vs previous year",
+      value: null,
+    });
+  });
 });

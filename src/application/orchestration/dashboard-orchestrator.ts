@@ -1,6 +1,7 @@
 import { composeDashboardPage } from "@/src/application/metrics";
 import type { ClockPort } from "@/src/application/ports";
 import type {
+  DashboardPageViewModel,
   MetricBreakdownViewModel,
   MetricSeriesViewModel,
   MetricTableViewModel,
@@ -9,9 +10,13 @@ import type {
 import {
   dashboardFiltersSchema,
   sourceStatusSchema,
+  type ComparisonMode,
+  type DashboardFilters,
+  type DateRange,
   type SourceStatus,
 } from "@/src/domain/contracts";
 import { createDatasetCacheKey } from "@/src/domain/utilities/cache-key";
+import { comparisonDateRange } from "@/src/domain/utilities/comparison-period";
 import { normalizeDashboardFilters } from "@/src/domain/utilities/filters";
 
 import type { CacheCoordinator } from "./cache-coordinator";
@@ -117,6 +122,47 @@ function unavailableContribution(
   };
 }
 
+function comparisonLookup(page: DashboardPageViewModel): ReadonlyMap<string, MetricViewModel> {
+  const lookup = new Map<string, MetricViewModel>();
+  for (const metric of page.metrics) lookup.set(metric.key, metric);
+  for (const series of page.series) lookup.set(series.metric.key, series.metric);
+  for (const breakdown of page.breakdowns) lookup.set(breakdown.metric.key, breakdown.metric);
+  for (const table of page.tables) lookup.set(table.metric.key, table.metric);
+  return lookup;
+}
+
+function attachComparison(
+  metric: MetricViewModel,
+  lookup: ReadonlyMap<string, MetricViewModel>,
+  mode: Exclude<ComparisonMode, "none">,
+  dataPeriod: DateRange,
+): MetricViewModel {
+  const comparisonMetric = lookup.get(metric.key);
+  if (!comparisonMetric) return metric;
+  return { ...metric, comparison: { mode, dataPeriod, value: comparisonMetric.value } };
+}
+
+/** Merges each metric's prior-period counterpart onto the page the user sees. */
+function withComparisonValues(
+  page: DashboardPageViewModel,
+  comparisonPage: DashboardPageViewModel,
+  mode: Exclude<ComparisonMode, "none">,
+  dataPeriod: DateRange,
+): DashboardPageViewModel {
+  const lookup = comparisonLookup(comparisonPage);
+  const attach = (metric: MetricViewModel) => attachComparison(metric, lookup, mode, dataPeriod);
+  return {
+    ...page,
+    metrics: page.metrics.map(attach),
+    series: page.series.map((series) => ({ ...series, metric: attach(series.metric) })),
+    breakdowns: page.breakdowns.map((breakdown) => ({
+      ...breakdown,
+      metric: attach(breakdown.metric),
+    })),
+    tables: page.tables.map((table) => ({ ...table, metric: attach(table.metric) })),
+  };
+}
+
 function mergeSourceStatuses(statuses: readonly SourceStatus[]): readonly SourceStatus[] {
   const bySource = new Map<SourceStatus["source"], SourceStatus[]>();
   for (const status of statuses) {
@@ -194,14 +240,14 @@ export class DashboardOrchestrator {
     this.contributors = mapped;
   }
 
-  async loadPage(request: DashboardRequest): Promise<OrchestratedDashboardResult> {
-    const filters = normalizeDashboardFilters(dashboardFiltersSchema.parse(request.filters));
-    const datasetKeys = [...new Set(this.sectionPlan[request.section] ?? [])];
-    const contributors = datasetKeys.map((dataset) => {
-      const contributor = this.contributors.get(dataset);
-      if (!contributor) throw new TypeError(`Missing contributor for planned dataset: ${dataset}`);
-      return contributor;
-    });
+  private async fetchContributions(
+    request: DashboardRequest,
+    filters: DashboardFilters,
+    contributors: readonly DashboardDatasetContributor[],
+  ): Promise<{
+    readonly contributions: readonly DashboardContribution[];
+    readonly cache: readonly DatasetCacheMetadata[];
+  }> {
     const baseContext: OrchestrationContext = {
       environment: request.environment,
       dataPeriod: { startDate: filters.startDate, endDate: filters.endDate },
@@ -266,22 +312,70 @@ export class DashboardOrchestrator {
       },
     );
 
-    const contributions = loaded.map(({ contribution }) => contribution);
+    return {
+      contributions: loaded.map(({ contribution }) => contribution),
+      cache: loaded.map(({ cache }) => cache),
+    };
+  }
+
+  private composePage(
+    request: DashboardRequest,
+    filters: DashboardFilters,
+    contributions: readonly DashboardContribution[],
+  ): DashboardPageViewModel {
     const sourceStatuses = mergeSourceStatuses(
       contributions.flatMap(({ sourceStatuses: statuses }) => statuses),
     );
-    const context = { ...baseContext, sourceStatuses };
+    const context: OrchestrationContext = {
+      environment: request.environment,
+      dataPeriod: { startDate: filters.startDate, endDate: filters.endDate },
+      filters,
+      reportingTimeZone: REPORTING_TIME_ZONE,
+      currency: REPORTING_CURRENCY,
+      sourceStatuses,
+    };
+    return composeDashboardPage({
+      section: request.section,
+      context,
+      metrics: contributions.flatMap(({ metrics }) => metrics ?? []),
+      series: contributions.flatMap(({ series }) => series ?? []),
+      breakdowns: contributions.flatMap(({ breakdowns }) => breakdowns ?? []),
+      tables: contributions.flatMap(({ tables }) => tables ?? []),
+      warnings: [...new Set(contributions.flatMap(({ warnings }) => warnings ?? []))],
+    });
+  }
+
+  async loadPage(request: DashboardRequest): Promise<OrchestratedDashboardResult> {
+    const filters = normalizeDashboardFilters(dashboardFiltersSchema.parse(request.filters));
+    const datasetKeys = [...new Set(this.sectionPlan[request.section] ?? [])];
+    const contributors = datasetKeys.map((dataset) => {
+      const contributor = this.contributors.get(dataset);
+      if (!contributor) throw new TypeError(`Missing contributor for planned dataset: ${dataset}`);
+      return contributor;
+    });
+
+    const primary = await this.fetchContributions(request, filters, contributors);
+    const page = this.composePage(request, filters, primary.contributions);
+
+    const comparisonRange = comparisonDateRange(
+      { startDate: filters.startDate, endDate: filters.endDate },
+      filters.comparison,
+    );
+    if (!comparisonRange || filters.comparison === "none") {
+      return { page, cache: primary.cache };
+    }
+
+    const comparisonFilters = normalizeDashboardFilters({
+      ...filters,
+      startDate: comparisonRange.startDate,
+      endDate: comparisonRange.endDate,
+    });
+    const comparison = await this.fetchContributions(request, comparisonFilters, contributors);
+    const comparisonPage = this.composePage(request, comparisonFilters, comparison.contributions);
+
     return {
-      page: composeDashboardPage({
-        section: request.section,
-        context,
-        metrics: contributions.flatMap(({ metrics }) => metrics ?? []),
-        series: contributions.flatMap(({ series }) => series ?? []),
-        breakdowns: contributions.flatMap(({ breakdowns }) => breakdowns ?? []),
-        tables: contributions.flatMap(({ tables }) => tables ?? []),
-        warnings: [...new Set(contributions.flatMap(({ warnings }) => warnings ?? []))],
-      }),
-      cache: loaded.map(({ cache }) => cache),
+      page: withComparisonValues(page, comparisonPage, filters.comparison, comparisonRange),
+      cache: primary.cache,
     };
   }
 }

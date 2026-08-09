@@ -7,6 +7,7 @@ import type {
 import type { SourceStatus } from "@/src/domain/contracts";
 import type {
   ChartDatum,
+  DisplayComparison,
   DisplayState,
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
@@ -41,6 +42,44 @@ function numericValue(value: MetricDisplayValue | null): number | null {
     default:
       return null;
   }
+}
+
+const COMPARISON_LABELS = {
+  previous_period: "vs previous period",
+  previous_year: "vs previous year",
+} as const;
+
+/**
+ * Percent change between two same-kind values. Returns null when a
+ * percentage isn't meaningful (mismatched kinds, a zero baseline) rather
+ * than inventing one — the pill then falls back to "Unavailable".
+ */
+function percentChange(
+  current: MetricDisplayValue,
+  previous: MetricDisplayValue,
+): { readonly direction: "up" | "down" | "flat"; readonly value: string } | null {
+  if (current.kind !== previous.kind) return null;
+  const currentNumeric = numericValue(current);
+  const previousNumeric = numericValue(previous);
+  if (currentNumeric === null || previousNumeric === null) return null;
+  const delta = currentNumeric - previousNumeric;
+  if (delta === 0) return { direction: "flat", value: "0%" };
+  if (previousNumeric === 0) return null;
+  const percent = (delta / Math.abs(previousNumeric)) * 100;
+  return {
+    direction: delta > 0 ? "up" : "down",
+    value: `${percent > 0 ? "+" : ""}${percent.toFixed(1)}%`,
+  };
+}
+
+function comparisonFor(metric: MetricViewModel): DisplayComparison | null {
+  if (!metric.comparison) return null;
+  const label = COMPARISON_LABELS[metric.comparison.mode];
+  if (metric.value === null || metric.comparison.value === null) {
+    return { label, value: null };
+  }
+  const change = percentChange(metric.value, metric.comparison.value);
+  return change ? { label, value: change.value, direction: change.direction } : { label, value: null };
 }
 
 function displayStateFor(metric: MetricViewModel): DisplayState {
@@ -88,6 +127,7 @@ export function mapDashboardPageToDisplayData(
   const currentValues: Record<string, MetricDisplayValue> = {};
   const states: Record<string, DisplayState> = {};
   const stateReasons: Record<string, string> = {};
+  const comparisonValues: Record<string, DisplayComparison> = {};
 
   const registerMetric = (metric: MetricViewModel) => {
     states[metric.key] = displayStateFor(metric);
@@ -97,6 +137,8 @@ export function mapDashboardPageToDisplayData(
       const reason = metric.unavailableReason ?? metric.readiness.message;
       if (reason) stateReasons[metric.key] = reason;
     }
+    const comparison = comparisonFor(metric);
+    if (comparison) comparisonValues[metric.key] = comparison;
   };
 
   for (const metric of page.metrics) registerMetric(metric);
@@ -151,5 +193,6 @@ export function mapDashboardPageToDisplayData(
     sources: page.sources.map(sourceIndicator),
     states,
     stateReasons,
+    comparisonValues,
   };
 }

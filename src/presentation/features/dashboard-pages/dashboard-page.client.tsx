@@ -69,12 +69,14 @@ function stateReason(metric: MetricCatalogEntry, fixture: DashboardPageDisplayDa
 function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayModel {
   const metric = requiredMetric(metricKey);
   const value = fixture.currentValues[metricKey] ?? null;
+  const comparison = fixture.comparisonValues?.[metricKey];
   return {
     label: metric.label,
     value,
     state: metricState(metric, fixture),
     helpText: `${metric.sources}. ${metric.calculation}`,
     ...(!value ? { unavailableReason: stateReason(metric, fixture) } : {}),
+    ...(comparison ? { comparison } : {}),
     // Sparklines are illustrative and only ever shown on synthetic fixtures.
     ...(fixture.synthetic &&
     value &&
