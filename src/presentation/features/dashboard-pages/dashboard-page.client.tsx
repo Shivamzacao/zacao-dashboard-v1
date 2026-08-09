@@ -13,7 +13,7 @@ import {
   StackedBarChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
-import { ChartCard, InsightCard, KpiCard } from "@/src/presentation/components/dashboard/cards";
+import { ChartCard, KpiCard } from "@/src/presentation/components/dashboard/cards";
 import { DataTable } from "@/src/presentation/components/dashboard/data-table.client";
 import { DetailDrawer } from "@/src/presentation/components/dashboard/detail-drawer.client";
 import type {
@@ -247,14 +247,6 @@ export function DashboardPageView({
       {/* The per-source readiness pills are withheld from the page for now at
           ZACAO's request. `fixture.sources` still carries them, so restoring
           the panel is a render-only change. */}
-      <section className="intelligence-decision-grid" aria-label="Decision support">
-        <InsightCard
-          title={spec.decisionTitle}
-          metadata={["Deterministic V1 rules", "No inferred data"]}
-        >
-          <p>{spec.decisionCopy}</p>
-        </InsightCard>
-      </section>
     </div>
   );
 }

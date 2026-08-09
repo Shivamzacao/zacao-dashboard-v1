@@ -30,8 +30,6 @@ export interface DashboardPageSpec {
   readonly kpis: readonly string[];
   readonly charts: readonly PageChartSpec[];
   readonly tables: readonly PageTableSpec[];
-  readonly decisionTitle: string;
-  readonly decisionCopy: string;
 }
 
 const spec = (value: DashboardPageSpec): DashboardPageSpec => Object.freeze(value);
@@ -73,9 +71,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
       ],
       tables: [],
-      decisionTitle: "Leadership attention",
-      decisionCopy:
-        "Business-health scoring and ranked recommendations remain unavailable until their deterministic signals, weights, and thresholds are approved.",
     }),
     revenue: spec({
       slug: "revenue",
@@ -121,9 +116,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "detailed-orders",
         },
       ],
-      decisionTitle: "Revenue basis",
-      decisionCopy:
-        "Shopify canonical sales values remain visible only after the revenue, refund, cancellation, discount, tax, and shipping policies are approved.",
     }),
     customers: spec({
       slug: "customers",
@@ -162,9 +154,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
       ],
       tables: [],
-      decisionTitle: "History completeness",
-      decisionCopy:
-        "Cohorts, realized lifetime value, RFM, and repeat behavior must disclose historical completeness and never infer missing customer history.",
     }),
     products: spec({
       slug: "products",
@@ -218,9 +207,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "product-velocity",
         },
       ],
-      decisionTitle: "Product readiness",
-      decisionCopy:
-        "Margin, inventory value, reorder dates, and frequently bought together analysis remain blocked until their source data and business rules are approved.",
     }),
     operations: spec({
       slug: "operations",
@@ -271,9 +257,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "incoming-production",
         },
       ],
-      decisionTitle: "Operational activation",
-      decisionCopy:
-        "Conditional operational analytics activate independently. Missing workbook inputs never block current Shopify inventory or unrelated fulfillment reporting.",
     }),
     marketing: spec({
       slug: "marketing",
@@ -325,9 +308,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "klaviyo-flows",
         },
       ],
-      decisionTitle: "Attribution boundary",
-      decisionCopy:
-        "Marketing spend supplies spend only. CAC, ROAS, and LTV:CAC require separately approved numerators, denominators, and verified attribution sources.",
     }),
     insights: spec({
       slug: "insights",
@@ -354,9 +334,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
       ],
       tables: [],
-      decisionTitle: "Recommendations policy",
-      decisionCopy:
-        "V1 supports deterministic alerts only. Assignment actions and AI-generated recommendations are explicitly outside V1.",
     }),
     growth: spec({
       slug: "growth",
@@ -400,9 +377,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "growth-next-actions",
         },
       ],
-      decisionTitle: "Conditional module",
-      decisionCopy:
-        "Growth Intelligence remains source-gated. Weighted pipeline probability is not a V1 calculation and will not be inferred.",
     }),
     financial: spec({
       slug: "financial",
@@ -441,9 +415,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
       ],
       tables: [],
-      decisionTitle: "Financial activation",
-      decisionCopy:
-        "Financial Intelligence is conditional on validated actuals and approved policies. Predictive cash flow is outside V1.",
     }),
   },
 );
