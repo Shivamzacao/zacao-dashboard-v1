@@ -233,6 +233,10 @@ describe("F2 reusable dashboard components", () => {
       expect(width).toBeLessThan(edges[index] ?? 0);
     });
     expect(edges[edges.length - 1]).toBeGreaterThan(0);
+    // jsdom has no layout, so the bands cannot measure themselves and fall back
+    // to the share estimate: the closing band prints its count beside the taper
+    // instead of clipping it inside.
+    expect(document.querySelectorAll(".funnel-band-value-outside")).toHaveLength(1);
     // Neighbouring stages never share a colour.
     const colours = bands.map(
       (band) => /background:\s*([^;]+)/.exec(band.getAttribute("style") ?? "")?.[1] ?? "",

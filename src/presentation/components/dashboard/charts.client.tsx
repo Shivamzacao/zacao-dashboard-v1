@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -449,12 +449,20 @@ function funnelEdges(stages: readonly ChartDatum[]): readonly number[] {
   });
 }
 
+/** Roughly one 12px semibold tabular digit, plus breathing room either side. */
+const FUNNEL_VALUE_CHAR_PX = 7.5;
+const FUNNEL_VALUE_PADDING_PX = 12;
+
 /**
- * Whether a band is wide enough to carry its own value. Narrow closing bands
- * print the count beside the shape instead, where it cannot be clipped.
+ * Whether a band can carry its own count, decided in pixels: the same 13% band
+ * is 30px across in a half-width card and 65px in a full-width one, so a share
+ * of the frame cannot answer the question on its own. `width` is 0 until the
+ * band has been measured — and in jsdom, which has no layout — so a share-based
+ * estimate stands in until then.
  */
-function bandFitsValue(midWidth: number, text: string): boolean {
-  return midWidth >= text.length * 3.4 + 10;
+function bandFitsValue(midShare: number, width: number, text: string): boolean {
+  const needed = text.length * FUNNEL_VALUE_CHAR_PX + FUNNEL_VALUE_PADDING_PX;
+  return width > 0 ? (midShare / 100) * width >= needed : midShare >= text.length * 3.4 + 10;
 }
 
 /**
@@ -473,6 +481,51 @@ function FunnelOutsideValue({ edge, text }: { readonly edge: number; readonly te
       title={text}
     >
       {text}
+    </span>
+  );
+}
+
+/** One trapezoid, which measures itself to decide where its count belongs. */
+function FunnelBand({
+  top,
+  bottom,
+  colour,
+  text,
+}: {
+  readonly top: number;
+  readonly bottom: number;
+  readonly colour: string;
+  readonly text: string;
+}) {
+  const bandRef = useRef<HTMLSpanElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const node = bandRef.current;
+    if (!node) return;
+    setWidth(node.getBoundingClientRect().width);
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver((entries) => {
+      setWidth(entries[0]?.contentRect.width ?? 0);
+    });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  const inside = bandFitsValue((top + bottom) / 2, width, text);
+  return (
+    <span className="funnel-row-band" ref={bandRef}>
+      <span
+        className="funnel-band-shape"
+        style={{
+          background: colour,
+          clipPath: `polygon(${50 - top / 2}% 0%, ${50 + top / 2}% 0%, ${50 + bottom / 2}% 100%, ${50 - bottom / 2}% 100%)`,
+        }}
+        aria-hidden="true"
+      />
+      {inside ? (
+        <span className="funnel-band-value">{text}</span>
+      ) : (
+        <FunnelOutsideValue edge={50 + Math.max(top, bottom) / 2} text={text} />
+      )}
     </span>
   );
 }
@@ -496,9 +549,6 @@ export function FunnelChartView(props: BaseChartProps) {
           const step = previous === null ? null : stageShare(value, previous);
           const top = (edges[index] ?? 1) * 100;
           const bottom = (edges[index + 1] ?? top) * 100;
-          const colour = stageColour(index);
-          const text = valueFormatters[format](value);
-          const inside = bandFitsValue((top + bottom) / 2, text);
           return (
             <li key={item.key} className="funnel-row">
               <span className="funnel-row-head">
@@ -509,21 +559,12 @@ export function FunnelChartView(props: BaseChartProps) {
                   {step === null ? "entry" : `${(step * 100).toFixed(1)}% of previous`}
                 </span>
               </span>
-              <span className="funnel-row-band">
-                <span
-                  className="funnel-band-shape"
-                  style={{
-                    background: colour,
-                    clipPath: `polygon(${50 - top / 2}% 0%, ${50 + top / 2}% 0%, ${50 + bottom / 2}% 100%, ${50 - bottom / 2}% 100%)`,
-                  }}
-                  aria-hidden="true"
-                />
-                {inside ? (
-                  <span className="funnel-band-value">{text}</span>
-                ) : (
-                  <FunnelOutsideValue edge={50 + Math.max(top, bottom) / 2} text={text} />
-                )}
-              </span>
+              <FunnelBand
+                top={top}
+                bottom={bottom}
+                colour={stageColour(index)}
+                text={valueFormatters[format](value)}
+              />
             </li>
           );
         })}
@@ -582,7 +623,10 @@ function weekdayRank(day: string): number {
 }
 
 function GridHeatmapChartView(
-  props: BaseChartProps & { readonly data: readonly ChartDatum[]; readonly format: ChartValueFormat },
+  props: BaseChartProps & {
+    readonly data: readonly ChartDatum[];
+    readonly format: ChartValueFormat;
+  },
 ) {
   const { data, format } = props;
   const rows = [...new Set(data.map((item) => item.group ?? ""))].sort(
