@@ -18,6 +18,8 @@ playwright-report/
 *.log
 .vercel/
 .trigger/
+# Agent scratch space, including throwaway worktrees of this repository
+.claude/
 
 # Generated QA artifacts
 tools/docx_qa/

@@ -15,7 +15,10 @@ const domainForbiddenImports = [
 export default defineConfig([
   ...nextCoreWebVitals,
   ...nextTypeScript,
-  globalIgnores([".next/**", "coverage/**", "docs/**", "node_modules/**"]),
+  // `.claude/worktrees` holds throwaway checkouts of this same repository, so
+  // linting it re-reports every file (plus generated output) from a second
+  // copy and fails the gate on code that is not in this tree.
+  globalIgnores([".next/**", ".claude/**", "coverage/**", "docs/**", "node_modules/**"]),
   {
     rules: {
       "@next/next/no-html-link-for-pages": "off",
