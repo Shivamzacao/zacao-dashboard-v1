@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import {
   Area,
   AreaChart,
@@ -136,7 +137,10 @@ function AccessibleChartTable({
       <tbody>
         {data.map((item) => (
           <tr key={item.key}>
-            <th scope="row">{item.label}</th>
+            {/* Grouped data (e.g. day/hour heatmap cells) shortens `label` to
+                just the column value for the visual grid; restore the group
+                here so the row stays self-describing without it. */}
+            <th scope="row">{item.group ? `${item.group} ${item.label}` : item.label}</th>
             <td>{format(item.value)}</td>
             <td>{format(item.secondaryValue)}</td>
           </tr>
@@ -477,12 +481,20 @@ export function FunnelChartView(props: BaseChartProps) {
 }
 
 export function HeatmapChartView(props: BaseChartProps) {
-  const max = Math.max(...(props.data ?? []).map((item) => Math.abs(item.value ?? 0)), 1);
+  const data = props.data ?? [];
   const format = props.valueFormat ?? "count";
+  // Day/hour breakdowns arrive with every item tagged by a `group` (the day);
+  // that's the signal to lay cells out as a grid instead of a flat list — a
+  // flat list of ~168 labelled cells is exactly the unreadable-axis problem
+  // this component exists to avoid.
+  if (data.length > 0 && data.every((item) => item.group !== undefined)) {
+    return <GridHeatmapChartView {...props} data={data} format={format} />;
+  }
+  const max = Math.max(...data.map((item) => Math.abs(item.value ?? 0)), 1);
   return (
     <ChartFrame {...props}>
       <div className="heatmap-grid">
-        {(props.data ?? []).map((item) => (
+        {data.map((item) => (
           <div
             key={item.key}
             className="heatmap-cell"
@@ -495,6 +507,72 @@ export function HeatmapChartView(props: BaseChartProps) {
             <span>{item.label}</span>
             <strong>{item.value === null ? "—" : valueFormatters[format](item.value)}</strong>
           </div>
+        ))}
+      </div>
+    </ChartFrame>
+  );
+}
+
+/** Canonical week order for grouping rows; anything unrecognised sorts after by name. */
+const WEEKDAY_ORDER = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+function weekdayRank(day: string): number {
+  const index = WEEKDAY_ORDER.indexOf(day as (typeof WEEKDAY_ORDER)[number]);
+  return index === -1 ? WEEKDAY_ORDER.length : index;
+}
+
+function GridHeatmapChartView(
+  props: BaseChartProps & { readonly data: readonly ChartDatum[]; readonly format: ChartValueFormat },
+) {
+  const { data, format } = props;
+  const rows = [...new Set(data.map((item) => item.group ?? ""))].sort(
+    (left, right) => weekdayRank(left) - weekdayRank(right) || left.localeCompare(right),
+  );
+  const columns = [...new Set(data.map((item) => item.label))].sort(
+    (left, right) => Number(left) - Number(right),
+  );
+  const byCell = new Map(data.map((item) => [`${item.group ?? ""}|${item.label}`, item]));
+  const max = Math.max(...data.map((item) => Math.abs(item.value ?? 0)), 1);
+  return (
+    <ChartFrame {...props}>
+      <div
+        className="heatmap-grid-2d"
+        style={{ "--heatmap-columns": String(columns.length) } as React.CSSProperties}
+      >
+        <span className="heatmap-corner" aria-hidden="true" />
+        {columns.map((hour) => (
+          <span key={`col-${hour}`} className="heatmap-col-label">
+            {Number(hour) % 3 === 0 ? hour : ""}
+          </span>
+        ))}
+        {rows.map((row) => (
+          <Fragment key={`row-${row}`}>
+            <span className="heatmap-row-label">{row.slice(0, 3)}</span>
+            {columns.map((hour) => {
+              const cell = byCell.get(`${row}|${hour}`);
+              const value = cell?.value ?? 0;
+              return (
+                <span
+                  key={`${row}-${hour}`}
+                  className="heatmap-cell-2d"
+                  title={`${row} ${hour}:00 — ${cell ? valueFormatters[format](value) : valueFormatters[format](0)}`}
+                  style={
+                    {
+                      "--heat-opacity": String(cell ? 0.08 + (Math.abs(value) / max) * 0.85 : 0.04),
+                    } as React.CSSProperties
+                  }
+                />
+              );
+            })}
+          </Fragment>
         ))}
       </div>
     </ChartFrame>

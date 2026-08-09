@@ -7,6 +7,7 @@ import {
   AreaChartView,
   DonutChartView,
   FunnelChartView,
+  HeatmapChartView,
   HorizontalBarChartView,
   LineChartView,
   StackedBarChartView,
@@ -127,6 +128,7 @@ function Chart({
     stacked: <StackedBarChartView {...props} {...seriesProps} />,
     donut: <DonutChartView {...props} />,
     funnel: <FunnelChartView {...props} />,
+    heatmap: <HeatmapChartView {...props} />,
   }[spec.kind];
   return (
     <ChartCard title={spec.title} description={spec.description} eyebrow={metric.label}>

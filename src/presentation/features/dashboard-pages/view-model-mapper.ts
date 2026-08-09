@@ -198,11 +198,25 @@ export function mapDashboardPageToDisplayData(
 
   for (const breakdown of page.breakdowns) {
     registerMetric(breakdown.metric);
-    chartData[breakdown.metric.key] = breakdown.items.map((item) => ({
-      key: item.key,
-      label: item.label,
-      value: numericValue(item.values[0] ?? null),
-    }));
+    // The day/hour heatmap key is "<day>:<hour>" (see buildPurchaseHeatmapBreakdown);
+    // splitting it into a group/label pair lets HeatmapChartView lay the data
+    // out as a day-by-hour grid instead of 168 flat category-axis ticks.
+    chartData[breakdown.metric.key] =
+      breakdown.dimension === "day_hour"
+        ? breakdown.items.map((item) => {
+            const [day, hour] = item.key.split(":");
+            return {
+              key: item.key,
+              label: hour ?? item.label,
+              value: numericValue(item.values[0] ?? null),
+              group: day ?? "",
+            };
+          })
+        : breakdown.items.map((item) => ({
+            key: item.key,
+            label: item.label,
+            value: numericValue(item.values[0] ?? null),
+          }));
   }
 
   const rowsByDataset: Record<string, readonly DisplayTableRow[]> = {};
