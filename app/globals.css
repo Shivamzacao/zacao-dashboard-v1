@@ -177,13 +177,25 @@ select {
 }
 .help-marker {
   display: grid;
+  flex: none;
   width: 18px;
   height: 18px;
   place-items: center;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: 999px;
+  appearance: none;
   color: var(--forest-dark);
+  background: transparent;
+  font: inherit;
   font-size: 10px;
+  cursor: pointer;
+}
+.help-marker:hover,
+.help-marker[aria-expanded="true"] {
+  border-color: var(--forest);
+  color: var(--forest);
+  background: var(--cream-soft);
 }
 .kpi-card-value {
   max-width: 100%;
@@ -630,14 +642,15 @@ select {
   border-radius: 8px;
   color: var(--forest-dark);
   background: var(--paper);
+  cursor: pointer;
 }
+/* Fixed, not absolute: the bubble is placed from the trigger's viewport rect
+   (see tooltip.client.tsx), so `overflow: hidden` on a card cannot clip it. */
 .tooltip-content {
-  position: absolute;
+  position: fixed;
   z-index: 80;
-  right: 0;
-  bottom: calc(100% + 7px);
   width: max-content;
-  max-width: 230px;
+  max-width: min(260px, calc(100vw - 24px));
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -646,6 +659,7 @@ select {
   box-shadow: var(--shadow-card);
   font-size: 11px;
   line-height: 16px;
+  pointer-events: none;
 }
 
 .data-table-region {

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { formatDisplayValue, fullDisplayValue } from "./format-display-value";
 import type { DisplayState, KpiDisplayModel, SourceIndicatorModel } from "./display-contracts";
 import { StateSurface, stateLabel } from "./state-surface";
+import { Tooltip } from "./tooltip.client";
 
 interface CardShellProps {
   readonly eyebrow?: string;
@@ -90,9 +91,13 @@ export function KpiCard({ model }: { readonly model: KpiDisplayModel }) {
       <div className="kpi-card-label-row">
         <p>{model.label}</p>
         {model.helpText ? (
-          <span className="help-marker" title={model.helpText} aria-label={model.helpText}>
-            ?
-          </span>
+          <Tooltip
+            label={model.helpText}
+            className="help-marker"
+            accessibleName={`About ${model.label}`}
+          >
+            <span aria-hidden="true">?</span>
+          </Tooltip>
         ) : null}
       </div>
       {isValueAvailable ? (

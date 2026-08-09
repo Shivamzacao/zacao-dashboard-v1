@@ -1,8 +1,7 @@
 "use client";
 
-import { useId, useState } from "react";
-
 import type { LegendItem } from "./display-contracts";
+import { Tooltip } from "./tooltip.client";
 
 export function AccessibleTooltip({
   label,
@@ -11,25 +10,11 @@ export function AccessibleTooltip({
   readonly label: string;
   readonly children: React.ReactNode;
 }) {
-  const id = useId();
-  const [open, setOpen] = useState(false);
   return (
     <span className="tooltip-root">
-      <button
-        type="button"
-        className="tooltip-trigger"
-        aria-describedby={open ? id : undefined}
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        onBlur={() => setOpen(false)}
-      >
+      <Tooltip label={label} className="tooltip-trigger">
         {children}
-      </button>
-      {open ? (
-        <span className="tooltip-content" role="tooltip" id={id}>
-          {label}
-        </span>
-      ) : null}
+      </Tooltip>
     </span>
   );
 }
