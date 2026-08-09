@@ -13,10 +13,7 @@ import {
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
 import { ChartCard, InsightCard, KpiCard } from "@/src/presentation/components/dashboard/cards";
-import {
-  DataTable,
-  type DashboardTableColumn,
-} from "@/src/presentation/components/dashboard/data-table.client";
+import { DataTable } from "@/src/presentation/components/dashboard/data-table.client";
 import { DetailDrawer } from "@/src/presentation/components/dashboard/detail-drawer.client";
 import type {
   DisplayState,
@@ -28,6 +25,7 @@ import {
 } from "@/src/presentation/components/dashboard/export-status.client";
 import type { DashboardPageDisplayData, DisplayTableRow } from "./display-data";
 import type { DashboardPageSpec, PageChartSpec, PageTableSpec } from "./page-specs";
+import { columnLabel, describeColumns, formatCell } from "./table-presentation";
 
 const catalog = new Map(metricCatalog.map((metric) => [metric.key, metric]));
 
@@ -155,15 +153,7 @@ function TableCard({
   const metric = requiredMetric(spec.metricKey);
   const state = metricState(metric, fixture);
   const rows = spec.dataset ? (fixture.rowsByDataset[spec.dataset] ?? []) : [];
-  const first = rows[0];
-  const columns: readonly DashboardTableColumn<DisplayTableRow>[] = first
-    ? Object.keys(first).map((key) => ({
-        key,
-        label: key.replace(/([A-Z])/g, " $1").replace(/^./, (value) => value.toUpperCase()),
-        sortable: true,
-        numeric: typeof first[key] === "number",
-      }))
-    : [];
+  const columns = describeColumns(rows);
   const [openRow, setOpenRow] = useState<DisplayTableRow | null>(null);
   const [exportState, setExportState] = useState<ExportState>(rows.length ? "idle" : "unsupported");
   const tableState: DisplayState = rows.length ? "current" : state;
@@ -212,8 +202,8 @@ function TableCard({
           <dl className="detail-record">
             {Object.entries(openRow).map(([key, value]) => (
               <div key={key}>
-                <dt>{key}</dt>
-                <dd>{String(value ?? "—")}</dd>
+                <dt>{columnLabel(key)}</dt>
+                <dd>{formatCell(key, value)}</dd>
               </div>
             ))}
           </dl>

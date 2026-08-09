@@ -184,7 +184,9 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           title: "Inventory position",
           description: "Current inventory available from verified Shopify locations.",
           metricKey: "inventory.shopify_current",
-          kind: "bar",
+          // SKU-and-state categories read left-to-right; upright bars force the
+          // axis to drop most of their labels.
+          kind: "horizontal",
         },
         {
           title: "Inventory runway & reorder",

@@ -120,4 +120,67 @@ describe("B5 Shopify metric services", () => {
     expect(inventory.metric.value).toEqual({ kind: "count", value: 25 });
     expect(inventory.metric.warnings).toContain("SHOPIFY_LOCATIONS_ONLY");
   });
+
+  it("keeps provider identifiers out of the catalog table", () => {
+    const catalogTable = buildCatalogTable(context(), [
+      {
+        productId: "gid://shopify/Product/9418340958515",
+        productTitle: "70% Cacao Dark Chocolate",
+        productStatus: "ACTIVE",
+        variantId: "gid://shopify/ProductVariant/49913834570035",
+        variantTitle: "4-Pack",
+        sku: "ZAC-DC-70-4PK",
+        priceMinorUnits: 3600,
+        activeOrSold: true,
+        unitCostMinorUnits: 1800,
+      },
+    ]);
+    expect(catalogTable.columns).toEqual([
+      "product",
+      "variant",
+      "sku",
+      "status",
+      "priceMinorUnits",
+    ]);
+    expect(catalogTable.rows[0]).not.toHaveProperty("productId");
+    expect(catalogTable.rows[0]).not.toHaveProperty("variantId");
+    expect(catalogTable.rows[0]).toMatchObject({
+      product: "70% Cacao Dark Chocolate",
+      variant: "4-Pack",
+      sku: "ZAC-DC-70-4PK",
+    });
+  });
+
+  it("labels inventory groups by SKU and quantity state rather than location GID", () => {
+    const fact = (sku: string | null, quantityName: string, quantity: number) => ({
+      locationId: "gid://shopify/Location/111934701875",
+      locationName: "Zacao Fulfillment",
+      sku,
+      quantityName,
+      quantity,
+      updatedAt: "2026-07-31T12:00:00.000Z",
+    });
+    const single = buildInventoryBreakdown(context(), [
+      fact("ZAC-DC-70-4PK", "reserved", 2),
+      fact("ZAC-MC-42-10PK", "safety_stock", 58),
+      fact(null, "available", 4),
+    ]);
+    expect(single.items.map(({ label }) => label)).toEqual([
+      "ZAC-DC-70-4PK · Reserved",
+      "ZAC-MC-42-10PK · Safety stock",
+      "Unmapped SKU · Available",
+    ]);
+    // The grouping key still carries the location GID, so groups stay distinct.
+    expect(single.items[0]?.key).toContain("gid://shopify/Location/111934701875");
+    expect(single.items[2]?.warnings).toContain("MISSING_SKU");
+
+    const multiple = buildInventoryBreakdown(context(), [
+      fact("ZAC-DC-70-4PK", "available", 12),
+      { ...fact("ZAC-DC-70-4PK", "available", 9), locationId: "loc-2", locationName: "Retail" },
+    ]);
+    expect(multiple.items.map(({ label }) => label)).toEqual([
+      "Zacao Fulfillment · ZAC-DC-70-4PK · Available",
+      "Retail · ZAC-DC-70-4PK · Available",
+    ]);
+  });
 });

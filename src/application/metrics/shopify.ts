@@ -177,14 +177,16 @@ export function buildCatalogTable(
   );
   return metricTableViewModelSchema.parse({
     metric: base,
-    columns: ["productId", "product", "status", "variantId", "variant", "sku", "priceMinorUnits"],
+    // Shopify GIDs (`gid://shopify/ProductVariant/…`) name nothing a reader can
+    // act on and are wide enough to squeeze out the columns that do, so the
+    // catalog carries the human-facing attributes only. SKU remains the
+    // identifier readers actually reconcile against.
+    columns: ["product", "variant", "sku", "status", "priceMinorUnits"],
     rows: facts.map((fact) => ({
-      productId: fact.productId,
       product: fact.productTitle,
-      status: fact.productStatus,
-      variantId: fact.variantId,
       variant: fact.variantTitle,
       sku: fact.sku,
+      status: fact.productStatus,
       priceMinorUnits: fact.priceMinorUnits,
     })),
   });
@@ -208,14 +210,58 @@ export function buildMissingCostMetric(
   );
 }
 
+/** Shopify quantity names arrive snake_cased; readers see prose. */
+const INVENTORY_QUANTITY_LABELS: Readonly<Record<string, string>> = {
+  available: "Available",
+  committed: "Committed",
+  damaged: "Damaged",
+  incoming: "Incoming",
+  on_hand: "On hand",
+  quality_control: "Quality control",
+  reserved: "Reserved",
+  safety_stock: "Safety stock",
+};
+
+function inventoryQuantityLabel(quantityName: string): string {
+  const known = INVENTORY_QUANTITY_LABELS[quantityName];
+  if (known) return known;
+  const words = quantityName.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+interface InventoryGroup {
+  readonly label: string;
+  readonly mappedSku: boolean;
+  readonly quantities: number[];
+}
+
 export function buildInventoryBreakdown(
   context: MetricServiceContext,
   facts: readonly InventoryFact[],
 ): MetricBreakdownViewModel {
-  const grouped = new Map<string, number[]>();
+  // Location GIDs stay in the grouping key — they keep it unique — but never
+  // in the label: a chart axis reading `gid://shopify/Location/111934701875`
+  // tells a reader nothing. The location name only earns its space once more
+  // than one location reports.
+  const multipleLocations = new Set(facts.map(({ locationId }) => locationId)).size > 1;
+  const grouped = new Map<string, InventoryGroup>();
   for (const fact of facts) {
     const key = `${fact.locationId}:${fact.sku ?? "UNMAPPED"}:${fact.quantityName}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), fact.quantity]);
+    const existing = grouped.get(key);
+    if (existing) {
+      existing.quantities.push(fact.quantity);
+      continue;
+    }
+    const parts = [
+      ...(multipleLocations ? [fact.locationName] : []),
+      fact.sku ?? "Unmapped SKU",
+      inventoryQuantityLabel(fact.quantityName),
+    ];
+    grouped.set(key, {
+      label: parts.join(" · "),
+      mappedSku: fact.sku !== null,
+      quantities: [fact.quantity],
+    });
   }
   const total = sumSafeNumbers(facts.map(({ quantity }) => quantity));
   const base = metric(
@@ -227,11 +273,11 @@ export function buildInventoryBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "location_sku_quantity",
-    items: [...grouped.entries()].map(([key, values]) => ({
+    items: [...grouped.entries()].map(([key, group]) => ({
       key,
-      label: key,
-      values: [{ kind: "count", value: sumSafeNumbers(values) }],
-      warnings: key.includes(":UNMAPPED:") ? ["MISSING_SKU"] : [],
+      label: group.label,
+      values: [{ kind: "count", value: sumSafeNumbers(group.quantities) }],
+      warnings: group.mappedSku ? [] : ["MISSING_SKU"],
     })),
   });
 }

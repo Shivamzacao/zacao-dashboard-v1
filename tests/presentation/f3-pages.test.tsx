@@ -68,6 +68,58 @@ describe("F3 dashboard pages", () => {
     expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
   });
 
+  it("renders live catalog rows as readable columns without provider URIs", () => {
+    // The shape live Shopify produces: GID-bearing rows and minor-unit prices.
+    const live = {
+      ...f3PageFixtureData,
+      synthetic: false,
+      rowsByDataset: {
+        "product-catalog": [
+          {
+            product: "70% Cacao Dark Chocolate",
+            variant: "4-Pack",
+            sku: "ZAC-DC-70-4PK",
+            status: "ACTIVE",
+            priceMinorUnits: 3600,
+          },
+          {
+            product: "Zacao Gift Card",
+            variant: "$25.00",
+            sku: null,
+            status: "ACTIVE",
+            priceMinorUnits: 2500,
+          },
+        ],
+      },
+      chartData: {
+        ...f3PageFixtureData.chartData,
+        "inventory.shopify_current": [
+          {
+            key: "gid://shopify/Location/111934701875:ZAC-DC-70-4PK:reserved",
+            label: "ZAC-DC-70-4PK · Reserved",
+            value: 2,
+          },
+        ],
+      },
+    };
+    const { container } = render(
+      <DashboardPageView spec={dashboardPageSpecs.products} fixture={live} />,
+    );
+    const catalog = screen.getByRole("table", { name: "Product catalog" });
+    expect(
+      [...catalog.querySelectorAll("thead th")].map((cell) =>
+        cell.textContent?.replace(/[↕↑↓]/g, ""),
+      ),
+    ).toEqual(["Product", "Variant", "SKU", "Status", "Price", "Details"]);
+    expect(screen.getByText("$36.00")).toBeTruthy();
+    expect(screen.getAllByText("Active").length).toBe(2);
+    // The unmapped gift-card SKU reads as absent, not as an empty string.
+    expect([...catalog.querySelectorAll("tbody td")].map((cell) => cell.textContent)).toContain(
+      "—",
+    );
+    expect(container.textContent).not.toContain("gid://");
+  });
+
   it("has no automated accessibility violations in a representative complete page", async () => {
     const { container } = render(
       <DashboardPageView spec={dashboardPageSpecs.insights} fixture={f3PageFixtureData} />,
