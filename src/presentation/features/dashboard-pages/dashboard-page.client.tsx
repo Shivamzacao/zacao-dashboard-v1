@@ -12,12 +12,7 @@ import {
   StackedBarChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
-import {
-  ChartCard,
-  InsightCard,
-  KpiCard,
-  SourceIndicator,
-} from "@/src/presentation/components/dashboard/cards";
+import { ChartCard, InsightCard, KpiCard } from "@/src/presentation/components/dashboard/cards";
 import {
   DataTable,
   type DashboardTableColumn,
@@ -257,21 +252,16 @@ export function DashboardPageView({
         </section>
       ) : null}
 
-      <section
-        className="intelligence-decision-grid"
-        aria-label="Decision support and source readiness"
-      >
+      {/* The per-source readiness pills are withheld from the page for now at
+          ZACAO's request. `fixture.sources` still carries them, so restoring
+          the panel is a render-only change. */}
+      <section className="intelligence-decision-grid" aria-label="Decision support">
         <InsightCard
           title={spec.decisionTitle}
           metadata={["Deterministic V1 rules", "No inferred data"]}
         >
           <p>{spec.decisionCopy}</p>
         </InsightCard>
-        <div className="source-readiness-panel">
-          {fixture.sources.map((source) => (
-            <SourceIndicator key={source.label} model={source} />
-          ))}
-        </div>
       </section>
     </div>
   );

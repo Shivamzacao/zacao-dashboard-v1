@@ -1259,16 +1259,16 @@ select {
   gap: 13px;
 }
 
+/* Single column while the source-readiness pills are withheld: the second
+   track would otherwise leave the insight card beside a permanent gap. */
 .intelligence-decision-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 13px;
 }
 
-/* The indicators are already self-contained pills, so no card wrapper: a
-   bordered box around one pill left a mostly-empty panel. align-self keeps
-   the pills at the top of the grid row instead of stretching to match the
-   insight card beside them. */
+/* Retained for the component fixture page and for restoring the per-source
+   panel later; no dashboard page renders it today. */
 .source-readiness-panel {
   display: flex;
   flex-wrap: wrap;
