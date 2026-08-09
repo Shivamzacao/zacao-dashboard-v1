@@ -1,12 +1,17 @@
 import {
   buildCashPositionMetric,
+  buildCashRunwayMetric,
   buildCombinedInventoryBreakdown,
   buildDepletionsBreakdown,
+  buildFefoVisibilityMetric,
   buildFinanceActualMetrics,
   buildGrowthPipelineViews,
   buildIncomingProductionTable,
   buildInventoryLotsTable,
+  buildInventoryValueMetric,
+  buildLowInventoryAlertMetric,
   buildMarketingSpendMetric,
+  buildMonthlyBurnMetrics,
   buildPartnerPerformanceTable,
   buildSocialMetricsTable,
 } from "@/src/application/metrics";
@@ -22,8 +27,11 @@ import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import {
   toCashPositionFacts,
   toCombinedInventoryFacts,
+  toFinanceActualFacts,
   toInventoryLotFacts,
+  toMetricTargetFacts,
   toProductionIncomingFacts,
+  toSkuCostFacts,
 } from "./facts";
 import {
   toDepletionRecords,
@@ -81,20 +89,38 @@ export function createManualWorkbookContributors(input: {
   }
 
   const operations = new ManualWorkbookContributor("manual-operations", async (context) => {
-    const [snapshots, lots, depletions, productionOrders, locationMaster, sourceStatus] =
-      await Promise.all([
-        store.readTabRecords("Inventory_Snapshots"),
-        store.readTabRecords("Inventory_Lots"),
-        store.readTabRecords("Additional_Depletions"),
-        store.readTabRecords("Production_Orders"),
-        store.readTabRecords("Location_Master"),
-        status(),
-      ]);
+    const [
+      snapshots,
+      lots,
+      depletions,
+      productionOrders,
+      locationMaster,
+      cogsBySku,
+      metricTargets,
+      sourceStatus,
+    ] = await Promise.all([
+      store.readTabRecords("Inventory_Snapshots"),
+      store.readTabRecords("Inventory_Lots"),
+      store.readTabRecords("Additional_Depletions"),
+      store.readTabRecords("Production_Orders"),
+      store.readTabRecords("Location_Master"),
+      store.readTabRecords("COGS_By_SKU"),
+      store.readTabRecords("Metric_Targets"),
+      status(),
+    ]);
     const serviceContext = metricContext(context, [sourceStatus]);
     const combined = toCombinedInventoryFacts(snapshots, locationMaster);
     const incoming = toProductionIncomingFacts(productionOrders);
     const fallbackAsOfDate = (sourceStatus.dataAsOf ?? sourceStatus.checkedAt).slice(0, 10);
+    const lotFacts = toInventoryLotFacts(lots, fallbackAsOfDate);
+    const costs = toSkuCostFacts(cogsBySku);
+    const targets = toMetricTargetFacts(metricTargets);
     return {
+      metrics: [
+        buildInventoryValueMetric(serviceContext, combined.facts, costs, fallbackAsOfDate),
+        buildFefoVisibilityMetric(serviceContext, lotFacts, fallbackAsOfDate),
+        buildLowInventoryAlertMetric(serviceContext, combined.facts, targets),
+      ],
       breakdowns: [
         buildCombinedInventoryBreakdown(
           serviceContext,
@@ -104,7 +130,7 @@ export function createManualWorkbookContributors(input: {
         buildDepletionsBreakdown(serviceContext, toDepletionRecords(depletions)),
       ],
       tables: [
-        buildInventoryLotsTable(serviceContext, toInventoryLotFacts(lots, fallbackAsOfDate)),
+        buildInventoryLotsTable(serviceContext, lotFacts),
         buildIncomingProductionTable(serviceContext, incoming.facts),
       ],
       sourceStatuses: [sourceStatus],
@@ -160,6 +186,7 @@ export function createManualWorkbookContributors(input: {
     const serviceContext = metricContext(context, [sourceStatus]);
     const finance = buildFinanceActualMetrics(serviceContext, toFinanceActualRecords(actuals));
     const cashMapping = toCashPositionFacts(cash);
+    const burn = buildMonthlyBurnMetrics(serviceContext, toFinanceActualFacts(actuals));
     return {
       metrics: [
         finance.total,
@@ -167,6 +194,13 @@ export function createManualWorkbookContributors(input: {
           serviceContext,
           cashMapping.facts,
           cashMapping.completeAccountCoverage,
+        ),
+        burn.metric,
+        buildCashRunwayMetric(
+          serviceContext,
+          cashMapping.facts,
+          cashMapping.completeAccountCoverage,
+          burn.trailing3MonthAverageMinorUnits,
         ),
       ],
       breakdowns: [finance.composition],

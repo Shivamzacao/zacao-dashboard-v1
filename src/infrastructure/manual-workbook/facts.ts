@@ -1,8 +1,11 @@
 import type {
   CashPositionFact,
   CombinedInventoryFact,
+  FinanceActualFact,
   InventoryLotFact,
+  MetricTargetFact,
   ProductionIncomingFact,
+  SkuCostFact,
 } from "@/src/application/metrics/types";
 import type { ManualStoreRecord } from "@/src/application/ports/manual-workbook";
 import { usdFromDecimalNumber } from "@/src/domain/metrics/calculations";
@@ -137,6 +140,73 @@ export function toProductionIncomingFacts(
 export interface CashPositionMapping {
   readonly facts: readonly CashPositionFact[];
   readonly completeAccountCoverage: boolean;
+}
+
+export function toMetricTargetFacts(
+  records: readonly ManualStoreRecord[],
+): readonly MetricTargetFact[] {
+  return records.flatMap((record) => {
+    const metricKey = text(record, "metric_key");
+    const periodStart = text(record, "period_start");
+    const periodEnd = text(record, "period_end");
+    const targetValue = numeric(record, "target_value");
+    const unit = text(record, "unit");
+    const scopeType = text(record, "scope_type");
+    const status = text(record, "status");
+    if (
+      !metricKey ||
+      !periodStart ||
+      !periodEnd ||
+      targetValue === null ||
+      !unit ||
+      !scopeType ||
+      !status
+    ) {
+      return [];
+    }
+    return [
+      {
+        metricKey,
+        periodStart,
+        periodEnd,
+        targetValue,
+        unit,
+        scopeType,
+        scopeValue: text(record, "scope_value"),
+        status,
+      },
+    ];
+  });
+}
+
+export function toSkuCostFacts(records: readonly ManualStoreRecord[]): readonly SkuCostFact[] {
+  return records.flatMap((record) => {
+    const sku = text(record, "sku");
+    const effectiveFrom = text(record, "effective_from");
+    const totalUnitCostUsd = numeric(record, "total_unit_cost_usd");
+    if (!sku || !effectiveFrom || totalUnitCostUsd === null) return [];
+    return [{ sku, effectiveFrom, effectiveTo: text(record, "effective_to"), totalUnitCostUsd }];
+  });
+}
+
+export function toFinanceActualFacts(
+  records: readonly ManualStoreRecord[],
+): readonly FinanceActualFact[] {
+  return records.flatMap((record) => {
+    const period = text(record, "period");
+    const category = text(record, "category");
+    const amount = numeric(record, "actual_amount_usd");
+    if (!period || !category || amount === null) return [];
+    const cashOrAccrual = text(record, "cash_or_accrual");
+    return [
+      {
+        period,
+        category,
+        amountMinorUnits: usdFromDecimalNumber(amount).minorUnits,
+        cashOrAccrual: cashOrAccrual === "cash" || cashOrAccrual === "accrual" ? cashOrAccrual : null,
+      },
+    ];
+  });
 }
 
 /** Single company-wide balance model: account is constant (ADR-003). */
