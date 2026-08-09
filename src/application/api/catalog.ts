@@ -31,7 +31,7 @@ export const drilldownCatalog = Object.freeze([
     dataset: "product-catalog",
     section: "Product Intelligence",
     metricKey: "products.catalog",
-    fields: ["productId", "product", "status", "variantId", "variant", "sku", "priceMinorUnits"],
+    fields: ["product", "variant", "sku", "status", "priceMinorUnits"],
     sortFields: ["product", "variant", "sku", "status"],
     exportable: true,
   }),
