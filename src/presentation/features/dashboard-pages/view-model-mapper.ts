@@ -163,6 +163,7 @@ export function mapDashboardPageToDisplayData(
     chartData[breakdown.metric.key] = breakdown.items.map((item) => ({
       key: item.key,
       label: item.label,
+      ...(item.group ? { group: item.group } : {}),
       value: numericValue(item.values[0] ?? null),
     }));
   }

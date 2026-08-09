@@ -89,6 +89,9 @@ export const metricBreakdownItemSchema = z
   .object({
     key: z.string().min(1),
     label: z.string().min(1),
+    // Second dimension for breakdowns that form a matrix (weekday x hour); the
+    // item then reads as one cell of `group` by `label`.
+    group: z.string().min(1).optional(),
     values: z.array(metricDisplayValueSchema),
     warnings: z.array(z.string().min(1)),
   })

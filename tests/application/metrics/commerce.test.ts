@@ -90,14 +90,40 @@ describe("DEC-015 canonical sales pass-through", () => {
 });
 
 describe("purchase timing and geography breakdowns", () => {
-  it("maps day/hour order counts without inventing values", () => {
+  it("maps day/hour order counts onto a dense grid without inventing values", () => {
     const breakdown = buildPurchaseHeatmapBreakdown(context, [
       { dayOfWeek: "Friday", hourOfDay: "13", orders: 6 },
       { dayOfWeek: "Saturday", hourOfDay: "10", orders: 4 },
     ]);
     expect(breakdown.metric.value).toEqual({ kind: "count", value: 10 });
-    expect(breakdown.items[0]).toMatchObject({ key: "Friday:13", label: "Friday 13" });
+    expect(breakdown.items).toHaveLength(7 * 24);
+    expect(breakdown.items[0]).toMatchObject({ key: "0:0", group: "Sunday", label: "12 AM" });
+    expect(breakdown.items.find(({ key }) => key === "5:13")).toMatchObject({
+      group: "Friday",
+      label: "1 PM",
+      values: [{ kind: "count", value: 6 }],
+    });
+    // Slots the provider never reported carry no value rather than a zero.
+    expect(breakdown.items.find(({ key }) => key === "5:14")?.values).toEqual([]);
+    expect(buildPurchaseHeatmapBreakdown(context, []).items).toEqual([]);
     expect(buildPurchaseHeatmapBreakdown(context, []).metric.value).toBeNull();
+  });
+
+  it("reads numeric weekday codes and keeps unrecognized slots visible", () => {
+    const breakdown = buildPurchaseHeatmapBreakdown(context, [
+      { dayOfWeek: "0", hourOfDay: "21", orders: 2 },
+      { dayOfWeek: "unknown", hourOfDay: "9", orders: 1 },
+    ]);
+    expect(breakdown.items.find(({ key }) => key === "0:21")).toMatchObject({
+      group: "Sunday",
+      label: "9 PM",
+      values: [{ kind: "count", value: 2 }],
+    });
+    expect(breakdown.items.at(-1)).toMatchObject({
+      key: "raw:unknown:9",
+      group: "unknown",
+      warnings: ["PURCHASE_TIMING_UNRECOGNIZED_SLOT"],
+    });
   });
 
   it("keeps billing geography aggregate-only with region labels", () => {

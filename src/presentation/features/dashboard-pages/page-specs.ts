@@ -1,6 +1,7 @@
 import type { DashboardSlug } from "@/src/application/api";
 
-export type ChartKind = "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel";
+export type ChartKind =
+  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
 
 export interface PageChartSpec {
   readonly title: string;
@@ -100,9 +101,10 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
         {
           title: "Purchase timing",
-          description: "Qualifying orders by New York reporting day and hour.",
+          description:
+            "Qualifying orders by weekday and hour of day, in America/New_York reporting time.",
           metricKey: "commerce.purchase_heatmap",
-          kind: "stacked",
+          kind: "heatmap",
         },
       ],
       tables: [

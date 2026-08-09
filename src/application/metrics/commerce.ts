@@ -18,6 +18,13 @@ import type {
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
 } from "./types";
+import {
+  HOURS_PER_DAY,
+  WEEKDAY_NAMES,
+  hourLabel,
+  hourOfDay,
+  weekdayIndex,
+} from "./purchase-timing";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -91,6 +98,53 @@ export function buildSalesTrendSeries(
   });
 }
 
+/**
+ * Purchase timing is the one breakdown that is really two dimensions, so it is
+ * emitted as a dense weekday x hour grid: every cell the display layer needs to
+ * draw a heatmap exists in reporting order. Slots the provider never reported
+ * carry no value rather than a fabricated zero.
+ */
+function purchaseTimingSlots(
+  facts: readonly PurchaseTimingFact[],
+): readonly Record<string, unknown>[] {
+  const ordersBySlot = new Map<string, number>();
+  const unrecognized: Record<string, unknown>[] = [];
+
+  for (const fact of facts) {
+    const day = weekdayIndex(fact.dayOfWeek);
+    const hour = hourOfDay(fact.hourOfDay);
+    if (day === null || hour === null) {
+      unrecognized.push({
+        key: `raw:${fact.dayOfWeek}:${fact.hourOfDay}`,
+        group: fact.dayOfWeek,
+        label: fact.hourOfDay,
+        values: [{ kind: "count", value: fact.orders }],
+        warnings: ["PURCHASE_TIMING_UNRECOGNIZED_SLOT"],
+      });
+      continue;
+    }
+    const slot = `${day}:${hour}`;
+    ordersBySlot.set(slot, (ordersBySlot.get(slot) ?? 0) + fact.orders);
+  }
+
+  const grid = ordersBySlot.size
+    ? WEEKDAY_NAMES.flatMap((name, day) =>
+        Array.from({ length: HOURS_PER_DAY }, (_unused, hour) => {
+          const orders = ordersBySlot.get(`${day}:${hour}`);
+          return {
+            key: `${day}:${hour}`,
+            group: name,
+            label: hourLabel(hour),
+            values: orders === undefined ? [] : [{ kind: "count", value: orders }],
+            warnings: [],
+          };
+        }),
+      )
+    : [];
+
+  return [...grid, ...unrecognized];
+}
+
 export function buildPurchaseHeatmapBreakdown(
   context: MetricServiceContext,
   facts: readonly PurchaseTimingFact[],
@@ -104,12 +158,7 @@ export function buildPurchaseHeatmapBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "day_hour",
-    items: facts.map((fact) => ({
-      key: `${fact.dayOfWeek}:${fact.hourOfDay}`,
-      label: `${fact.dayOfWeek} ${fact.hourOfDay}`,
-      values: [{ kind: "count", value: fact.orders }],
-      warnings: [],
-    })),
+    items: purchaseTimingSlots(facts),
   });
 }
 

@@ -75,8 +75,14 @@ function ChartFrame({
   height = 260,
   legend,
   valueFormat = "count",
+  // Views that already render their own accessible table (the heatmap matrix)
+  // opt out of the screen-reader duplicate and size themselves.
+  selfDescribing = false,
   children,
-}: BaseChartProps & { readonly children: React.ReactNode }) {
+}: BaseChartProps & {
+  readonly selfDescribing?: boolean;
+  readonly children: React.ReactNode;
+}) {
   const usableData = data?.filter((item) => item.value !== null) ?? [];
   const dataState = state === "current" && usableData.length === 0 ? "empty" : state;
   return (
@@ -84,16 +90,23 @@ function ChartFrame({
       className={`chart-frame state-${dataState}`}
       style={{ "--chart-height": `${height}px` } as React.CSSProperties}
     >
-      <p className="chart-summary" id={`${slug(title)}-summary`}>
-        {summary}
-      </p>
+      {summary ? (
+        <p className="chart-summary" id={`${slug(title)}-summary`}>
+          {summary}
+        </p>
+      ) : null}
       {legend?.length ? <ChartLegend items={legend} /> : null}
       {["current", "partial", "stale"].includes(dataState) && usableData.length ? (
         <>
-          <div className="chart-visual" aria-hidden="true">
+          <div
+            className={selfDescribing ? "chart-visual chart-visual-auto" : "chart-visual"}
+            aria-hidden={selfDescribing ? undefined : true}
+          >
             {children}
           </div>
-          <AccessibleChartTable title={title} data={data ?? []} valueFormat={valueFormat} />
+          {selfDescribing ? null : (
+            <AccessibleChartTable title={title} data={data ?? []} valueFormat={valueFormat} />
+          )}
         </>
       ) : (
         <StateSurface state={dataState === "current" ? "empty" : dataState} />
@@ -365,16 +378,114 @@ export function FunnelChartView(props: BaseChartProps) {
   );
 }
 
+/** Distinct values in first-seen order, which for matrix data is reporting order. */
+function distinct(values: readonly string[]): readonly string[] {
+  return [...new Set(values)];
+}
+
+/** `9 AM` -> `9a`, so a 24-column hour ruler stays legible in a card. */
+function compactColumnLabel(label: string): string {
+  const match = /^(\d{1,2})\s*(AM|PM)$/i.exec(label.trim());
+  return match ? `${match[1]}${match[2]?.[0]?.toLowerCase() ?? ""}` : label;
+}
+
+function heatIntensity(value: number, max: number): number {
+  if (value <= 0) return 0;
+  return 0.18 + 0.82 * Math.sqrt(value / max);
+}
+
+/**
+ * Matrix heatmap: rows are the datum `group`, columns the datum `label`. It is
+ * a real table rather than a decorative grid, so the cell values are the
+ * accessible representation instead of a duplicated screen-reader table.
+ */
+function HeatmapMatrix({
+  title,
+  data,
+  format,
+}: {
+  readonly title: string;
+  readonly data: readonly ChartDatum[];
+  readonly format: ChartValueFormat;
+}) {
+  const rows = distinct(data.map((item) => item.group ?? ""));
+  const columns = distinct(data.map((item) => item.label));
+  const cells = new Map(data.map((item) => [`${item.group ?? ""} ${item.label}`, item]));
+  const max = Math.max(...data.map((item) => Math.abs(item.value ?? 0)), 1);
+
+  return (
+    <div className="heatmap-matrix-scroll">
+      <table className="heatmap-matrix">
+        <caption className="sr-only">{title} data</caption>
+        <thead>
+          <tr>
+            <td className="heatmap-corner" />
+            {columns.map((column, index) => (
+              <th key={column} scope="col">
+                <span className="sr-only">{column}</span>
+                <span className="heatmap-column-tick" aria-hidden="true">
+                  {index % 3 === 0 ? compactColumnLabel(column) : ""}
+                </span>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row}>
+              <th scope="row">{row}</th>
+              {columns.map((column) => {
+                const cell = cells.get(`${row} ${column}`);
+                const value = cell?.value ?? null;
+                return (
+                  <td
+                    key={column}
+                    className="heatmap-cell"
+                    data-unreported={value === null ? "" : undefined}
+                    title={`${row} ${column}: ${value === null ? "not reported" : valueFormatters[format](value)}`}
+                    style={
+                      {
+                        "--heat": String(value === null ? 0 : heatIntensity(Math.abs(value), max)),
+                      } as React.CSSProperties
+                    }
+                  >
+                    <span className="sr-only">
+                      {value === null ? "Not reported" : valueFormatters[format](value)}
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="heatmap-scale" aria-hidden="true">
+        <span>Fewer</span>
+        <span className="heatmap-scale-ramp" />
+        <span>{`More (peak ${valueFormatters[format](max)})`}</span>
+      </p>
+    </div>
+  );
+}
+
 export function HeatmapChartView(props: BaseChartProps) {
-  const max = Math.max(...(props.data ?? []).map((item) => Math.abs(item.value ?? 0)), 1);
+  const data = props.data ?? [];
   const format = props.valueFormat ?? "count";
+  if (data.some((item) => item.group)) {
+    return (
+      <ChartFrame {...props} selfDescribing>
+        <HeatmapMatrix title={props.title} data={data} format={format} />
+      </ChartFrame>
+    );
+  }
+  const max = Math.max(...data.map((item) => Math.abs(item.value ?? 0)), 1);
   return (
     <ChartFrame {...props}>
       <div className="heatmap-grid">
-        {(props.data ?? []).map((item) => (
+        {data.map((item) => (
           <div
             key={item.key}
-            className="heatmap-cell"
+            className="heatmap-cell-labelled"
             style={
               {
                 "--heat-opacity": String(0.12 + (Math.abs(item.value ?? 0) / max) * 0.1),

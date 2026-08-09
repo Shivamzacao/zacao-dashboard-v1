@@ -1,3 +1,4 @@
+import { HOURS_PER_DAY, WEEKDAY_NAMES, hourLabel } from "@/src/application/metrics/purchase-timing";
 import type { MetricDisplayValue } from "@/src/application/view-models";
 import type {
   ChartDatum,
@@ -17,6 +18,26 @@ export interface F3PageFixtureData extends DashboardPageDisplayData {
   readonly chartData: Readonly<Record<string, readonly ChartDatum[]>>;
   readonly rowsByDataset: Readonly<Record<string, readonly FixtureTableRow[]>>;
   readonly sources: readonly SourceIndicatorModel[];
+}
+
+/**
+ * The purchase heatmap renders a dense weekday x hour grid, so the synthetic
+ * fixture mirrors that shape rather than a handful of sample cells. Weights are
+ * a fixed retail-shaped curve — deterministic, and obviously not real data.
+ */
+function purchaseHeatmapFixture(): readonly ChartDatum[] {
+  const weekdayWeight = [0.7, 0.9, 1, 1.05, 1.2, 1.4, 0.85];
+  const hourWeight = [
+    1, 1, 0, 0, 0, 1, 2, 4, 6, 9, 12, 14, 15, 13, 11, 10, 11, 13, 16, 18, 15, 10, 6, 3,
+  ];
+  return WEEKDAY_NAMES.flatMap((day, dayIndex) =>
+    Array.from({ length: HOURS_PER_DAY }, (_unused, hour) => ({
+      key: `${dayIndex}:${hour}`,
+      group: day,
+      label: hourLabel(hour),
+      value: Math.round((weekdayWeight[dayIndex] ?? 1) * (hourWeight[hour] ?? 0)),
+    })),
+  );
 }
 
 export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
@@ -81,11 +102,7 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       { key: "jun", label: "Jun", value: 4850 },
       { key: "jul", label: "Jul", value: 5200 },
     ],
-    "commerce.purchase_heatmap": [
-      { key: "fri-13", label: "Fri 13:00", value: 18 },
-      { key: "sat-10", label: "Sat 10:00", value: 24 },
-      { key: "sun-16", label: "Sun 16:00", value: 15 },
-    ],
+    "commerce.purchase_heatmap": purchaseHeatmapFixture(),
     "products.sales": [
       { key: "dark", label: "Dark 70%", value: 6400 },
       { key: "smooth", label: "Smooth 42%", value: 5300 },

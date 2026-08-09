@@ -7,6 +7,7 @@ import {
   AreaChartView,
   DonutChartView,
   FunnelChartView,
+  HeatmapChartView,
   HorizontalBarChartView,
   LineChartView,
   StackedBarChartView,
@@ -106,7 +107,9 @@ function Chart({
   const data = fixture.chartData[spec.metricKey] ?? null;
   const props = {
     title: spec.title,
-    summary: spec.description,
+    // The card header already carries the description; repeating it above the
+    // plot only pushes the visual down.
+    summary: "",
     data,
     state,
     // A declared unit from the data producer wins: some charts plot values in
@@ -133,6 +136,7 @@ function Chart({
     stacked: <StackedBarChartView {...props} {...seriesProps} />,
     donut: <DonutChartView {...props} />,
     funnel: <FunnelChartView {...props} />,
+    heatmap: <HeatmapChartView {...props} />,
   }[spec.kind];
   return (
     <ChartCard title={spec.title} description={spec.description} eyebrow={metric.label}>
