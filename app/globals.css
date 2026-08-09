@@ -1372,14 +1372,6 @@ select {
   gap: 13px;
 }
 
-/* Single column while the source-readiness pills are withheld: the second
-   track would otherwise leave the insight card beside a permanent gap. */
-.intelligence-decision-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 13px;
-}
-
 /* Retained for the component fixture page and for restoring the per-source
    panel later; no dashboard page renders it today. */
 .source-readiness-panel {
@@ -1424,8 +1416,7 @@ select {
   }
 
   .intelligence-chart-grid,
-  .intelligence-table-grid,
-  .intelligence-decision-grid {
+  .intelligence-table-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -39,7 +39,7 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByLabelText("Key performance indicators")).toBeTruthy();
     expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Returning customer rate: 38.4%")).toBeTruthy();
-    expect(screen.getByText("Leadership attention")).toBeTruthy();
+    expect(screen.queryByText("Deterministic V1 rules")).toBeNull();
   });
 
   it("uses the approved F2 table, drill-down, and export path for Product Intelligence", () => {
@@ -53,8 +53,7 @@ describe("F3 dashboard pages", () => {
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {
     render(<DashboardPageView spec={dashboardPageSpecs.marketing} fixture={f3PageFixtureData} />);
     expect(screen.getAllByText("No activity").length).toBeGreaterThan(0);
-    expect(screen.getByText("Attribution boundary")).toBeTruthy();
-    expect(screen.getByText(/Marketing spend supplies spend only/)).toBeTruthy();
+    expect(screen.getByText(/Spend from the approved workbook/)).toBeTruthy();
   });
 
   it("keeps conditional Growth and Financial pages structurally complete without fake values", () => {
@@ -62,9 +61,7 @@ describe("F3 dashboard pages", () => {
       <DashboardPageView spec={dashboardPageSpecs.growth} fixture={f3PageFixtureData} />,
     );
     expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
-    expect(screen.getByText("Conditional module")).toBeTruthy();
     rerender(<DashboardPageView spec={dashboardPageSpecs.financial} fixture={f3PageFixtureData} />);
-    expect(screen.getByText("Financial activation")).toBeTruthy();
     expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
   });
 
