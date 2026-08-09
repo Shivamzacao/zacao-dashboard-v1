@@ -23,7 +23,8 @@ function spanInDays(range: DateRange): number {
   const start = parseIsoDate(range.startDate);
   const end = parseIsoDate(range.endDate);
   const days =
-    (Date.UTC(end.year, end.month - 1, end.day) - Date.UTC(start.year, start.month - 1, start.day)) /
+    (Date.UTC(end.year, end.month - 1, end.day) -
+      Date.UTC(start.year, start.month - 1, start.day)) /
     86_400_000;
   return days + 1;
 }

@@ -79,7 +79,9 @@ function comparisonFor(metric: MetricViewModel): DisplayComparison | null {
     return { label, value: null };
   }
   const change = percentChange(metric.value, metric.comparison.value);
-  return change ? { label, value: change.value, direction: change.direction } : { label, value: null };
+  return change
+    ? { label, value: change.value, direction: change.direction }
+    : { label, value: null };
 }
 
 function displayStateFor(metric: MetricViewModel): DisplayState {
