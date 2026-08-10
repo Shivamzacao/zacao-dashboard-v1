@@ -29,3 +29,4 @@ tests/infrastructure/**/fixtures/*-live.json
 
 # Locally generated sample workbooks
 outputs/manual-workbook-sample.xlsx
+outputs/zacao-main-sheet.xlsx

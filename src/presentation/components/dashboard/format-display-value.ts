@@ -34,6 +34,11 @@ export function formatDisplayValue(value: MetricDisplayValue | null): string {
     case "quantity":
       return formatNumber(value.value);
     case "duration_seconds": {
+      // Runway/tenure-style durations land here in days, not minutes — render
+      // those as "N days" rather than an unreadable minute count.
+      if (value.value >= 86_400) {
+        return `${countFormatter.format(Math.round(value.value / 86_400))} days`;
+      }
       const minutes = Math.floor(value.value / 60);
       const seconds = value.value % 60;
       return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;

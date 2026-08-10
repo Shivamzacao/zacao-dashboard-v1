@@ -164,6 +164,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "inventory.shopify_current",
         "quality.missing_sku_cost",
         "inventory.sell_through",
+        "inventory.value",
       ],
       charts: [
         {
@@ -218,6 +219,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "inventory.combined",
         "forecast.variance",
         "production.incoming",
+        "inventory.fefo",
       ],
       charts: [
         {
@@ -389,6 +391,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "finance.cash_position",
         "finance.monthly_burn",
         "finance.cash_runway",
+        "inventory.value",
       ],
       charts: [
         {

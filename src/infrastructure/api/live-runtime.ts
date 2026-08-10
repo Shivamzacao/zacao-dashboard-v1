@@ -96,7 +96,11 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-channels",
   ],
   "Customer Intelligence": ["shopify-customers", "shopify-funnel", "shopify-geography"],
-  "Product Intelligence": ["shopify-product-units", "shopify-catalog-inventory"],
+  "Product Intelligence": [
+    "shopify-product-units",
+    "shopify-catalog-inventory",
+    "manual-operations",
+  ],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
     "shopify-fulfillment",
@@ -113,6 +117,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
   "Financial Intelligence": [
     "shopify-sales",
     "manual-financial",
+    "manual-operations",
     "deferred-google_sheets",
     "deferred-google_drive",
   ],
@@ -122,6 +127,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-channels",
     "klaviyo-readiness",
     "insights-freshness",
+    "manual-operations",
   ],
 };
 

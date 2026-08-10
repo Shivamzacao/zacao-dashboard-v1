@@ -229,3 +229,28 @@ export interface PlanActualFact {
   readonly planMinorUnits: number;
   readonly actualMinorUnits: number;
 }
+
+export interface MetricTargetFact {
+  readonly metricKey: string;
+  readonly periodStart: string;
+  readonly periodEnd: string;
+  readonly targetValue: number;
+  readonly unit: string;
+  readonly scopeType: string;
+  readonly scopeValue: string | null;
+  readonly status: string;
+}
+
+export interface SkuCostFact {
+  readonly sku: string;
+  readonly effectiveFrom: string;
+  readonly effectiveTo: string | null;
+  readonly totalUnitCostUsd: number;
+}
+
+export interface FinanceActualFact {
+  readonly period: string;
+  readonly category: string;
+  readonly amountMinorUnits: number;
+  readonly cashOrAccrual: "cash" | "accrual" | null;
+}
