@@ -729,6 +729,9 @@ select {
   vertical-align: middle;
 }
 .data-table th {
+  min-width: 76px;
+  overflow-wrap: normal;
+  word-break: normal;
   color: var(--forest-dark);
   background: var(--cream-soft);
   font-size: 10px;
