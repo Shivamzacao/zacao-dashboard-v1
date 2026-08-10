@@ -56,4 +56,10 @@ describe("drill-down table presentation", () => {
   it("returns no columns for an empty dataset", () => {
     expect(describeColumns([])).toEqual([]);
   });
+
+  it("omits explicitly hidden columns without changing the row data", () => {
+    const rows = [{ product: "Dark Chocolate", sku: "ZAC-DC-70", status: "ACTIVE" }];
+    expect(describeColumns(rows, ["sku"]).map(({ key }) => key)).toEqual(["product", "status"]);
+    expect(rows[0]?.sku).toBe("ZAC-DC-70");
+  });
 });
