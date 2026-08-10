@@ -241,6 +241,30 @@ export function mapDashboardPageToDisplayData(
       }));
       chartValueFormats[table.metric.key] = "count";
     }
+    if (table.metric.key === "production.incoming") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: String(row["poNumber"] ?? index),
+        label: String(row["expectedArrivalDate"] ?? row["poNumber"] ?? index),
+        value: typeof row["incomingUnits"] === "number" ? row["incomingUnits"] : null,
+      }));
+      chartValueFormats[table.metric.key] = "count";
+    }
+    if (table.metric.key === "social.performance") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: `${String(row["platform"] ?? "social")}-${String(row["date"] ?? index)}`,
+        label: String(row["date"] ?? row["platform"] ?? index),
+        value: typeof row["followers"] === "number" ? row["followers"] : null,
+      }));
+      chartValueFormats[table.metric.key] = "count";
+    }
+    if (table.metric.key === "partners.performance") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: String(row["partner"] ?? index),
+        label: String(row["partner"] ?? index),
+        value: typeof row["revenueMinorUnits"] === "number" ? row["revenueMinorUnits"] / 100 : null,
+      }));
+      chartValueFormats[table.metric.key] = "money";
+    }
   }
 
   return {
