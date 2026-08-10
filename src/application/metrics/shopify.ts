@@ -251,7 +251,8 @@ export function buildInventoryBreakdown(
   const multipleLocations = new Set(facts.map(({ locationId }) => locationId)).size > 1;
   const grouped = new Map<string, InventoryGroup>();
   for (const fact of facts) {
-    const key = `${fact.locationId}:${fact.sku ?? "UNMAPPED"}:${fact.quantityName}`;
+    const productKey = fact.sku ?? `${fact.productTitle}:${fact.variantTitle}`;
+    const key = `${fact.locationId}:${productKey}:${fact.quantityName}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.quantities.push(fact.quantity);
@@ -259,7 +260,8 @@ export function buildInventoryBreakdown(
     }
     const parts = [
       ...(multipleLocations ? [fact.locationName] : []),
-      fact.sku ?? "Unmapped SKU",
+      fact.productTitle,
+      fact.variantTitle,
       inventoryQuantityLabel(fact.quantityName),
     ];
     grouped.set(key, {
