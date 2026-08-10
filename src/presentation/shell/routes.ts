@@ -115,7 +115,8 @@ export interface UtilityRouteDefinition {
  * catalog; utility pages carry no metrics or sections.
  */
 export const utilityRoutes: readonly UtilityRouteDefinition[] = Object.freeze([
-  Object.freeze({ href: "/import", title: "Data import", icon: "import" as const }),
+  // Temporarily hidden from the sidebar.
+  // Object.freeze({ href: "/import", title: "Data import", icon: "import" as const }),
 ]);
 
 export function dashboardRouteBySlug(slug: string): DashboardRouteDefinition | undefined {
