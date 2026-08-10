@@ -16,6 +16,7 @@ import { KlaviyoAdapter } from "@/src/infrastructure/klaviyo/adapter";
 import { KlaviyoClient } from "@/src/infrastructure/klaviyo/client";
 import type { KlaviyoConfiguration } from "@/src/infrastructure/klaviyo/config";
 import type { ManualWorkbookStore } from "@/src/application/ports/manual-workbook";
+import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import { createKlaviyoContributors } from "@/src/infrastructure/klaviyo/contributors";
 import { klaviyoSourceStatus } from "@/src/infrastructure/klaviyo/source-status";
 import { createManualWorkbookContributors } from "@/src/infrastructure/manual-workbook/contributors";
@@ -36,6 +37,9 @@ import {
 import { ShopifyQlAdapter } from "@/src/infrastructure/shopify/shopifyql/adapter";
 import { shopifyFailureStatus } from "@/src/infrastructure/shopify/source-status";
 import { SystemClock } from "@/src/infrastructure/time";
+import { createSheetsApiContributors } from "@/src/infrastructure/sheets-api/contributors";
+import { SheetsApiClient } from "@/src/infrastructure/sheets-api/client";
+import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/config";
 
 import { DefaultBackendApiRuntime } from "./default-runtime";
 
@@ -96,11 +100,12 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-channels",
   ],
   "Customer Intelligence": ["shopify-customers", "shopify-funnel", "shopify-geography"],
-  "Product Intelligence": ["shopify-product-units", "shopify-catalog-inventory"],
+  "Product Intelligence": ["shopify-product-units", "shopify-catalog-inventory", "sheets-product"],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
     "shopify-fulfillment",
     "manual-operations",
+    "sheets-operations",
     "deferred-google_drive",
   ],
   "Marketing Intelligence": [
@@ -108,12 +113,13 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "klaviyo-performance",
     "klaviyo-engagement",
     "manual-marketing",
+    "sheets-marketing",
   ],
-  "Growth Intelligence": ["manual-growth"],
+  "Growth Intelligence": ["manual-growth", "manual-marketing", "sheets-growth"],
   "Financial Intelligence": [
     "shopify-sales",
     "manual-financial",
-    "deferred-google_sheets",
+    "sheets-financial",
     "deferred-google_drive",
   ],
   "Insights and Data Quality": [
@@ -122,6 +128,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-channels",
     "klaviyo-readiness",
     "insights-freshness",
+    "sheets-insights",
   ],
 };
 
@@ -139,6 +146,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
   private readonly shopifyAdapters: (() => Promise<ShopifyAdapters>) | null;
   private readonly klaviyoAdapter: KlaviyoAdapter | null;
   private readonly manualWorkbookStore: ManualWorkbookStore | null;
+  private readonly sheetsSource: SheetsTabDataSource | null;
 
   constructor(
     shopifySettings: ShopifyRuntimeSettings | null,
@@ -146,6 +154,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     dependencies: {
       fetchImplementation?: typeof fetch;
       manualWorkbookStore?: ManualWorkbookStore | null;
+      sheetsConfiguration?: SheetsApiConfiguration | null;
     } = {},
   ) {
     this.manualWorkbookStore = dependencies.manualWorkbookStore ?? null;
@@ -156,6 +165,12 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     const clientFetch = dependencies.fetchImplementation
       ? { fetch: dependencies.fetchImplementation }
       : {};
+    this.sheetsSource = dependencies.sheetsConfiguration
+      ? new SheetsApiClient(dependencies.sheetsConfiguration, {
+          ...clientFetch,
+          now: () => this.clock.now(),
+        })
+      : null;
 
     this.shopifyAdapters = shopifySettings
       ? lazy(async (): Promise<ShopifyAdapters> => {
@@ -184,9 +199,21 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       : null;
 
     const contributors: DashboardDatasetContributor[] = [
-      new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
       new DeferredSourceContributor("deferred-google_drive", "google_drive", now),
     ];
+    if (this.sheetsSource) {
+      contributors.push(...createSheetsApiContributors(this.sheetsSource));
+    } else {
+      contributors.push(
+        new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
+        new DeferredSourceContributor("sheets-operations", "google_sheets", now),
+        new DeferredSourceContributor("sheets-product", "google_sheets", now),
+        new DeferredSourceContributor("sheets-insights", "google_sheets", now),
+        new DeferredSourceContributor("sheets-marketing", "google_sheets", now),
+        new DeferredSourceContributor("sheets-growth", "google_sheets", now),
+        new DeferredSourceContributor("sheets-financial", "google_sheets", now),
+      );
+    }
 
     if (this.shopifyAdapters) {
       contributors.push(
@@ -227,9 +254,16 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       );
     }
 
-    if (this.manualWorkbookStore) {
+    if (this.manualWorkbookStore && !this.sheetsSource) {
       contributors.push(
         ...createManualWorkbookContributors({ store: this.manualWorkbookStore, now }),
+      );
+    } else if (!this.sheetsSource) {
+      contributors.push(
+        new DeferredSourceContributor("manual-operations", "manual_workbook", now),
+        new DeferredSourceContributor("manual-marketing", "manual_workbook", now),
+        new DeferredSourceContributor("manual-growth", "manual_workbook", now),
+        new DeferredSourceContributor("manual-financial", "manual_workbook", now),
       );
     } else {
       contributors.push(
@@ -299,16 +333,26 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           .catch((error: unknown) => manualWorkbookStatus({ checkedAt: checkedAt(), error }))
       : Promise.resolve(deferredManualWorkbookStatus(checkedAt()));
 
-    const [shopifyStatus, klaviyoStatus, manualStatus] = await Promise.all([
+    const sheets: Promise<SourceStatus> = this.sheetsSource
+      ? this.sheetsSource
+          .readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"])
+          .then((result) => result.sourceStatus)
+          .catch(
+            () => this.sheetsSource?.sourceStatus() ?? deferredStatus("google_sheets", checkedAt()),
+          )
+      : Promise.resolve(deferredStatus("google_sheets", checkedAt()));
+
+    const [shopifyStatus, klaviyoStatus, manualStatus, sheetsStatus] = await Promise.all([
       shopify,
       klaviyo,
       manualWorkbook,
+      sheets,
     ]);
     return [
       shopifyStatus,
       klaviyoStatus,
       manualStatus,
-      deferredStatus("google_sheets", checkedAt()),
+      sheetsStatus,
       deferredStatus("google_drive", checkedAt()),
     ];
   }
@@ -362,14 +406,17 @@ export function createBackendApiRuntime(loaders: {
   shopify: () => ShopifyRuntimeSettings | null;
   klaviyo: () => KlaviyoConfiguration | null;
   manualWorkbookStore?: ManualWorkbookStore | null;
+  sheets?: () => SheetsApiConfiguration | null;
 }): BackendApiRuntime {
   const shopifySettings = safeLoad(loaders.shopify);
   const klaviyoConfiguration = safeLoad(loaders.klaviyo);
   const manualWorkbookStore = loaders.manualWorkbookStore ?? null;
-  if (!shopifySettings && !klaviyoConfiguration && !manualWorkbookStore) {
+  const sheetsConfiguration = loaders.sheets ? safeLoad(loaders.sheets) : null;
+  if (!shopifySettings && !klaviyoConfiguration && !manualWorkbookStore && !sheetsConfiguration) {
     return new DefaultBackendApiRuntime();
   }
   return new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
     manualWorkbookStore,
+    sheetsConfiguration,
   });
 }

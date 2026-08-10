@@ -162,6 +162,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "products.units_sold",
         "products.units_velocity",
         "inventory.shopify_current",
+        "inventory.value",
         "quality.missing_sku_cost",
         "inventory.sell_through",
       ],
@@ -243,6 +244,12 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           description: "Approved production quantities and expected dates.",
           metricKey: "production.incoming",
           kind: "area",
+        },
+        {
+          title: "Additional depletions",
+          description: "Validated non-revenue inventory movements grouped by reason.",
+          metricKey: "inventory.depletions",
+          kind: "donut",
         },
       ],
       tables: [
@@ -387,6 +394,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "finance.actual_expenses",
         "finance.actual_margin",
         "finance.cash_position",
+        "inventory.value",
         "finance.monthly_burn",
         "finance.cash_runway",
       ],

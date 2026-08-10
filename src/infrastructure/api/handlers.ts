@@ -19,6 +19,7 @@ import { loadKlaviyoConfigurationOrNull } from "@/src/infrastructure/klaviyo/run
 import { loadManualWorkbookConfigurationOrNull } from "@/src/infrastructure/manual-workbook/runtime";
 import { PostgresManualWorkbookStore } from "@/src/infrastructure/manual-workbook/store";
 import { loadShopifyRuntimeSettingsOrNull } from "@/src/infrastructure/shopify/runtime";
+import { loadSheetsApiConfigurationOrNull } from "@/src/infrastructure/sheets-api/config";
 
 import { createImportApiHandlers } from "./import-handlers";
 import { createBackendApiRuntime } from "./live-runtime";
@@ -200,6 +201,7 @@ export const backendApiService = new BackendApiService(
     shopify: loadShopifyRuntimeSettingsOrNull,
     klaviyo: loadKlaviyoConfigurationOrNull,
     manualWorkbookStore,
+    sheets: loadSheetsApiConfigurationOrNull,
   }),
   now,
 );
