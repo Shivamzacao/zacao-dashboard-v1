@@ -1,12 +1,17 @@
-import { z } from "zod";
-
 import type {
   SheetsDashboardPage,
   SheetsTabDataSource,
   SheetsTabReadResult,
+  SheetRecord,
 } from "@/src/application/ports/sheets-tabs";
-import type { ManualStoreRecord } from "@/src/application/ports/manual-workbook";
 import { sourceStatusSchema, type SourceStatus } from "@/src/domain/contracts";
+import { createGoogleAccessTokenProvider } from "@/src/infrastructure/google/auth";
+import { GoogleClientError, GoogleReadClient } from "@/src/infrastructure/google/client";
+import {
+  APPROVED_GOOGLE_FILE_IDS,
+  REQUIRED_GOOGLE_READ_SCOPES,
+  type GoogleSourceConfiguration,
+} from "@/src/infrastructure/google/config";
 import {
   MANUAL_TAB_CONTRACTS,
   MANUAL_WORKBOOK_TABS,
@@ -18,28 +23,18 @@ import {
 
 import type { SheetsApiConfiguration } from "./config";
 
-const rowSchema = z.record(z.string(), z.unknown());
-const envelopeSchema = z
-  .object({ success: z.boolean(), data: z.array(rowSchema), offset: z.unknown().optional() })
-  .passthrough();
-const aggregateSchema = z.record(z.string(), z.unknown());
 const knownTabs = new Set<string>(MANUAL_WORKBOOK_TABS);
 const numericKinds = new Set(["integer", "usd", "decimal", "percent"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}(?:[ T].*)?$/;
+const FRESH_MS = 30_000;
+const STALE_MS = 900_000;
 
-interface CachedWorkbook {
-  readonly tabs: Readonly<Record<string, readonly ManualStoreRecord[]>>;
+interface CachedRead {
+  readonly tabs: Readonly<Record<string, readonly SheetRecord[]>>;
   readonly warnings: readonly string[];
   readonly fetchedAt: number;
   readonly dataAsOf: string | null;
-}
-
-export class SheetsApiError extends Error {
-  constructor(readonly kind: "timeout" | "transport" | "http" | "invalid") {
-    super(`Sheets API ${kind}`);
-    this.name = "SheetsApiError";
-  }
 }
 
 function normalizeCell(value: unknown, column: ManualColumnContract): string | number | null {
@@ -56,37 +51,53 @@ function normalizeCell(value: unknown, column: ManualColumnContract): string | n
   return text;
 }
 
-function normalizeTab(tab: ManualWorkbookTab, value: unknown) {
-  const envelope = envelopeSchema.safeParse(value);
-  if (!envelope.success || !envelope.data.success) {
-    return { rows: [] as ManualStoreRecord[], warnings: [`SHEETS_TAB_INVALID:${tab}`] };
-  }
+function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknown[])[]) {
+  if (values.length === 0) return { rows: [] as SheetRecord[], warnings: [] as string[] };
   const contract = MANUAL_TAB_CONTRACTS[tab];
-  const rows: ManualStoreRecord[] = [];
+  const headers = values[0]?.map((value) => String(value).trim()) ?? [];
+  // The production Inventory_Snapshots sheet currently has a blank A1 while
+  // the values beneath it are the contract's record identifier.
+  if (headers[0] === "" && contract.columns[0]) headers[0] = contract.columns[0].header;
+  const headerIndexes = new Map(headers.map((header, index) => [header, index]));
+  const missing = contract.columns.filter((column) => !headerIndexes.has(column.header));
+  if (missing.some((column) => column.required)) {
+    return { rows: [] as SheetRecord[], warnings: [`SHEETS_TAB_INVALID:${tab}`] };
+  }
+  const rows: SheetRecord[] = [];
   const warnings: string[] = [];
-  for (const [index, raw] of envelope.data.data.entries()) {
+  const businessKeys = new Set<string>();
+  for (let index = 1; index < values.length; index += 1) {
+    const raw = values[index] ?? [];
+    if (raw.every((cell) => cell === null || cell === undefined || cell === "")) continue;
     const normalized: Record<string, string | number | boolean | null> = {};
     let valid = true;
     for (const column of contract.columns) {
-      const value = normalizeCell(raw[column.header], column);
+      const cellIndex = headerIndexes.get(column.header);
+      const value = normalizeCell(cellIndex === undefined ? null : raw[cellIndex], column);
       normalized[column.header] = value;
       if (column.required && value === null) valid = false;
     }
     if (!valid) {
-      warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 2}`);
+      warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 1}`);
       continue;
     }
     if (
       normalized[SOURCE_STATUS_COLUMN] === null ||
       normalized[SOURCE_STATUS_COLUMN] === PRODUCTION_SOURCE_STATUS
     ) {
+      const businessKey = JSON.stringify(contract.businessKey.map((key) => normalized[key]));
+      if (businessKeys.has(businessKey)) {
+        warnings.push(`SHEETS_DUPLICATE_BUSINESS_KEY:${tab}:${index + 1}`);
+        continue;
+      }
+      businessKeys.add(businessKey);
       rows.push(normalized);
     }
   }
   return { rows, warnings };
 }
 
-function dataAsOf(tabs: Readonly<Record<string, readonly ManualStoreRecord[]>>): string | null {
+function dataAsOf(tabs: Readonly<Record<string, readonly SheetRecord[]>>): string | null {
   const latest = Object.values(tabs)
     .flatMap((rows) => rows)
     .map((row) => row["data_as_of"])
@@ -96,39 +107,71 @@ function dataAsOf(tabs: Readonly<Record<string, readonly ManualStoreRecord[]>>):
   return latest ? `${latest}T00:00:00.000Z` : null;
 }
 
-function status(input: {
+function sourceStatus(input: {
   now: string;
   state: SourceStatus["state"];
   dataAsOf: string | null;
   warnings: readonly string[];
   complete: boolean;
+  lastSuccessfulAt?: string | null;
 }): SourceStatus {
   return sourceStatusSchema.parse({
     source: "google_sheets",
     state: input.state,
     checkedAt: input.now,
-    lastSuccessfulAt: ["current", "partial", "no_activity", "stale"].includes(input.state)
-      ? input.now
-      : null,
+    lastSuccessfulAt:
+      input.lastSuccessfulAt ??
+      (["current", "partial", "no_activity"].includes(input.state) ? input.now : null),
     dataAsOf: input.dataAsOf,
     completeness: input.complete ? "complete" : input.state === "partial" ? "partial" : "unknown",
     warningCodes: input.warnings,
   });
 }
 
+function columnName(count: number): string {
+  let value = count;
+  let result = "";
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+  return result || "A";
+}
+
 export class SheetsApiClient implements SheetsTabDataSource {
-  private readonly cacheByUrl = new Map<string, CachedWorkbook>();
-  private readonly pendingByUrl = new Map<string, Promise<CachedWorkbook>>();
+  private readonly google: GoogleReadClient;
+  private readonly cache = new Map<string, CachedRead>();
+  private readonly pending = new Map<string, Promise<CachedRead>>();
   private lastStatus: SourceStatus;
 
   constructor(
     private readonly configuration: SheetsApiConfiguration,
-    private readonly dependencies: {
+    dependencies: {
       readonly fetch?: typeof fetch;
       readonly now?: () => Date;
+      readonly accessToken?: () => Promise<string>;
     } = {},
   ) {
-    this.lastStatus = status({
+    this.nowImplementation = dependencies.now ?? (() => new Date());
+    const googleConfiguration: GoogleSourceConfiguration = {
+      environment: "production",
+      activeWorkbookId: configuration.workbookId,
+      productionWorkbookId: configuration.workbookId,
+      budgetWorkbookId: APPROVED_GOOGLE_FILE_IDS.budgetWorkbook,
+      sopWorkbookId: APPROVED_GOOGLE_FILE_IDS.sopWorkbook,
+      reportingTimeZone: "America/New_York",
+      grantedScopes: [...REQUIRED_GOOGLE_READ_SCOPES],
+      requestTimeoutMs: configuration.timeoutMs,
+      rowChunkSize: configuration.rowChunkSize,
+    };
+    this.google = new GoogleReadClient(googleConfiguration, {
+      fetch: dependencies.fetch ?? fetch,
+      accessToken:
+        dependencies.accessToken ??
+        createGoogleAccessTokenProvider(configuration.credential, REQUIRED_GOOGLE_READ_SCOPES),
+    });
+    this.lastStatus = sourceStatus({
       now: this.now().toISOString(),
       state: "no_activity",
       dataAsOf: null,
@@ -137,79 +180,43 @@ export class SheetsApiClient implements SheetsTabDataSource {
     });
   }
 
-  private now(): Date {
-    return this.dependencies.now?.() ?? new Date();
+  private readonly nowImplementation: () => Date;
+  private now() {
+    return this.nowImplementation();
   }
-
-  sourceStatus(): SourceStatus {
+  sourceStatus() {
     return this.lastStatus;
   }
 
-  private async request(url: string, signal?: AbortSignal): Promise<unknown> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.configuration.timeoutMs);
-    const abort = () => controller.abort();
-    signal?.addEventListener("abort", abort, { once: true });
-    try {
-      const response = await (this.dependencies.fetch ?? fetch)(url, {
-        signal: controller.signal,
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) throw new SheetsApiError("http");
-      try {
-        return await response.json();
-      } catch {
-        throw new SheetsApiError("invalid");
-      }
-    } catch (error) {
-      if (error instanceof SheetsApiError) throw error;
-      if (controller.signal.aborted) throw new SheetsApiError("timeout");
-      throw new SheetsApiError("transport");
-    } finally {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", abort);
-    }
-  }
-
-  private normalizeAggregate(payload: unknown): CachedWorkbook {
-    const parsed = aggregateSchema.safeParse(payload);
-    if (!parsed.success) throw new SheetsApiError("invalid");
-    const tabs: Record<string, readonly ManualStoreRecord[]> = {};
+  private async freshRead(requested: readonly ManualWorkbookTab[], signal?: AbortSignal) {
+    const metadata = await this.google.readSpreadsheetMetadata(
+      this.configuration.workbookId,
+      signal,
+    );
+    const available = new Map(metadata.sheets.map((sheet) => [sheet.title, sheet]));
+    const present = requested.filter((tab) => available.has(tab));
+    const raw =
+      (await this.google.readTabsRows?.({
+        spreadsheetId: this.configuration.workbookId,
+        sheets: present.map((tab) => ({
+          title: tab,
+          lastColumn: columnName(MANUAL_TAB_CONTRACTS[tab].columns.length),
+        })),
+        ...(signal ? { signal } : {}),
+      })) ?? {};
+    const tabs: Record<string, readonly SheetRecord[]> = {};
     const warnings: string[] = [];
-    for (const [tab, value] of Object.entries(parsed.data)) {
-      if (!knownTabs.has(tab)) continue;
-      const normalized = normalizeTab(tab as ManualWorkbookTab, value);
+    for (const tab of requested) {
+      if (!available.has(tab)) {
+        tabs[tab] = [];
+        warnings.push(`SHEETS_TAB_MISSING:${tab}`);
+        continue;
+      }
+      const normalized = normalizeRows(tab, raw[tab] ?? []);
       tabs[tab] = normalized.rows;
       warnings.push(...normalized.warnings);
     }
-    const fetchedAt = this.now().getTime();
-    return { tabs, warnings, fetchedAt, dataAsOf: dataAsOf(tabs) };
-  }
-
-  private async workbook(url: string, signal?: AbortSignal): Promise<CachedWorkbook> {
-    const now = this.now().getTime();
-    const cached = this.cacheByUrl.get(url);
-    if (cached && now - cached.fetchedAt < 300_000) return cached;
-    const existing = this.pendingByUrl.get(url);
-    if (existing) return existing;
-    const pending = this.request(url, signal)
-      .then((payload) => {
-        const normalized = this.normalizeAggregate(payload);
-        this.cacheByUrl.set(url, normalized);
-        return normalized;
-      })
-      .finally(() => {
-        this.pendingByUrl.delete(url);
-      });
-    this.pendingByUrl.set(url, pending);
-    return pending;
-  }
-
-  private async readDedicatedTab(tab: ManualWorkbookTab, url: string, signal?: AbortSignal) {
-    const payload = await this.request(url, signal);
-    const aggregate = aggregateSchema.safeParse(payload);
-    const envelope = aggregate.success && tab in aggregate.data ? aggregate.data[tab] : payload;
-    return normalizeTab(tab, envelope);
+    return { tabs, warnings, fetchedAt: this.now().getTime(), dataAsOf: dataAsOf(tabs) };
   }
 
   async readPageTabs(
@@ -220,69 +227,58 @@ export class SheetsApiClient implements SheetsTabDataSource {
     const requested = [...new Set(tabNames)].filter((tab): tab is ManualWorkbookTab =>
       knownTabs.has(tab),
     );
-    const dedicated = requested.filter((tab) => this.configuration.tabUrls[tab]);
-    const fallback = requested.filter((tab) => !this.configuration.tabUrls[tab]);
-    const pageUrl = this.configuration.pageUrls[page] ?? this.configuration.aggregateUrl;
+    const key = `${page}:${[...requested].sort().join(",")}`;
+    const now = this.now();
+    const cached = this.cache.get(key);
+    let read: CachedRead;
     try {
-      if (fallback.length && !pageUrl) throw new SheetsApiError("transport");
-      const [pageWorkbook, dedicatedResults] = await Promise.all([
-        fallback.length && pageUrl ? this.workbook(pageUrl, signal) : Promise.resolve(null),
-        Promise.all(
-          dedicated.map(async (tab) => ({
-            tab,
-            result: await this.readDedicatedTab(
-              tab,
-              this.configuration.tabUrls[tab] as string,
-              signal,
-            ),
-          })),
-        ),
-      ]);
-      const tabs: Record<string, readonly ManualStoreRecord[]> = {};
-      const warnings = [...(pageWorkbook?.warnings ?? [])];
-      for (const tab of fallback) {
-        if (!(tab in (pageWorkbook?.tabs ?? {}))) warnings.push(`SHEETS_TAB_MISSING:${tab}`);
-        tabs[tab] = pageWorkbook?.tabs[tab] ?? [];
+      if (cached && now.getTime() - cached.fetchedAt < FRESH_MS) read = cached;
+      else {
+        let request = this.pending.get(key);
+        if (!request) {
+          request = this.freshRead(requested, signal)
+            .then((value) => {
+              this.cache.set(key, value);
+              return value;
+            })
+            .finally(() => this.pending.delete(key));
+          this.pending.set(key, request);
+        }
+        read = await request;
       }
-      for (const { tab, result } of dedicatedResults) {
-        tabs[tab] = result.rows;
-        warnings.push(...result.warnings);
-      }
-      const relevantWarnings = [
-        ...new Set(
-          warnings.filter((warning) => requested.some((tab) => warning.includes(`:${tab}`))),
-        ),
-      ];
-      const totalRows = Object.values(tabs).reduce((sum, rows) => sum + rows.length, 0);
-      const state = relevantWarnings.length ? "partial" : totalRows ? "current" : "no_activity";
-      this.lastStatus = status({
-        now: this.now().toISOString(),
+      const totalRows = Object.values(read.tabs).reduce((sum, rows) => sum + rows.length, 0);
+      const state = read.warnings.length ? "partial" : totalRows ? "current" : "no_activity";
+      this.lastStatus = sourceStatus({
+        now: now.toISOString(),
         state,
-        dataAsOf: dataAsOf(tabs) ?? pageWorkbook?.dataAsOf ?? null,
-        warnings: relevantWarnings,
-        complete: relevantWarnings.length === 0,
+        dataAsOf: read.dataAsOf,
+        warnings: read.warnings,
+        complete: read.warnings.length === 0,
       });
-      return { tabs, sourceStatus: this.lastStatus, warnings: relevantWarnings };
+      return { tabs: read.tabs, sourceStatus: this.lastStatus, warnings: read.warnings };
     } catch (error) {
-      const now = this.now();
-      const cached = pageUrl ? this.cacheByUrl.get(pageUrl) : null;
-      if (cached && now.getTime() - cached.fetchedAt <= 900_000) {
-        const tabs = Object.fromEntries(requested.map((tab) => [tab, cached.tabs[tab] ?? []]));
-        this.lastStatus = status({
+      if (cached && now.getTime() - cached.fetchedAt <= STALE_MS) {
+        const warnings = ["SHEETS_STALE_FALLBACK"];
+        this.lastStatus = sourceStatus({
           now: now.toISOString(),
           state: "stale",
           dataAsOf: cached.dataAsOf,
-          warnings: ["SHEETS_STALE_FALLBACK"],
+          warnings,
           complete: false,
+          lastSuccessfulAt: new Date(cached.fetchedAt).toISOString(),
         });
-        return { tabs, sourceStatus: this.lastStatus, warnings: ["SHEETS_STALE_FALLBACK"] };
+        return { tabs: cached.tabs, sourceStatus: this.lastStatus, warnings };
       }
-      const kind = error instanceof SheetsApiError ? error.kind : "transport";
-      this.lastStatus = status({
+      const invalid = error instanceof GoogleClientError && error.kind === "malformed_response";
+      const warning =
+        error instanceof GoogleClientError
+          ? `SHEETS_GOOGLE_${error.kind.toUpperCase()}`
+          : "SHEETS_GOOGLE_UNAVAILABLE";
+      this.lastStatus = sourceStatus({
         now: now.toISOString(),
-        state: kind === "invalid" ? "invalid" : "unavailable",
+        state: invalid ? "invalid" : "unavailable",
         dataAsOf: null,
-        warnings: [`SHEETS_API_${kind.toUpperCase()}`],
+        warnings: [warning],
         complete: false,
       });
       throw error;

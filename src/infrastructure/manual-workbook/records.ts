@@ -1,12 +1,12 @@
 import type { ManualMetricRecord } from "@/src/application/metrics/types";
-import type { ManualStoreRecord } from "@/src/application/ports/manual-workbook";
+import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 
-function text(record: ManualStoreRecord, key: string): string | null {
+function text(record: SheetRecord, key: string): string | null {
   const value = record[key];
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
-function numeric(record: ManualStoreRecord, key: string): number | null {
+function numeric(record: SheetRecord, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -33,7 +33,7 @@ function periodBounds(period: string | null): { start: string; end: string } | n
  */
 
 export function toMarketingSpendRecords(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): readonly ManualMetricRecord[] {
   return records.map((record) => ({
     Date: text(record, "date"),
@@ -44,7 +44,7 @@ export function toMarketingSpendRecords(
 }
 
 export function toFinanceActualRecords(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): readonly ManualMetricRecord[] {
   return records.map((record) => {
     // The workbook records month periods (YYYY-MM); a month counts toward the
@@ -58,9 +58,7 @@ export function toFinanceActualRecords(
   });
 }
 
-export function toDepletionRecords(
-  records: readonly ManualStoreRecord[],
-): readonly ManualMetricRecord[] {
+export function toDepletionRecords(records: readonly SheetRecord[]): readonly ManualMetricRecord[] {
   return records.map((record) => ({
     Date: text(record, "movement_date"),
     Reason: text(record, "reason"),
@@ -69,7 +67,7 @@ export function toDepletionRecords(
 }
 
 export function toPartnerPerformanceRecords(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): readonly ManualMetricRecord[] {
   return records.map((record) => {
     const bounds = periodBounds(text(record, "period"));
@@ -96,7 +94,7 @@ const PIPELINE_STATUS_LABELS: Readonly<Record<string, string>> = {
 };
 
 export function toGrowthPipelineRecords(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): readonly ManualMetricRecord[] {
   return records.map((record) => {
     const status = text(record, "status");
@@ -114,7 +112,7 @@ export function toGrowthPipelineRecords(
 }
 
 export function toSocialMetricsRecords(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): readonly ManualMetricRecord[] {
   return records.map((record) => ({
     Date: text(record, "snapshot_date"),

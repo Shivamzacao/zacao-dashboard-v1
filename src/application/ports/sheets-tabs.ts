@@ -1,8 +1,10 @@
-import type { ManualStoreRecord } from "./manual-workbook";
 import type { SourceStatus } from "@/src/domain/contracts";
 
+export type SheetCell = string | number | boolean | null;
+export type SheetRecord = Readonly<Record<string, SheetCell>>;
+
 export interface SheetsTabReadResult {
-  readonly tabs: Readonly<Record<string, readonly ManualStoreRecord[]>>;
+  readonly tabs: Readonly<Record<string, readonly SheetRecord[]>>;
   readonly sourceStatus: SourceStatus;
   readonly warnings: readonly string[];
 }

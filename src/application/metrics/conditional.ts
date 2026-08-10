@@ -60,14 +60,12 @@ export function buildCombinedInventoryBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "warehouse_sku",
-    items: completeRequiredLocations
-      ? [...grouped].map(([key, quantities]) => ({
-          key,
-          label: key,
-          values: [{ kind: "quantity", value: sumFiniteNumbers(quantities) }],
-          warnings: [],
-        }))
-      : [],
+    items: [...grouped].map(([key, quantities]) => ({
+      key,
+      label: key,
+      values: [{ kind: "quantity", value: sumFiniteNumbers(quantities) }],
+      warnings: completeRequiredLocations ? [] : ["INVENTORY_LOCATION_COVERAGE_INCOMPLETE"],
+    })),
   });
 }
 
@@ -96,7 +94,14 @@ export function buildInventoryLotsTable(
       "quantityRemaining",
       "status",
     ],
-    rows: facts.map((fact) => ({ ...fact })),
+    rows: [...facts]
+      .sort((left, right) =>
+        (left.bestByDate ?? "9999-12-31").localeCompare(right.bestByDate ?? "9999-12-31"),
+      )
+      .map((fact) => ({
+        ...fact,
+        warnings: fact.bestByDate === null ? "LOT_BEST_BY_DATE_MISSING" : "",
+      })),
   });
 }
 
@@ -115,8 +120,23 @@ export function buildForecastVarianceTable(
   );
   return metricTableViewModelSchema.parse({
     metric: base,
-    columns: ["period", "sku", "channel", "forecastUnits", "actualUnits", "varianceUnits"],
-    rows: facts.map((fact) => ({ ...fact, varianceUnits: fact.actualUnits - fact.forecastUnits })),
+    columns: [
+      "period",
+      "sku",
+      "channel",
+      "forecastUnits",
+      "actualUnits",
+      "varianceUnits",
+      "variancePercent",
+    ],
+    rows: facts.map((fact) => ({
+      ...fact,
+      varianceUnits: fact.actualUnits - fact.forecastUnits,
+      variancePercent:
+        fact.forecastUnits === 0
+          ? null
+          : (fact.actualUnits - fact.forecastUnits) / fact.forecastUnits,
+    })),
   });
 }
 
@@ -124,14 +144,20 @@ export function buildIncomingProductionTable(
   context: MetricServiceContext,
   facts: readonly ProductionIncomingFact[],
 ): MetricTableViewModel {
+  const applicable = facts.filter(
+    ({ expectedArrivalDate }) =>
+      expectedArrivalDate === null ||
+      (expectedArrivalDate >= context.dataPeriod.startDate &&
+        expectedArrivalDate <= context.dataPeriod.endDate),
+  );
   const base = metric(
     context,
     "production.incoming",
-    facts.length === 0
+    applicable.length === 0
       ? null
       : {
           kind: "quantity",
-          value: sumFiniteNumbers(facts.map(({ incomingUnits }) => incomingUnits)),
+          value: sumFiniteNumbers(applicable.map(({ incomingUnits }) => incomingUnits)),
         },
   );
   return metricTableViewModelSchema.parse({
@@ -144,9 +170,17 @@ export function buildIncomingProductionTable(
       "status",
       "expectedArrivalDate",
       "incomingUnits",
+      "incomingValueMinorUnits",
+      "freightMinorUnits",
       "unitsReceived",
     ],
-    rows: facts.map((fact) => ({ ...fact })),
+    rows: [...applicable]
+      .sort((left, right) =>
+        (left.expectedArrivalDate ?? "9999-12-31").localeCompare(
+          right.expectedArrivalDate ?? "9999-12-31",
+        ),
+      )
+      .map((fact) => ({ ...fact })),
   });
 }
 

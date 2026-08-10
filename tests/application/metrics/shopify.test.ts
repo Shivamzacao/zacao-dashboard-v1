@@ -4,7 +4,6 @@ import {
   buildCatalogTable,
   buildCustomerClassificationMetrics,
   buildInventoryBreakdown,
-  buildMissingCostMetric,
   buildProductUnitsBreakdown,
   buildProductVelocityTable,
   buildShopifyFunnelTable,
@@ -88,7 +87,7 @@ describe("B5 Shopify metric services", () => {
     expect(velocity.rows).toHaveLength(2);
   });
 
-  it("returns sanitized catalog/current inventory and deterministic missing-cost findings", () => {
+  it("returns sanitized catalog/current inventory without treating Shopify cost as sheet authority", () => {
     const catalog = [
       {
         productId: "product-1",
@@ -103,7 +102,6 @@ describe("B5 Shopify metric services", () => {
       },
     ] as const;
     const catalogTable = buildCatalogTable(context(), catalog);
-    const missingCost = buildMissingCostMetric(context(), catalog);
     const inventory = buildInventoryBreakdown(context(), [
       {
         locationId: "location-1",
@@ -117,8 +115,6 @@ describe("B5 Shopify metric services", () => {
       },
     ]);
     expect(catalogTable.rows[0]).not.toHaveProperty("unitCostMinorUnits");
-    expect(missingCost.value).toEqual({ kind: "count", value: 1 });
-    expect(missingCost.warnings).toContain("MISSING_COST:SKU-A");
     expect(inventory.metric.value).toEqual({ kind: "count", value: 25 });
     expect(inventory.metric.warnings).toContain("SHOPIFY_LOCATIONS_ONLY");
   });

@@ -28,7 +28,8 @@ describe("B5 conditional calculation interfaces", () => {
       true,
     );
     expect(partial.metric.value).toBeNull();
-    expect(partial.items).toEqual([]);
+    expect(partial.items).toHaveLength(2);
+    expect(partial.items[0]?.warnings).toContain("INVENTORY_LOCATION_COVERAGE_INCOMPLETE");
     expect(complete.metric.value).toEqual({ kind: "quantity", value: 15 });
 
     const cash = buildCashPositionMetric(
@@ -64,7 +65,7 @@ describe("B5 conditional calculation interfaces", () => {
         sku: "SKU-A",
         destinationWarehouse: "SNAPL",
         status: "In Transit",
-        expectedArrivalDate: "2026-08-15",
+        expectedArrivalDate: "2026-07-15",
         incomingUnits: 100.5,
         unitsReceived: 0,
       },

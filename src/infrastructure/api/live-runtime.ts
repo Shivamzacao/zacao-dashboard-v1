@@ -15,15 +15,9 @@ import { ConsoleLogger } from "@/src/infrastructure/logging";
 import { KlaviyoAdapter } from "@/src/infrastructure/klaviyo/adapter";
 import { KlaviyoClient } from "@/src/infrastructure/klaviyo/client";
 import type { KlaviyoConfiguration } from "@/src/infrastructure/klaviyo/config";
-import type { ManualWorkbookStore } from "@/src/application/ports/manual-workbook";
 import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import { createKlaviyoContributors } from "@/src/infrastructure/klaviyo/contributors";
 import { klaviyoSourceStatus } from "@/src/infrastructure/klaviyo/source-status";
-import { createManualWorkbookContributors } from "@/src/infrastructure/manual-workbook/contributors";
-import {
-  deferredManualWorkbookStatus,
-  manualWorkbookStatus,
-} from "@/src/infrastructure/manual-workbook/source-status";
 import { ShopifyAdminAdapter } from "@/src/infrastructure/shopify/admin-graphql/adapter";
 import { ShopifyGraphQlClient } from "@/src/infrastructure/shopify/client";
 import {
@@ -104,7 +98,6 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
   "Operations Intelligence": [
     "shopify-catalog-inventory",
     "shopify-fulfillment",
-    "manual-operations",
     "sheets-operations",
     "deferred-google_drive",
   ],
@@ -112,16 +105,10 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-funnel",
     "klaviyo-performance",
     "klaviyo-engagement",
-    "manual-marketing",
     "sheets-marketing",
   ],
-  "Growth Intelligence": ["manual-growth", "manual-marketing", "sheets-growth"],
-  "Financial Intelligence": [
-    "shopify-sales",
-    "manual-financial",
-    "sheets-financial",
-    "deferred-google_drive",
-  ],
+  "Growth Intelligence": ["sheets-growth"],
+  "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
   "Insights and Data Quality": [
     "shopify-history",
     "shopify-catalog-inventory",
@@ -145,7 +132,6 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
   private readonly orchestrator: DashboardOrchestrator;
   private readonly shopifyAdapters: (() => Promise<ShopifyAdapters>) | null;
   private readonly klaviyoAdapter: KlaviyoAdapter | null;
-  private readonly manualWorkbookStore: ManualWorkbookStore | null;
   private readonly sheetsSource: SheetsTabDataSource | null;
 
   constructor(
@@ -153,11 +139,9 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     klaviyoConfiguration: KlaviyoConfiguration | null,
     dependencies: {
       fetchImplementation?: typeof fetch;
-      manualWorkbookStore?: ManualWorkbookStore | null;
       sheetsConfiguration?: SheetsApiConfiguration | null;
     } = {},
   ) {
-    this.manualWorkbookStore = dependencies.manualWorkbookStore ?? null;
     const now = () => this.clock.now();
     const fetchDependency = dependencies.fetchImplementation
       ? { fetchImplementation: dependencies.fetchImplementation }
@@ -254,26 +238,6 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       );
     }
 
-    if (this.manualWorkbookStore && !this.sheetsSource) {
-      contributors.push(
-        ...createManualWorkbookContributors({ store: this.manualWorkbookStore, now }),
-      );
-    } else if (!this.sheetsSource) {
-      contributors.push(
-        new DeferredSourceContributor("manual-operations", "manual_workbook", now),
-        new DeferredSourceContributor("manual-marketing", "manual_workbook", now),
-        new DeferredSourceContributor("manual-growth", "manual_workbook", now),
-        new DeferredSourceContributor("manual-financial", "manual_workbook", now),
-      );
-    } else {
-      contributors.push(
-        new DeferredSourceContributor("manual-operations", "manual_workbook", now),
-        new DeferredSourceContributor("manual-marketing", "manual_workbook", now),
-        new DeferredSourceContributor("manual-growth", "manual_workbook", now),
-        new DeferredSourceContributor("manual-financial", "manual_workbook", now),
-      );
-    }
-
     contributors.push(this.createFreshnessContributor());
 
     this.orchestrator = new DashboardOrchestrator(
@@ -325,14 +289,6 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           .catch((error: unknown) => klaviyoSourceStatus({ checkedAt: checkedAt(), error }))
       : Promise.resolve(deferredStatus("klaviyo", checkedAt()));
 
-    const manualStore = this.manualWorkbookStore;
-    const manualWorkbook: Promise<SourceStatus> = manualStore
-      ? manualStore
-          .latestCommittedBatches()
-          .then((batches) => manualWorkbookStatus({ checkedAt: checkedAt(), batches }))
-          .catch((error: unknown) => manualWorkbookStatus({ checkedAt: checkedAt(), error }))
-      : Promise.resolve(deferredManualWorkbookStatus(checkedAt()));
-
     const sheets: Promise<SourceStatus> = this.sheetsSource
       ? this.sheetsSource
           .readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"])
@@ -342,16 +298,14 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           )
       : Promise.resolve(deferredStatus("google_sheets", checkedAt()));
 
-    const [shopifyStatus, klaviyoStatus, manualStatus, sheetsStatus] = await Promise.all([
+    const [shopifyStatus, klaviyoStatus, sheetsStatus] = await Promise.all([
       shopify,
       klaviyo,
-      manualWorkbook,
       sheets,
     ]);
     return [
       shopifyStatus,
       klaviyoStatus,
-      manualStatus,
       sheetsStatus,
       deferredStatus("google_drive", checkedAt()),
     ];
@@ -405,18 +359,15 @@ function safeLoad<T>(loader: () => T | null): T | null {
 export function createBackendApiRuntime(loaders: {
   shopify: () => ShopifyRuntimeSettings | null;
   klaviyo: () => KlaviyoConfiguration | null;
-  manualWorkbookStore?: ManualWorkbookStore | null;
   sheets?: () => SheetsApiConfiguration | null;
 }): BackendApiRuntime {
   const shopifySettings = safeLoad(loaders.shopify);
   const klaviyoConfiguration = safeLoad(loaders.klaviyo);
-  const manualWorkbookStore = loaders.manualWorkbookStore ?? null;
   const sheetsConfiguration = loaders.sheets ? safeLoad(loaders.sheets) : null;
-  if (!shopifySettings && !klaviyoConfiguration && !manualWorkbookStore && !sheetsConfiguration) {
+  if (!shopifySettings && !klaviyoConfiguration && !sheetsConfiguration) {
     return new DefaultBackendApiRuntime();
   }
   return new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
-    manualWorkbookStore,
     sheetsConfiguration,
   });
 }

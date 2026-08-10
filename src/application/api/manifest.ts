@@ -12,9 +12,6 @@ export const apiContractManifest = Object.freeze({
     dashboard: "/api/v1/dashboards/{dashboard}",
     drilldown: "/api/v1/drilldowns/{dataset}",
     export: "/api/v1/exports/{dataset}",
-    imports: "/api/v1/imports",
-    importPreview: "/api/v1/imports/preview",
-    importCommit: "/api/v1/imports/commit",
   },
   dashboards: Object.entries(dashboardSlugToSection).map(([slug, section]) => ({ slug, section })),
   drilldowns: drilldownCatalog.map(

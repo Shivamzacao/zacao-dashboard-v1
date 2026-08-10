@@ -8,6 +8,7 @@ export const REQUIRED_GOOGLE_READ_SCOPES = [
 ] as const;
 
 export const APPROVED_GOOGLE_FILE_IDS = {
+  dashboardWorkbook: "1vOkSXadR0WAFmUgWUvZmxmOoxVs5fxYkIW3GT2FmjjA",
   testWorkbook: "1h1SmzQaSX_sBAHTdYkh8wQJFyYS66Jg5_q-MFNShtkg",
   productionWorkbook: "1wj7RNZ0VNhaYDyWTU_MkJNYLdMPHe17u6ZYsmP-HwbM",
   budgetWorkbook: "1ccm6JvpLYmKSWoatG0UOiDAKe4XF1_-ZBZ18WwMcTzE",

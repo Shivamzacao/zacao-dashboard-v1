@@ -206,14 +206,14 @@ export function buildGrowthPipelineViews(
     open.length > values.length ? ["PIPELINE_VALUE_PARTIAL"] : [],
   );
   const grouped = new Map<string, ManualMetricRecord[]>();
-  for (const record of records) {
+  for (const record of open) {
     const type = text(record, "Pipeline Type");
     if (type !== null) grouped.set(type, [...(grouped.get(type) ?? []), record]);
   }
   const byTypeBase = metric(
     context,
     "growth.pipeline_by_type",
-    records.length === 0 ? null : { kind: "count", value: records.length },
+    open.length === 0 ? null : { kind: "count", value: open.length },
   );
   return {
     open: openMetric,
@@ -283,10 +283,28 @@ export function buildSocialMetricsTable(
   records: readonly ManualMetricRecord[],
 ): MetricTableViewModel {
   const applicable = records.filter((record) => inPeriod(record, "Date", context));
+  const engagements = applicable.flatMap((record) => {
+    const value = number(record, "Engagements");
+    return value === null ? [] : [value];
+  });
+  const latestByAccount = new Map<string, ManualMetricRecord>();
+  for (const record of applicable) {
+    const key = `${text(record, "Platform") ?? ""}:${text(record, "Account") ?? ""}`;
+    const prior = latestByAccount.get(key);
+    if (!prior || (text(record, "Date") ?? "") > (text(prior, "Date") ?? "")) {
+      latestByAccount.set(key, record);
+    }
+  }
   const base = metric(
     context,
     "social.performance",
-    applicable.length === 0 ? null : { kind: "count", value: applicable.length },
+    engagements.length === 0 ? null : { kind: "count", value: sumFiniteNumbers(engagements) },
+    [...latestByAccount.values()].flatMap((record) => {
+      const platform = text(record, "Platform") ?? "unknown";
+      const account = text(record, "Account") ?? "unknown";
+      const followers = number(record, "Followers");
+      return followers === null ? [] : [`LATEST_FOLLOWERS:${platform}:${account}:${followers}`];
+    }),
   );
   return metricTableViewModelSchema.parse({
     metric: base,

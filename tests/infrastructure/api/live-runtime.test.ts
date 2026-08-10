@@ -427,16 +427,14 @@ describe("LiveBackendApiRuntime", () => {
     expect(funnel.value).toBeNull();
   });
 
-  it("probes live sources for status reporting and keeps Google deferred", async () => {
+  it("probes live sources without exposing the removed manual-workbook source", async () => {
     const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
       fetchImplementation: stubFetch(),
     });
     const statuses = await runtime.sourceStatuses();
     expect(statuses.find((status) => status.source === "shopify")?.state).toBe("current");
     expect(statuses.find((status) => status.source === "klaviyo")?.state).toBe("no_activity");
-    expect(statuses.find((status) => status.source === "manual_workbook")?.state).toBe(
-      "not_configured",
-    );
+    expect(statuses).toHaveLength(4);
     expect(statuses.find((status) => status.source === "google_sheets")?.state).toBe(
       "not_configured",
     );
