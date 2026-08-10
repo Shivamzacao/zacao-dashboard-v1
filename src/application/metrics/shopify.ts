@@ -197,24 +197,6 @@ export function buildCatalogTable(
   });
 }
 
-export function buildMissingCostMetric(
-  context: MetricServiceContext,
-  facts: readonly CatalogVariantFact[],
-): MetricViewModel {
-  const missing = facts.filter(
-    ({ activeOrSold, unitCostMinorUnits }) => activeOrSold && unitCostMinorUnits === null,
-  );
-  return metric(
-    context,
-    "quality.missing_sku_cost",
-    {
-      kind: "count",
-      value: missing.length,
-    },
-    missing.map(({ sku, variantId }) => `MISSING_COST:${sku ?? variantId}`),
-  );
-}
-
 /** Shopify quantity names arrive snake_cased; readers see prose. */
 const INVENTORY_QUANTITY_LABELS: Readonly<Record<string, string>> = {
   available: "Available",

@@ -20,7 +20,6 @@ const SOURCE_LABELS: Readonly<Record<SourceStatus["source"], string>> = {
   klaviyo: "Klaviyo",
   google_sheets: "Google Sheets",
   google_drive: "Google Drive",
-  manual_workbook: "Manual workbook",
 };
 
 const drilldownDatasetByMetricKey = new Map(

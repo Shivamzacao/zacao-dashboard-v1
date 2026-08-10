@@ -164,21 +164,6 @@ export function buildNativeChannelMixBreakdown(
   });
 }
 
-export function buildUnclassifiedChannelMetric(
-  context: MetricServiceContext,
-  facts: readonly NativeChannelFact[],
-): MetricViewModel {
-  const unclassifiedOrders = sumSafeNumbers(
-    facts.filter(({ channel }) => channel === "Unclassified").map(({ orders }) => orders),
-  );
-  return metric(
-    context,
-    "quality.unclassified_channel",
-    facts.length === 0 ? null : { kind: "count", value: unclassifiedOrders },
-    unclassifiedOrders > 0 ? ["UNCLASSIFIED_CHANNEL_PRESENT"] : [],
-  );
-}
-
 /** DEC-016: provider fulfillment aggregates, event-dated, coverage disclosed. */
 export function buildFulfillmentSummaryBreakdown(
   context: MetricServiceContext,
@@ -241,8 +226,7 @@ export function buildProductMixBreakdown(
     total === 0
       ? null
       : Math.round(
-          (Math.max(0, ...[...grouped.values()].map(({ netSales }) => netSales)) * 10_000) /
-            total,
+          (Math.max(0, ...[...grouped.values()].map(({ netSales }) => netSales)) * 10_000) / total,
         );
   const base = metric(
     context,

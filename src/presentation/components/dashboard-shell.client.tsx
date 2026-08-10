@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { FilterPendingOverlay } from "./filter-pending-overlay";
@@ -28,6 +28,7 @@ export function DashboardShellClient({
 }: DashboardShellClientProps) {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const { state, push, selectPreset, pending } = useDashboardUrlFilters(supportedFilters, today);
   const activeRoute = dashboardRouteByPath(pathname);
@@ -46,6 +47,22 @@ export function DashboardShellClient({
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [navigationOpen]);
+
+  useEffect(() => {
+    if (dataMode !== "live") return;
+    const refresh = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    const interval = window.setInterval(refresh, 30_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [dataMode, router]);
 
   const closeNavigation = () => {
     if (!navigationOpen) return;

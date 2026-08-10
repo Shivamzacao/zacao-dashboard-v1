@@ -5,18 +5,18 @@ import {
   type MetricTableViewModel,
   type MetricViewModel,
 } from "@/src/application/view-models";
-import type { ManualStoreRecord } from "@/src/application/ports/manual-workbook";
+import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 import { usdFromDecimalNumber } from "@/src/domain/metrics/calculations";
 
 import type { MetricServiceContext } from "./types";
 import { createMetricViewModel } from "./view-model";
 
-function text(record: ManualStoreRecord, key: string): string | null {
+function text(record: SheetRecord, key: string): string | null {
   const value = record[key];
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
-function numeric(record: ManualStoreRecord, key: string): number | null {
+function numeric(record: SheetRecord, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -37,7 +37,7 @@ function metric(
   });
 }
 
-function latestSnapshots(records: readonly ManualStoreRecord[]): readonly ManualStoreRecord[] {
+function latestSnapshots(records: readonly SheetRecord[]): readonly SheetRecord[] {
   const latest = records
     .map((record) => text(record, "snapshot_at"))
     .filter((value): value is string => value !== null)
@@ -46,11 +46,11 @@ function latestSnapshots(records: readonly ManualStoreRecord[]): readonly Manual
   return latest ? records.filter((record) => text(record, "snapshot_at") === latest) : [];
 }
 
-function applicableCost(
-  costs: readonly ManualStoreRecord[],
+function applicableCostRecord(
+  costs: readonly SheetRecord[],
   sku: string,
   snapshotDate: string,
-): number | null {
+): SheetRecord | null {
   const candidates = costs
     .filter((record) => {
       const from = text(record, "effective_from");
@@ -65,17 +65,34 @@ function applicableCost(
     .sort((left, right) =>
       (text(right, "effective_from") ?? "").localeCompare(text(left, "effective_from") ?? ""),
     );
-  return candidates.length
-    ? numeric(candidates[0] as ManualStoreRecord, "total_unit_cost_usd")
-    : null;
+  return candidates[0] ?? null;
+}
+
+function applicableCost(costs: readonly SheetRecord[], sku: string, snapshotDate: string) {
+  const record = applicableCostRecord(costs, sku, snapshotDate);
+  return record ? numeric(record, "total_unit_cost_usd") : null;
 }
 
 export function buildInventoryValueMetric(
   context: MetricServiceContext,
-  snapshots: readonly ManualStoreRecord[],
-  costs: readonly ManualStoreRecord[],
+  snapshots: readonly SheetRecord[],
+  costs: readonly SheetRecord[],
 ): MetricViewModel {
   const latest = latestSnapshots(snapshots);
+  const selectedCostBases = new Set(
+    latest.flatMap((snapshot) => {
+      const sku = text(snapshot, "sku");
+      const date = text(snapshot, "snapshot_at")?.slice(0, 10);
+      const record = sku && date ? applicableCostRecord(costs, sku, date) : null;
+      const basis = record ? text(record, "cost_basis") : null;
+      return basis ? [basis] : [];
+    }),
+  );
+  if (selectedCostBases.size > 1) {
+    return metric(context, "inventory.value", null, [
+      `MIXED_COST_BASIS:${[...selectedCostBases].sort().join(",")}`,
+    ]);
+  }
   let value = 0;
   let valuedRows = 0;
   for (const snapshot of latest) {
@@ -85,21 +102,76 @@ export function buildInventoryValueMetric(
     if (!sku || !date || onHand === null) continue;
     const unitCost = applicableCost(costs, sku, date);
     if (unitCost === null) continue;
-    value += onHand * unitCost;
+    // The workbook rule ties to the source by rounding every line first.
+    value += Math.round(onHand * unitCost * 100) / 100;
     valuedRows += 1;
   }
   return metric(
     context,
     "inventory.value",
     valuedRows ? { kind: "money", value: usdFromDecimalNumber(value) } : null,
-    valuedRows < latest.length ? ["INVENTORY_COST_COVERAGE_PARTIAL"] : [],
+    [
+      ...(valuedRows < latest.length ? ["INVENTORY_COST_COVERAGE_PARTIAL"] : []),
+      ...latest.flatMap((snapshot) => {
+        const sku = text(snapshot, "sku");
+        const date = text(snapshot, "snapshot_at")?.slice(0, 10);
+        return sku && date && applicableCost(costs, sku, date) === null
+          ? [`MISSING_COST:${sku}`]
+          : [];
+      }),
+      ...[...selectedCostBases].map((basis) => `COST_BASIS:${basis}`),
+    ],
   );
+}
+
+/**
+ * The API currently exposes only a rolled-up unit cost. The business rule
+ * requires component-level blanks from the authoritative SKU population, so a
+ * total cost must never be used to manufacture a reassuring zero.
+ */
+export function buildMissingSkuCostMetric(
+  context: MetricServiceContext,
+  skuMaster: readonly SheetRecord[],
+  componentCosts: readonly SheetRecord[],
+): MetricViewModel {
+  const required = ["co_packing_fee_usd", "coconut_sugar_cost_usd", "packaging_cost_usd"];
+  if (skuMaster.length === 0 || componentCosts.length === 0) {
+    return metric(context, "quality.missing_sku_cost", null, ["MISSING_COST_COMPONENT_SOURCE"]);
+  }
+  const costsBySku = new Map(
+    componentCosts.flatMap((record) => {
+      const sku = text(record, "sku");
+      return sku ? [[sku, record] as const] : [];
+    }),
+  );
+  const missing = skuMaster.flatMap((skuRecord) => {
+    const sku = text(skuRecord, "sku_id");
+    if (!sku) return [];
+    const cost = costsBySku.get(sku);
+    const components = required.filter((field) => !cost || numeric(cost, field) === null);
+    return components.length ? [{ sku, components }] : [];
+  });
+  return metric(
+    context,
+    "quality.missing_sku_cost",
+    { kind: "count", value: missing.length },
+    missing.map(({ sku, components }) => `MISSING_COST:${sku}:${components.join(",")}`),
+  );
+}
+
+export function buildUnclassifiedChannelPendingMetric(
+  context: MetricServiceContext,
+  mappings: readonly SheetRecord[],
+): MetricViewModel {
+  return metric(context, "quality.unclassified_channel", null, [
+    mappings.length === 0 ? "CHANNEL_MAPPING_REQUIRED" : "CHANNEL_RULE_APPROVAL_REQUIRED",
+  ]);
 }
 
 export function buildLowInventoryBreakdown(
   context: MetricServiceContext,
-  snapshots: readonly ManualStoreRecord[],
-  targets: readonly ManualStoreRecord[],
+  snapshots: readonly SheetRecord[],
+  targets: readonly SheetRecord[],
 ): MetricBreakdownViewModel {
   const latest = latestSnapshots(snapshots);
   const activeTargets = new Map<string, number>();
@@ -128,19 +200,23 @@ export function buildLowInventoryBreakdown(
   const availableBySku = new Map<string, number>();
   for (const snapshot of latest) {
     const sku = text(snapshot, "sku");
-    const available = numeric(snapshot, "available");
-    if (sku && available !== null)
-      availableBySku.set(sku, (availableBySku.get(sku) ?? 0) + available);
+    const onHand = numeric(snapshot, "on_hand");
+    if (sku && onHand !== null) availableBySku.set(sku, (availableBySku.get(sku) ?? 0) + onHand);
   }
   const items = [...activeTargets].map(([sku, threshold]) => {
     const available = availableBySku.get(sku) ?? 0;
-    return { sku, threshold, available, low: available <= threshold };
+    return { sku, threshold, available, low: available < threshold };
   });
   const low = items.filter((item) => item.low);
+  const inventorySkus = new Set(
+    latest.map((snapshot) => text(snapshot, "sku")).filter((sku): sku is string => sku !== null),
+  );
+  const completeThresholdCoverage =
+    inventorySkus.size > 0 && [...inventorySkus].every((sku) => activeTargets.has(sku));
   const base = metric(
     context,
     "alerts.low_inventory",
-    items.length
+    completeThresholdCoverage
       ? {
           kind: "status",
           value: low.length
@@ -148,6 +224,7 @@ export function buildLowInventoryBreakdown(
             : "All targeted SKUs above threshold",
         }
       : null,
+    completeThresholdCoverage ? [] : ["REORDER_THRESHOLD_COVERAGE_INCOMPLETE"],
   );
   return metricBreakdownViewModelSchema.parse({
     metric: base,
@@ -163,14 +240,16 @@ export function buildLowInventoryBreakdown(
 
 export function buildProductionCostBreakdown(
   context: MetricServiceContext,
-  orders: readonly ManualStoreRecord[],
+  orders: readonly SheetRecord[],
 ): MetricBreakdownViewModel {
+  const seenFreight = new Set<string>();
   const rows = orders.flatMap((record) => {
     const po = text(record, "po_number");
     const units = numeric(record, "units");
     const unitCost = numeric(record, "unit_cost_usd");
     if (!po || units === null || unitCost === null) return [];
-    const freight = numeric(record, "freight_usd") ?? 0;
+    const freight = seenFreight.has(po) ? 0 : (numeric(record, "freight_usd") ?? 0);
+    seenFreight.add(po);
     return [{ po, exposure: units * unitCost + freight }];
   });
   const total = rows.reduce((sum, row) => sum + row.exposure, 0);
@@ -193,9 +272,9 @@ export function buildProductionCostBreakdown(
 
 export function buildMarketingSpendBreakdown(
   context: MetricServiceContext,
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): MetricBreakdownViewModel {
-  const grouped = new Map<string, number>();
+  const grouped = new Map<string, { date: string; label: string; spend: number }>();
   for (const record of records) {
     const date = text(record, "date");
     const spend = numeric(record, "spend_usd");
@@ -206,9 +285,17 @@ export function buildMarketingSpendBreakdown(
       date > context.dataPeriod.endDate
     )
       continue;
-    grouped.set(date, (grouped.get(date) ?? 0) + spend);
+    const platform = text(record, "platform") ?? "Unspecified platform";
+    const campaign = text(record, "campaign_name");
+    const key = `${date}:${platform}:${campaign ?? ""}`;
+    const prior = grouped.get(key);
+    grouped.set(key, {
+      date,
+      label: campaign ? `${date} · ${platform} · ${campaign}` : `${date} · ${platform}`,
+      spend: (prior?.spend ?? 0) + spend,
+    });
   }
-  const total = [...grouped.values()].reduce((sum, value) => sum + value, 0);
+  const total = [...grouped.values()].reduce((sum, value) => sum + value.spend, 0);
   const base = metric(
     context,
     "marketing.spend",
@@ -217,13 +304,13 @@ export function buildMarketingSpendBreakdown(
   );
   return metricBreakdownViewModelSchema.parse({
     metric: base,
-    dimension: "date",
+    dimension: "date_platform_campaign",
     items: [...grouped]
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([date, spend]) => ({
-        key: date,
-        label: date,
-        values: [{ kind: "money", value: usdFromDecimalNumber(spend) }],
+      .sort(([, left], [, right]) => left.date.localeCompare(right.date))
+      .map(([key, entry]) => ({
+        key,
+        label: entry.label,
+        values: [{ kind: "money", value: usdFromDecimalNumber(entry.spend) }],
         warnings: [],
       })),
   });
@@ -231,7 +318,7 @@ export function buildMarketingSpendBreakdown(
 
 export function buildCashPositionBreakdown(
   context: MetricServiceContext,
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): MetricBreakdownViewModel {
   const grouped = new Map<string, number>();
   for (const record of records) {
@@ -267,20 +354,42 @@ export function buildCashPositionBreakdown(
  */
 export function buildForecastPendingTable(
   context: MetricServiceContext,
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): MetricTableViewModel {
-  const rows = records.flatMap((record) => {
+  const grouped = new Map<string, { weekStart: string; sku: string; forecastUnits: number }>();
+  for (const record of records) {
+    if (text(record, "status") !== "approved") continue;
     const weekStart = text(record, "week_start");
     const sku = text(record, "sku");
-    const channel = text(record, "channel");
     const forecastUnits = numeric(record, "forecast_units");
-    if (!weekStart || !sku || !channel || forecastUnits === null) return [];
-    return [{ weekStart, sku, channel, forecastUnits, actualUnits: null, varianceUnits: null }];
-  });
+    if (!weekStart || !sku || forecastUnits === null) continue;
+    const key = `${weekStart}:${sku}`;
+    const prior = grouped.get(key);
+    grouped.set(key, {
+      weekStart,
+      sku,
+      forecastUnits: (prior?.forecastUnits ?? 0) + forecastUnits,
+    });
+  }
+  const rows = [...grouped.values()].map((row) => ({
+    ...row,
+    channel: "All channels",
+    actualUnits: null,
+    varianceUnits: null,
+    variancePercent: null,
+  }));
   const base = metric(context, "forecast.variance", null, ["FORECAST_ACTUAL_MATCH_PENDING"]);
   return metricTableViewModelSchema.parse({
     metric: base,
-    columns: ["weekStart", "sku", "channel", "forecastUnits", "actualUnits", "varianceUnits"],
+    columns: [
+      "weekStart",
+      "sku",
+      "channel",
+      "forecastUnits",
+      "actualUnits",
+      "varianceUnits",
+      "variancePercent",
+    ],
     rows,
   });
 }

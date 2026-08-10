@@ -59,6 +59,11 @@ export interface GoogleReadTransport {
     readonly renderOption?: "UNFORMATTED_VALUE" | "FORMATTED_VALUE" | "FORMULA";
     readonly signal?: AbortSignal;
   }): Promise<readonly (readonly unknown[])[]>;
+  readTabsRows?(input: {
+    readonly spreadsheetId: string;
+    readonly sheets: readonly { readonly title: string; readonly lastColumn: string }[];
+    readonly signal?: AbortSignal;
+  }): Promise<Readonly<Record<string, readonly (readonly unknown[])[]>>>;
   downloadFile(fileId: string, signal?: AbortSignal): Promise<Uint8Array>;
 }
 
@@ -118,6 +123,40 @@ export class GoogleReadClient implements GoogleReadTransport {
       configuration.budgetWorkbookId,
       configuration.sopWorkbookId,
     ]);
+  }
+
+  async readTabsRows(input: {
+    readonly spreadsheetId: string;
+    readonly sheets: readonly { readonly title: string; readonly lastColumn: string }[];
+    readonly signal?: AbortSignal;
+  }): Promise<Readonly<Record<string, readonly (readonly unknown[])[]>>> {
+    this.assertAllowedFile(input.spreadsheetId);
+    if (input.sheets.length === 0) return {};
+    const url = new URL(
+      `/v4/spreadsheets/${encodeURIComponent(input.spreadsheetId)}/values:batchGet`,
+      SHEETS_ORIGIN,
+    );
+    for (const sheet of input.sheets) {
+      const title = sheet.title.replaceAll("'", "''");
+      url.searchParams.append("ranges", `'${title}'!A:${sheet.lastColumn}`);
+    }
+    url.searchParams.set("majorDimension", "ROWS");
+    url.searchParams.set("valueRenderOption", "UNFORMATTED_VALUE");
+    url.searchParams.set("dateTimeRenderOption", "FORMATTED_STRING");
+    const body = await this.readJson<{ valueRanges?: readonly ValuesResponse[] }>(
+      url,
+      input.signal,
+    );
+    if (!Array.isArray(body.valueRanges)) {
+      throw new GoogleClientError(
+        "malformed_response",
+        "Google batch values are incomplete",
+        false,
+      );
+    }
+    return Object.fromEntries(
+      input.sheets.map((sheet, index) => [sheet.title, body.valueRanges?.[index]?.values ?? []]),
+    );
   }
 
   async readFileMetadata(fileId: string, signal?: AbortSignal): Promise<GoogleFileMetadata> {

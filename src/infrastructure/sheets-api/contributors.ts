@@ -9,12 +9,14 @@ import {
   buildIncomingProductionTable,
   buildInventoryLotsTable,
   buildInventoryValueMetric,
+  buildMissingSkuCostMetric,
   buildLowInventoryBreakdown,
   buildMarketingSpendMetric,
   buildMarketingSpendBreakdown,
   buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
   buildSocialMetricsTable,
+  buildUnclassifiedChannelPendingMetric,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -39,7 +41,7 @@ import {
   toSocialMetricsRecords,
 } from "@/src/infrastructure/manual-workbook/records";
 
-const SHEETS_CACHE: CachePolicy = { freshForSeconds: 300, staleForSeconds: 900 };
+const SHEETS_CACHE: CachePolicy = { freshForSeconds: 30, staleForSeconds: 900 };
 
 function context(value: OrchestrationContext, status: SourceStatus): MetricServiceContext {
   return { environment: value.environment, dataPeriod: value.dataPeriod, sourceStatuses: [status] };
@@ -111,7 +113,11 @@ export function createSheetsApiContributors(
   });
 
   const product = new SheetsContributor("sheets-product", async (value) => {
-    const result = await source.readPageTabs("product", ["Inventory_Snapshots", "COGS_By_SKU"]);
+    const result = await source.readPageTabs("product", [
+      "Inventory_Snapshots",
+      "COGS_By_SKU",
+      "SKU_Master",
+    ]);
     const metricContext = context(value, result.sourceStatus);
     return {
       metrics: [
@@ -120,6 +126,7 @@ export function createSheetsApiContributors(
           result.tabs["Inventory_Snapshots"] ?? [],
           result.tabs["COGS_By_SKU"] ?? [],
         ),
+        buildMissingSkuCostMetric(metricContext, result.tabs["SKU_Master"] ?? [], []),
       ],
       sourceStatuses: [result.sourceStatus],
       warnings: result.warnings,
@@ -127,9 +134,16 @@ export function createSheetsApiContributors(
   });
 
   const insights = new SheetsContributor("sheets-insights", async (value) => {
-    const result = await source.readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"]);
+    const result = await source.readPageTabs("insights", [
+      "Inventory_Snapshots",
+      "Metric_Targets",
+      "Channel_Mapping",
+    ]);
     const metricContext = context(value, result.sourceStatus);
     return {
+      metrics: [
+        buildUnclassifiedChannelPendingMetric(metricContext, result.tabs["Channel_Mapping"] ?? []),
+      ],
       breakdowns: [
         buildLowInventoryBreakdown(
           metricContext,

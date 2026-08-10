@@ -193,7 +193,7 @@ export interface InventoryLotFact {
   readonly warehouse: string;
   readonly sku: string;
   readonly lotCode: string;
-  readonly bestByDate: string;
+  readonly bestByDate: string | null;
   readonly quantityRemaining: number;
   readonly status: string | null;
 }
@@ -212,8 +212,10 @@ export interface ProductionIncomingFact {
   readonly sku: string;
   readonly destinationWarehouse: string;
   readonly status: string;
-  readonly expectedArrivalDate: string;
+  readonly expectedArrivalDate: string | null;
   readonly incomingUnits: number;
+  readonly incomingValueMinorUnits?: number | null;
+  readonly freightMinorUnits?: number | null;
   readonly unitsReceived: number | null;
 }
 

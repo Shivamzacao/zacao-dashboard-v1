@@ -23,9 +23,6 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       dashboard: "/api/v1/dashboards/{dashboard}",
       drilldown: "/api/v1/drilldowns/{dataset}",
       export: "/api/v1/exports/{dataset}",
-      imports: "/api/v1/imports",
-      importPreview: "/api/v1/imports/preview",
-      importCommit: "/api/v1/imports/commit",
     });
     expect(apiContractManifest.dashboards.map(({ slug }) => slug)).toEqual([
       "executive",

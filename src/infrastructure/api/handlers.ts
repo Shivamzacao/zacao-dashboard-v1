@@ -16,12 +16,9 @@ import {
 import { CONTRACT_SCHEMA_VERSION } from "@/src/domain/contracts";
 
 import { loadKlaviyoConfigurationOrNull } from "@/src/infrastructure/klaviyo/runtime";
-import { loadManualWorkbookConfigurationOrNull } from "@/src/infrastructure/manual-workbook/runtime";
-import { PostgresManualWorkbookStore } from "@/src/infrastructure/manual-workbook/store";
 import { loadShopifyRuntimeSettingsOrNull } from "@/src/infrastructure/shopify/runtime";
 import { loadSheetsApiConfigurationOrNull } from "@/src/infrastructure/sheets-api/config";
 
-import { createImportApiHandlers } from "./import-handlers";
 import { createBackendApiRuntime } from "./live-runtime";
 import { PRIVATE_API_HEADERS, problemResponse, successResponse } from "./serialization";
 
@@ -183,27 +180,12 @@ export function createApiHandlers(service: BackendApiService, now: () => Date) {
 
 const now = () => new Date();
 
-function createManualWorkbookStore(): PostgresManualWorkbookStore | null {
-  try {
-    const configuration = loadManualWorkbookConfigurationOrNull();
-    return configuration ? new PostgresManualWorkbookStore(configuration) : null;
-  } catch {
-    // A malformed DATABASE_URL must not crash the API; the manual-workbook
-    // source simply stays not_configured and commits are refused.
-    return null;
-  }
-}
-
-export const manualWorkbookStore = createManualWorkbookStore();
-
 export const backendApiService = new BackendApiService(
   createBackendApiRuntime({
     shopify: loadShopifyRuntimeSettingsOrNull,
     klaviyo: loadKlaviyoConfigurationOrNull,
-    manualWorkbookStore,
     sheets: loadSheetsApiConfigurationOrNull,
   }),
   now,
 );
 export const apiHandlers = createApiHandlers(backendApiService, now);
-export const importApiHandlers = createImportApiHandlers({ store: manualWorkbookStore, now });

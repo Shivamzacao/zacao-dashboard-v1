@@ -4,15 +4,15 @@ import type {
   InventoryLotFact,
   ProductionIncomingFact,
 } from "@/src/application/metrics/types";
-import type { ManualStoreRecord } from "@/src/application/ports/manual-workbook";
+import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 import { usdFromDecimalNumber } from "@/src/domain/metrics/calculations";
 
-function text(record: ManualStoreRecord, key: string): string | null {
+function text(record: SheetRecord, key: string): string | null {
   const value = record[key];
   return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 }
 
-function numeric(record: ManualStoreRecord, key: string): number | null {
+function numeric(record: SheetRecord, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -38,8 +38,8 @@ export interface CombinedInventoryMapping {
  * warehouse (from Location_Master) appears at that date (ADR-003).
  */
 export function toCombinedInventoryFacts(
-  snapshots: readonly ManualStoreRecord[],
-  locationMaster: readonly ManualStoreRecord[],
+  snapshots: readonly SheetRecord[],
+  locationMaster: readonly SheetRecord[],
 ): CombinedInventoryMapping {
   const dated = snapshots.flatMap((record) => {
     const snapshotAt = text(record, "snapshot_at");
@@ -69,7 +69,7 @@ export function toCombinedInventoryFacts(
 }
 
 export function toInventoryLotFacts(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
   fallbackAsOfDate: string,
 ): readonly InventoryLotFact[] {
   return records.flatMap((record) => {
@@ -78,7 +78,7 @@ export function toInventoryLotFacts(
     const lotCode = text(record, "lot_number");
     const bestByDate = text(record, "best_by_date");
     const quantityRemaining = numeric(record, "quantity_remaining");
-    if (!warehouse || !sku || !lotCode || !bestByDate || quantityRemaining === null) return [];
+    if (!warehouse || !sku || !lotCode || quantityRemaining === null) return [];
     return [
       {
         asOfDate: text(record, "data_as_of") ?? fallbackAsOfDate,
@@ -99,7 +99,7 @@ export interface ProductionIncomingMapping {
 }
 
 export function toProductionIncomingFacts(
-  records: readonly ManualStoreRecord[],
+  records: readonly SheetRecord[],
 ): ProductionIncomingMapping {
   let excludedWithoutExpectedDate = 0;
   const facts = records.flatMap((record) => {
@@ -109,13 +109,10 @@ export function toProductionIncomingFacts(
     const sku = text(record, "sku");
     const units = numeric(record, "units");
     if (!poNumber || !sku || units === null) return [];
-    const expectedArrivalDate = text(record, "expected_date");
-    if (!expectedArrivalDate) {
-      // ADR-003: rows without an expected date cannot appear on the incoming
-      // timeline; they are counted and disclosed instead of guessed.
-      excludedWithoutExpectedDate += 1;
-      return [];
-    }
+    const expectedArrivalDate = text(record, "expected_date") ?? text(record, "must_deliver_by");
+    if (!expectedArrivalDate) excludedWithoutExpectedDate += 1;
+    const unitCost = numeric(record, "unit_cost_usd");
+    const freight = numeric(record, "freight_usd");
     return [
       {
         poNumber,
@@ -126,6 +123,9 @@ export function toProductionIncomingFacts(
         status,
         expectedArrivalDate,
         incomingUnits: units,
+        incomingValueMinorUnits:
+          unitCost === null ? null : usdFromDecimalNumber(units * unitCost).minorUnits,
+        freightMinorUnits: freight === null ? null : usdFromDecimalNumber(freight).minorUnits,
         // The workbook records no received-unit quantity; unknown stays null.
         unitsReceived: null,
       },
@@ -140,7 +140,7 @@ export interface CashPositionMapping {
 }
 
 /** Single company-wide balance model: account is constant (ADR-003). */
-export function toCashPositionFacts(records: readonly ManualStoreRecord[]): CashPositionMapping {
+export function toCashPositionFacts(records: readonly SheetRecord[]): CashPositionMapping {
   const facts = records.flatMap((record) => {
     const date = text(record, "as_of_date");
     const balance = numeric(record, "cash_balance_usd");

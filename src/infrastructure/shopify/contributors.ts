@@ -4,11 +4,9 @@ import {
   buildFulfillmentSummaryBreakdown,
   buildNativeChannelMixBreakdown,
   buildProductMixBreakdown,
-  buildUnclassifiedChannelMetric,
   buildCustomerClassificationMetrics,
   buildHistoricalCompletenessMetric,
   buildInventoryBreakdown,
-  buildMissingCostMetric,
   buildProductSalesBreakdown,
   buildProductUnitsBreakdown,
   buildProductVelocityTable,
@@ -267,7 +265,6 @@ export function createShopifyContributors(input: {
       const catalogFacts = mapCatalogVariantFacts(result.records);
       const inventoryFacts = mapInventoryFacts(result.records);
       return {
-        metrics: [buildMissingCostMetric(serviceContext, catalogFacts)],
         tables: [buildCatalogTable(serviceContext, catalogFacts)],
         breakdowns: [buildInventoryBreakdown(serviceContext, inventoryFacts)],
         sourceStatuses: [status],
@@ -313,7 +310,6 @@ export function createShopifyContributors(input: {
       const serviceContext = metricContext(context, [status]);
       const facts = mapNativeChannelFacts(result.rows);
       return {
-        metrics: [buildUnclassifiedChannelMetric(serviceContext, facts)],
         breakdowns: [buildNativeChannelMixBreakdown(serviceContext, facts)],
         sourceStatuses: [status],
       };
