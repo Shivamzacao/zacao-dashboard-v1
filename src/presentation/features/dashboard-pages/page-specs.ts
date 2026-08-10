@@ -23,6 +23,7 @@ export interface PageTableSpec {
   readonly description: string;
   readonly metricKey: string;
   readonly dataset?: string;
+  readonly hiddenColumns?: readonly string[];
 }
 
 export interface DashboardPageSpec {
@@ -199,6 +200,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           description: "Verified Shopify product and variant attributes.",
           metricKey: "products.catalog",
           dataset: "product-catalog",
+          hiddenColumns: ["sku"],
         },
         {
           title: "SKU velocity",

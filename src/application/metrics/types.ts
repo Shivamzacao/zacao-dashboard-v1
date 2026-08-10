@@ -49,6 +49,8 @@ export interface CatalogVariantFact {
 export interface InventoryFact {
   readonly locationId: string;
   readonly locationName: string;
+  readonly productTitle: string;
+  readonly variantTitle: string;
   readonly sku: string | null;
   readonly quantityName: string;
   readonly quantity: number;

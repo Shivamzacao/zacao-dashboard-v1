@@ -93,7 +93,7 @@ describe("F3 dashboard pages", () => {
         "inventory.shopify_current": [
           {
             key: "gid://shopify/Location/111934701875:ZAC-DC-70-4PK:reserved",
-            label: "ZAC-DC-70-4PK · Reserved",
+            label: "70% Cacao Dark Chocolate · 4-Pack · Reserved",
             value: 2,
           },
         ],
@@ -107,14 +107,11 @@ describe("F3 dashboard pages", () => {
       [...catalog.querySelectorAll("thead th")].map((cell) =>
         cell.textContent?.replace(/[↕↑↓]/g, ""),
       ),
-    ).toEqual(["Product", "Variant", "SKU", "Status", "Price", "Details"]);
+    ).toEqual(["Product", "Variant", "Status", "Price", "Details"]);
     expect(screen.getByText("$36.00")).toBeTruthy();
     expect(screen.getAllByText("Active").length).toBe(2);
-    // The unmapped gift-card SKU reads as absent, not as an empty string.
-    expect([...catalog.querySelectorAll("tbody td")].map((cell) => cell.textContent)).toContain(
-      "—",
-    );
     expect(container.textContent).not.toContain("gid://");
+    expect(container.textContent).not.toContain("ZAC-DC-70-4PK · Reserved");
   });
 
   it("has no automated accessibility violations in a representative complete page", async () => {

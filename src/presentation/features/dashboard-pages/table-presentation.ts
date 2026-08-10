@@ -112,11 +112,13 @@ function isOpaqueColumn(key: string, rows: readonly DisplayTableRow[]): boolean 
 /** Reader-facing columns for a drill-down dataset, in the row's own field order. */
 export function describeColumns(
   rows: readonly DisplayTableRow[],
+  hiddenColumns: readonly string[] = [],
 ): readonly DashboardTableColumn<DisplayTableRow>[] {
   const first = rows[0];
   if (!first) return [];
+  const hidden = new Set(hiddenColumns);
   return Object.keys(first)
-    .filter((key) => !isOpaqueColumn(key, rows))
+    .filter((key) => !hidden.has(key) && !isOpaqueColumn(key, rows))
     .map((key) => ({
       key,
       label: columnLabel(key),
