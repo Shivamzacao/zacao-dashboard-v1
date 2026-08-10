@@ -50,8 +50,21 @@ async function loadLiveDisplayData(
   filters: DashboardFilters,
 ): Promise<{ display: DashboardPageDisplayData; headerSource: SourceStatus | undefined }> {
   const result = await backendApiService.dashboard(dashboardSlugToSection[slug], filters);
+  const display = mapDashboardPageToDisplayData(result.data.page, "production");
+  console.info("Dashboard display payload", {
+    route: slug,
+    payloadBytes: new TextEncoder().encode(JSON.stringify(display)).byteLength,
+    chartPointCount: Object.values(display.chartData).reduce(
+      (total, points) => total + points.length,
+      0,
+    ),
+    hydratedTableRowCount: Object.values(display.rowsByDataset).reduce(
+      (total, rows) => total + rows.length,
+      0,
+    ),
+  });
   return {
-    display: mapDashboardPageToDisplayData(result.data.page, "production"),
+    display,
     headerSource: result.data.page.sources[0],
   };
 }
@@ -85,7 +98,11 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
     return (
       <main className="dashboard-content">
         <PageHeader route={route} source={headerSource} dataMode="live" />
-        <DashboardPageView spec={dashboardPageSpec(route.slug)} fixture={display} />
+        <DashboardPageView
+          spec={dashboardPageSpec(route.slug)}
+          fixture={display}
+          filterQuery={filterState.query}
+        />
       </main>
     );
   }

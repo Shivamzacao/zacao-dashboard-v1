@@ -33,6 +33,10 @@ interface DataTableProps<Row extends object> {
   readonly totalRows: number;
   readonly onPageChange: (page: number) => void;
   readonly onRowOpen?: (row: Row) => void;
+  /** Rows are already one server page and must not be sliced by the client. */
+  readonly rowsArePage?: boolean;
+  readonly hasNextPage?: boolean;
+  readonly onSortChange?: (field: string | null, direction: "asc" | "desc") => void;
 }
 
 export function DataTable<Row extends object>({
@@ -46,6 +50,9 @@ export function DataTable<Row extends object>({
   totalRows,
   onPageChange,
   onRowOpen,
+  rowsArePage = false,
+  hasNextPage,
+  onSortChange,
 }: DataTableProps<Row>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const defs = useMemo<ColumnDef<Row>[]>(
@@ -63,13 +70,25 @@ export function DataTable<Row extends object>({
       })),
     [columns],
   );
+  const boundedRows = useMemo(
+    () =>
+      rowsArePage
+        ? [...rows].slice(0, pageSize)
+        : [...rows].slice(page * pageSize, (page + 1) * pageSize),
+    [page, pageSize, rows, rowsArePage],
+  );
   // TanStack Table intentionally exposes non-memoizable helpers; component state remains local.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data: [...rows],
+    data: boundedRows,
     columns: defs,
     state: { sorting },
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      const next = typeof updater === "function" ? updater(sorting) : updater;
+      setSorting(next);
+      const active = next[0];
+      onSortChange?.(active?.id ?? null, active?.desc ? "desc" : "asc");
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
@@ -172,6 +191,8 @@ export function DataTable<Row extends object>({
         pageSize={pageSize}
         totalRows={totalRows}
         onPageChange={onPageChange}
+        cursorMode={rowsArePage}
+        {...(hasNextPage === undefined ? {} : { hasNextPage })}
         ariaLabel={`${caption} pagination`}
       />
       {state !== "current" ? (

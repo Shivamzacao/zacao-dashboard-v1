@@ -147,6 +147,27 @@ describe("F2 reusable dashboard components", () => {
     expect(onOpen).toHaveBeenCalledWith({ id: "a", label: "Alpha", amount: 1 });
   });
 
+  it("never renders more than the controlled page size", () => {
+    const rows = Array.from({ length: 1_000 }, (_, index) => ({
+      id: String(index),
+      label: `Row ${index}`,
+    }));
+    render(
+      <DataTable
+        caption="Large dataset"
+        columns={[{ key: "label", label: "Label" }]}
+        rows={rows}
+        rowKey={(row) => row.id}
+        page={0}
+        pageSize={25}
+        totalRows={rows.length}
+        onPageChange={() => undefined}
+      />,
+    );
+    expect(screen.getAllByRole("row")).toHaveLength(26);
+    expect(screen.queryByText("Row 25")).toBeNull();
+  });
+
   it("supports drawer Escape/close focus behavior and truthful export states", async () => {
     const onClose = vi.fn();
     const trigger = { current: document.createElement("button") };

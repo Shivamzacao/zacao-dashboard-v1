@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import axe from "axe-core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { drilldownCatalog } from "@/src/application/api";
 import { metricCatalog } from "@/src/domain/metrics/catalog";
@@ -11,7 +11,10 @@ import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/
 import { f3PageFixtureData } from "@/src/presentation/fixtures/f3-page-data";
 import { dashboardRoutes } from "@/src/presentation/shell/routes";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe("F3 dashboard pages", () => {
   it("maps every page element to an approved B7 metric and drill-down contract", () => {
@@ -48,6 +51,55 @@ describe("F3 dashboard pages", () => {
     expect(screen.getAllByRole("button", { name: "Export CSV" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /View details for/ })).toHaveLength(6);
     expect(screen.getByText("Inventory runway & reorder")).toBeTruthy();
+  });
+
+  it("loads a bounded live drill-down page instead of hydrating full table rows", async () => {
+    const rows = Array.from({ length: 40 }, (_, index) => ({
+      id: `variant-${index}`,
+      product: `Product ${index}`,
+      variant: "Default",
+      sku: `SKU-${index}`,
+      status: "ACTIVE",
+      priceMinorUnits: 1000,
+    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            ok: true,
+            data: {
+              rows,
+              pagination: { hasNextPage: true, nextCursor: "next-page" },
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    const products = dashboardPageSpecs.products;
+    const table = products.tables[0];
+    if (!table) throw new Error("Product table fixture is missing");
+    render(
+      <DashboardPageView
+        spec={{ ...products, kpis: [], charts: [], tables: [table] }}
+        fixture={{
+          ...f3PageFixtureData,
+          environment: "production",
+          synthetic: false,
+          rowsByDataset: {},
+        }}
+        filterQuery="start=2026-07-10&end=2026-08-08&comparison=none"
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("table", { name: "Product catalog" })).toBeTruthy(),
+    );
+    expect(screen.getAllByRole("button", { name: /View details for/ })).toHaveLength(25);
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/v1/drilldowns/product-catalog?"),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {
