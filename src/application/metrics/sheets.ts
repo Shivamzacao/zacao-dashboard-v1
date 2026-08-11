@@ -57,6 +57,7 @@ function applicableCostRecord(
       const to = text(record, "effective_to");
       return (
         text(record, "sku") === sku &&
+        text(record, "cost_basis") === "landed" &&
         from !== null &&
         from <= snapshotDate &&
         (!to || to >= snapshotDate)
@@ -88,11 +89,6 @@ export function buildInventoryValueMetric(
       return basis ? [basis] : [];
     }),
   );
-  if (selectedCostBases.size > 1) {
-    return metric(context, "inventory.value", null, [
-      `MIXED_COST_BASIS:${[...selectedCostBases].sort().join(",")}`,
-    ]);
-  }
   let value = 0;
   let valuedRows = 0;
   for (const snapshot of latest) {
@@ -170,71 +166,16 @@ export function buildUnclassifiedChannelPendingMetric(
 
 export function buildLowInventoryBreakdown(
   context: MetricServiceContext,
-  snapshots: readonly SheetRecord[],
-  targets: readonly SheetRecord[],
+  _snapshots: readonly SheetRecord[],
+  _targets: readonly SheetRecord[],
 ): MetricBreakdownViewModel {
-  const latest = latestSnapshots(snapshots);
-  const activeTargets = new Map<string, number>();
-  for (const target of targets) {
-    if (
-      text(target, "metric_key") !== "inventory.reorder_point" ||
-      text(target, "scope_type") !== "sku" ||
-      text(target, "status") !== "active"
-    )
-      continue;
-    const sku = text(target, "scope_value");
-    const value = numeric(target, "target_value");
-    const start = text(target, "period_start");
-    const end = text(target, "period_end");
-    if (
-      sku &&
-      value !== null &&
-      start &&
-      end &&
-      start <= context.dataPeriod.endDate &&
-      end >= context.dataPeriod.startDate
-    ) {
-      activeTargets.set(sku, value);
-    }
-  }
-  const availableBySku = new Map<string, number>();
-  for (const snapshot of latest) {
-    const sku = text(snapshot, "sku");
-    const onHand = numeric(snapshot, "on_hand");
-    if (sku && onHand !== null) availableBySku.set(sku, (availableBySku.get(sku) ?? 0) + onHand);
-  }
-  const items = [...activeTargets].map(([sku, threshold]) => {
-    const available = availableBySku.get(sku) ?? 0;
-    return { sku, threshold, available, low: available < threshold };
-  });
-  const low = items.filter((item) => item.low);
-  const inventorySkus = new Set(
-    latest.map((snapshot) => text(snapshot, "sku")).filter((sku): sku is string => sku !== null),
-  );
-  const completeThresholdCoverage =
-    inventorySkus.size > 0 && [...inventorySkus].every((sku) => activeTargets.has(sku));
-  const base = metric(
-    context,
-    "alerts.low_inventory",
-    completeThresholdCoverage
-      ? {
-          kind: "status",
-          value: low.length
-            ? `${low.length} SKU(s) below threshold`
-            : "All targeted SKUs above threshold",
-        }
-      : null,
-    completeThresholdCoverage ? [] : ["REORDER_THRESHOLD_COVERAGE_INCOMPLETE"],
-  );
+  void _snapshots;
+  void _targets;
+  const base = metric(context, "alerts.low_inventory", null, ["PHASE_2_NOT_CONFIGURED"]);
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: items.map((item) => ({
-      key: item.sku,
-      label: item.sku,
-      values: [{ kind: "quantity", value: item.available }],
-      warnings: item.low ? [`REORDER_POINT:${item.threshold}`] : [],
-    })),
+    items: [],
   });
 }
 

@@ -1,14 +1,7 @@
 import type { DashboardSlug } from "@/src/application/api";
 
 export type ChartKind =
-  | "line"
-  | "area"
-  | "bar"
-  | "horizontal"
-  | "stacked"
-  | "donut"
-  | "funnel"
-  | "heatmap";
+  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
 
 export interface PageChartSpec {
   readonly title: string;
@@ -366,8 +359,8 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "horizontal",
         },
         {
-          title: "Social performance",
-          description: "Approved platform metrics from maintained social records.",
+          title: "Social Audience Growth",
+          description: "Month-end follower totals and growth for Instagram, TikTok, and LinkedIn.",
           metricKey: "social.performance",
           kind: "line",
         },

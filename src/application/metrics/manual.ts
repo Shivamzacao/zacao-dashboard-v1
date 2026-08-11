@@ -132,27 +132,10 @@ export function buildDepletionsBreakdown(
 
 export function buildPartnerPerformanceTable(
   context: MetricServiceContext,
-  records: readonly ManualMetricRecord[],
+  _records: readonly ManualMetricRecord[],
 ): MetricTableViewModel {
-  const applicable = records.filter((record) => {
-    const start = text(record, "Period Start");
-    const end = text(record, "Period End");
-    return (
-      start !== null &&
-      end !== null &&
-      start <= context.dataPeriod.endDate &&
-      end >= context.dataPeriod.startDate
-    );
-  });
-  const revenue = applicable.flatMap((record) => {
-    const value = number(record, "Revenue USD");
-    return value === null ? [] : [usdFromDecimalNumber(value)];
-  });
-  const base = metric(
-    context,
-    "partners.performance",
-    revenue.length === 0 ? null : { kind: "money", value: addUsd(revenue) },
-  );
+  void _records;
+  const base = metric(context, "partners.performance", null, ["PHASE_2_NOT_CONFIGURED"]);
   return metricTableViewModelSchema.parse({
     metric: base,
     columns: [
@@ -166,23 +149,7 @@ export function buildPartnerPerformanceTable(
       "commissionMinorUnits",
       "payoutStatus",
     ],
-    rows: applicable.map((record) => ({
-      periodStart: text(record, "Period Start"),
-      periodEnd: text(record, "Period End"),
-      partnerType: text(record, "Partner Type"),
-      partner: text(record, "Partner"),
-      platform: text(record, "Platform"),
-      orders: number(record, "Orders"),
-      revenueMinorUnits:
-        number(record, "Revenue USD") === null
-          ? null
-          : usdFromDecimalNumber(number(record, "Revenue USD") ?? 0).minorUnits,
-      commissionMinorUnits:
-        number(record, "Commission USD") === null
-          ? null
-          : usdFromDecimalNumber(number(record, "Commission USD") ?? 0).minorUnits,
-      payoutStatus: text(record, "Payout Status"),
-    })),
+    rows: [],
   });
 }
 
@@ -194,26 +161,41 @@ export function buildGrowthPipelineViews(
   readonly byType: MetricBreakdownViewModel;
   readonly nextActions: MetricTableViewModel;
 } {
-  const open = records.filter((record) => text(record, "Status") === "Open");
-  const values = open.flatMap((record) => {
-    const value = number(record, "Value USD");
-    return value === null ? [] : [usdFromDecimalNumber(value)];
-  });
+  const openStages = new Set([
+    "prospect",
+    "contacted",
+    "sampling",
+    "negotiating",
+    "warm lead",
+    "in discussion",
+    "proposal sent",
+  ]);
+  const open = records.filter(
+    (record) =>
+      text(record, "Status") === "Open" &&
+      openStages.has((text(record, "Stage") ?? "").toLowerCase()),
+  );
+  const ids = new Set(
+    open.flatMap((record) => {
+      const id = text(record, "Opportunity ID");
+      return id ? [id] : [];
+    }),
+  );
   const openMetric = metric(
     context,
     "growth.open_pipeline",
-    values.length === 0 ? null : { kind: "money", value: addUsd(values) },
-    open.length > values.length ? ["PIPELINE_VALUE_PARTIAL"] : [],
+    ids.size === 0 ? null : { kind: "count", value: ids.size },
+    open.length > ids.size ? ["OPPORTUNITY_ID_COVERAGE_PARTIAL"] : [],
   );
   const grouped = new Map<string, ManualMetricRecord[]>();
-  for (const record of open) {
+  for (const record of open.filter((record) => text(record, "Opportunity ID") !== null)) {
     const type = text(record, "Pipeline Type");
     if (type !== null) grouped.set(type, [...(grouped.get(type) ?? []), record]);
   }
   const byTypeBase = metric(
     context,
     "growth.pipeline_by_type",
-    open.length === 0 ? null : { kind: "count", value: open.length },
+    ids.size === 0 ? null : { kind: "count", value: ids.size },
   );
   return {
     open: openMetric,
@@ -223,7 +205,9 @@ export function buildGrowthPipelineViews(
       items: [...grouped].map(([key, rows]) => ({
         key,
         label: key,
-        values: [{ kind: "count", value: rows.length }],
+        values: [
+          { kind: "count", value: new Set(rows.map((row) => text(row, "Opportunity ID"))).size },
+        ],
         warnings: [],
       })),
     }),
@@ -253,13 +237,14 @@ export function buildGrowthPipelineViews(
         "valueMinorUnits",
       ],
       rows: open
-        .filter(
-          (record) => text(record, "Next Action") !== null || text(record, "Due Date") !== null,
-        )
-        .sort((left, right) =>
-          (text(left, "Due Date") ?? "9999-12-31").localeCompare(
-            text(right, "Due Date") ?? "9999-12-31",
-          ),
+        .sort(
+          (left, right) =>
+            (text(left, "Due Date") ?? "9999-12-31").localeCompare(
+              text(right, "Due Date") ?? "9999-12-31",
+            ) ||
+            (text(left, "Last Activity Date") ?? "0000-00-00").localeCompare(
+              text(right, "Last Activity Date") ?? "0000-00-00",
+            ),
         )
         .map((record) => ({
           pipelineType: text(record, "Pipeline Type"),
@@ -283,13 +268,14 @@ export function buildSocialMetricsTable(
   records: readonly ManualMetricRecord[],
 ): MetricTableViewModel {
   const applicable = records.filter((record) => inPeriod(record, "Date", context));
-  const engagements = applicable.flatMap((record) => {
-    const value = number(record, "Engagements");
-    return value === null ? [] : [value];
-  });
+  const supportedPlatforms = new Set(["instagram", "tiktok", "linkedin"]);
   const latestByAccount = new Map<string, ManualMetricRecord>();
-  for (const record of applicable) {
+  const historyByAccount = new Map<string, ManualMetricRecord[]>();
+  for (const record of applicable.filter((row) =>
+    supportedPlatforms.has((text(row, "Platform") ?? "").toLowerCase()),
+  )) {
     const key = `${text(record, "Platform") ?? ""}:${text(record, "Account") ?? ""}`;
+    historyByAccount.set(key, [...(historyByAccount.get(key) ?? []), record]);
     const prior = latestByAccount.get(key);
     if (!prior || (text(record, "Date") ?? "") > (text(prior, "Date") ?? "")) {
       latestByAccount.set(key, record);
@@ -298,13 +284,15 @@ export function buildSocialMetricsTable(
   const base = metric(
     context,
     "social.performance",
-    engagements.length === 0 ? null : { kind: "count", value: sumFiniteNumbers(engagements) },
-    [...latestByAccount.values()].flatMap((record) => {
-      const platform = text(record, "Platform") ?? "unknown";
-      const account = text(record, "Account") ?? "unknown";
-      const followers = number(record, "Followers");
-      return followers === null ? [] : [`LATEST_FOLLOWERS:${platform}:${account}:${followers}`];
-    }),
+    latestByAccount.size === 0
+      ? null
+      : {
+          kind: "count",
+          value: sumFiniteNumbers(
+            [...latestByAccount.values()].map((row) => number(row, "Followers") ?? 0),
+          ),
+        },
+    ["SOCIAL_AUDIENCE_GROWTH_V1"],
   );
   return metricTableViewModelSchema.parse({
     metric: base,
@@ -313,21 +301,40 @@ export function buildSocialMetricsTable(
       "platform",
       "account",
       "followers",
+      "previousFollowers",
+      "netNewFollowers",
+      "growthPercent",
       "impressions",
       "reach",
       "engagements",
       "linkClicks",
     ],
-    rows: applicable.map((record) => ({
-      date: text(record, "Date"),
-      platform: text(record, "Platform"),
-      account: text(record, "Account"),
-      followers: number(record, "Followers"),
-      impressions: number(record, "Impressions"),
-      reach: number(record, "Reach"),
-      engagements: number(record, "Engagements"),
-      linkClicks: number(record, "Link Clicks"),
-    })),
+    rows: [...latestByAccount].map(([key, record]) => {
+      const history = [...(historyByAccount.get(key) ?? [])].sort((left, right) =>
+        (text(left, "Date") ?? "").localeCompare(text(right, "Date") ?? ""),
+      );
+      const previous = history.at(-2);
+      const followers = number(record, "Followers");
+      const previousFollowers = previous ? number(previous, "Followers") : null;
+      const netNewFollowers =
+        followers !== null && previousFollowers !== null ? followers - previousFollowers : null;
+      return {
+        date: text(record, "Date"),
+        platform: text(record, "Platform"),
+        account: text(record, "Account"),
+        followers,
+        previousFollowers,
+        netNewFollowers,
+        growthPercent:
+          netNewFollowers !== null && previousFollowers !== null && previousFollowers !== 0
+            ? (netNewFollowers / previousFollowers) * 100
+            : null,
+        impressions: null,
+        reach: null,
+        engagements: null,
+        linkClicks: null,
+      };
+    }),
   });
 }
 

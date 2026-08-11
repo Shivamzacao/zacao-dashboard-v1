@@ -107,6 +107,8 @@ export function toGrowthPipelineRecords(
       "Value USD": numeric(record, "value_usd"),
       "Next Action": text(record, "next_action"),
       "Due Date": text(record, "next_action_date"),
+      "Last Activity Date": text(record, "last_activity_date"),
+      Owner: text(record, "owner"),
     };
   });
 }
