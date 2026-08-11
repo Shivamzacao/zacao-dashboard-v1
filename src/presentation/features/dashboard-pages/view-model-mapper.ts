@@ -26,6 +26,43 @@ const drilldownDatasetByMetricKey = new Map(
   drilldownCatalog.map((definition) => [definition.metricKey, definition.dataset]),
 );
 
+export const CATEGORICAL_CHART_LIMIT = 8;
+export const TIME_SERIES_CHART_LIMIT = 366;
+
+/** Deterministic top-N projection used by both the visual and accessible chart. */
+export function summarizeCategoricalChartData(
+  data: readonly ChartDatum[],
+  limit = CATEGORICAL_CHART_LIMIT,
+): readonly ChartDatum[] {
+  if (data.length <= limit) return data;
+  const ranked = [...data].sort(
+    (left, right) =>
+      (right.value ?? Number.NEGATIVE_INFINITY) - (left.value ?? Number.NEGATIVE_INFINITY) ||
+      left.key.localeCompare(right.key),
+  );
+  const shown = ranked.slice(0, limit);
+  const rest = ranked.slice(limit);
+  return [
+    ...shown,
+    {
+      key: "__other__",
+      label: `Other (${rest.length})`,
+      value: rest.reduce((total, item) => total + (item.value ?? 0), 0),
+    },
+  ];
+}
+
+function warnOversized(
+  kind: "chart" | "table",
+  key: string,
+  count: number,
+  limit: number,
+  returnedCount = limit,
+) {
+  if (count <= limit) return;
+  console.warn("Dashboard payload bounded", { kind, key, rawCount: count, returnedCount });
+}
+
 /** Chart-friendly numeric projection of a typed display value. */
 function numericValue(value: MetricDisplayValue | null): number | null {
   if (value === null) return null;
@@ -188,7 +225,8 @@ export function mapDashboardPageToDisplayData(
 
   for (const series of page.series) {
     registerMetric(series.metric);
-    chartData[series.metric.key] = series.points.map((point) => ({
+    warnOversized("chart", series.metric.key, series.points.length, TIME_SERIES_CHART_LIMIT);
+    chartData[series.metric.key] = series.points.slice(0, TIME_SERIES_CHART_LIMIT).map((point) => ({
       key: point.period,
       label: compactPeriodLabel(point.period),
       value: numericValue(point.value),
@@ -200,9 +238,9 @@ export function mapDashboardPageToDisplayData(
     // The day/hour heatmap key is "<day>:<hour>" (see buildPurchaseHeatmapBreakdown);
     // splitting it into a group/label pair lets HeatmapChartView lay the data
     // out as a day-by-hour grid instead of 168 flat category-axis ticks.
-    chartData[breakdown.metric.key] =
+    const projected =
       breakdown.dimension === "day_hour"
-        ? breakdown.items.map((item) => {
+        ? breakdown.items.slice(0, 168).map((item) => {
             const [day, hour] = item.key.split(":");
             return {
               key: item.key,
@@ -216,13 +254,29 @@ export function mapDashboardPageToDisplayData(
             label: item.label,
             value: numericValue(item.values[0] ?? null),
           }));
+    if (breakdown.dimension !== "day_hour") {
+      warnOversized(
+        "chart",
+        breakdown.metric.key,
+        projected.length,
+        CATEGORICAL_CHART_LIMIT,
+        CATEGORICAL_CHART_LIMIT + 1,
+      );
+      chartData[breakdown.metric.key] = summarizeCategoricalChartData(projected);
+    } else {
+      warnOversized("chart", breakdown.metric.key, breakdown.items.length, 168);
+      chartData[breakdown.metric.key] = projected;
+    }
   }
 
   const rowsByDataset: Record<string, readonly DisplayTableRow[]> = {};
   for (const table of page.tables) {
     registerMetric(table.metric);
     const dataset = drilldownDatasetByMetricKey.get(table.metric.key);
-    if (dataset) {
+    warnOversized("table", dataset ?? table.metric.key, table.rows.length, 100);
+    // Live tables load their own bounded drill-down pages. Keeping these rows
+    // out of the RSC payload prevents a large source from blocking hydration.
+    if (dataset && environment === "test") {
       rowsByDataset[dataset] = table.rows;
     }
     // A stage/count table doubles as funnel chart input. Those plotted values

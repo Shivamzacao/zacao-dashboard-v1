@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import { composeDashboardPage, createMetricViewModel } from "@/src/application/metrics";
 import { metricTableViewModelSchema, type MetricViewModel } from "@/src/application/view-models";
 import type { SourceStatus } from "@/src/domain/contracts";
-import { mapDashboardPageToDisplayData } from "@/src/presentation/features/dashboard-pages/view-model-mapper";
+import {
+  mapDashboardPageToDisplayData,
+  summarizeCategoricalChartData,
+} from "@/src/presentation/features/dashboard-pages/view-model-mapper";
 
 const dataPeriod = { startDate: "2025-08-08", endDate: "2026-08-07" };
 
@@ -43,6 +46,17 @@ function pageWith(
 }
 
 describe("mapDashboardPageToDisplayData", () => {
+  it("summarizes large categorical charts deterministically", () => {
+    const input = Array.from({ length: 12 }, (_, index) => ({
+      key: `sku-${String(index).padStart(2, "0")}`,
+      label: `SKU ${index}`,
+      value: index,
+    }));
+    const result = summarizeCategoricalChartData(input);
+    expect(result).toHaveLength(9);
+    expect(result.slice(0, 8).map(({ value }) => value)).toEqual([11, 10, 9, 8, 7, 6, 5, 4]);
+    expect(result.at(-1)).toEqual({ key: "__other__", label: "Other (4)", value: 6 });
+  });
   it("maps real values into currentValues and never fabricates blocked entries", () => {
     const returningRate = createMetricViewModel({
       metricKey: "customers.returning_rate",

@@ -101,6 +101,7 @@ export class BackendApiService {
   }
 
   async drilldown(dataset: string, query: DrilldownQuery) {
+    const startedAt = performance.now();
     const definition = drilldownDefinition(dataset);
     if (!definition) throw new ApiQueryError("Unsupported drill-down dataset", ["dataset"]);
     if (definition.sourceLimited) {
@@ -132,6 +133,12 @@ export class BackendApiService {
       .slice(start, start + query.limit)
       .map((row) => Object.fromEntries(query.fields.map((field) => [field, row[field] ?? null])));
     const nextOffset = start + selected.length;
+    console.info("Dashboard drill-down page", {
+      dataset,
+      rawRowCount: rows.length,
+      returnedRowCount: selected.length,
+      durationMs: Math.round(performance.now() - startedAt),
+    });
     return {
       data: {
         dataset,
