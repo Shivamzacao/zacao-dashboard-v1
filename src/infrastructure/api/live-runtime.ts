@@ -109,7 +109,12 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-purchase-timing",
     "shopify-channels",
   ],
-  "Customer Intelligence": ["shopify-customers", "shopify-funnel", "shopify-geography"],
+  "Customer Intelligence": [
+    "shopify-customers",
+    "shopify-funnel",
+    "shopify-geography",
+    "sheets-customers",
+  ],
   "Product Intelligence": [
     "shopify-product-units",
     "shopify-catalog-inventory",
@@ -240,6 +245,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       contributors.push(
         new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
         new DeferredSourceContributor("sheets-operations", "google_sheets", now),
+        new DeferredSourceContributor("sheets-customers", "google_sheets", now),
         new DeferredSourceContributor("sheets-product", "google_sheets", now),
         new DeferredSourceContributor("sheets-insights", "google_sheets", now),
         new DeferredSourceContributor("sheets-marketing", "google_sheets", now),

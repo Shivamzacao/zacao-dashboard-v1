@@ -614,6 +614,12 @@ select {
 .legend-swatch.tone-terracotta {
   color: var(--terracotta);
 }
+.legend-swatch.tone-sage {
+  color: #7fa68f;
+}
+.legend-swatch.tone-plum {
+  color: #74546f;
+}
 .legend-swatch.tone-muted {
   color: var(--muted);
 }

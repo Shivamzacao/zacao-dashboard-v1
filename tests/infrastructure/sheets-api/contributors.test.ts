@@ -60,6 +60,71 @@ function contributor(source: SheetsTabDataSource, dataset: string) {
 }
 
 describe("Sheets API contributors", () => {
+  it("publishes Realized LTV and aggregate PII-free cohort rows", async () => {
+    const source = new FakeSource({
+      Sales_Actuals: [
+        {
+          order_id: "O-1",
+          customer_id: "C-PRIVATE",
+          order_date: "2026-01-05",
+          first_order_date: "2026-01-05",
+          gross_product_sales_usd: 100,
+          discounts_usd: 10,
+          refunds_returns_usd: 0,
+          cancellations_usd: 0,
+          net_product_revenue_usd: 90,
+          order_status: "paid",
+          acquisition_channel: "Online Store",
+          currency: "USD",
+          is_test: "no",
+          data_as_of: "2026-08-10",
+        },
+        {
+          order_id: "O-2",
+          customer_id: "C-PRIVATE",
+          order_date: "2026-01-25",
+          first_order_date: "2026-01-05",
+          gross_product_sales_usd: 50,
+          discounts_usd: 0,
+          refunds_returns_usd: 0,
+          cancellations_usd: 0,
+          net_product_revenue_usd: 50,
+          order_status: "paid",
+          acquisition_channel: "Online Store",
+          currency: "USD",
+          is_test: "no",
+          data_as_of: "2026-08-10",
+        },
+      ],
+      Channel_Mapping: [
+        {
+          source_channel_or_name: "Online Store",
+          dashboard_channel: "DTC (Shopify)",
+          effective_from: "2025-01-01",
+          status: "active",
+        },
+      ],
+    });
+
+    const result = await contributor(source, "sheets-customers").load(context);
+    expect(result.metrics?.find(({ key }) => key === "customers.realized_ltv")?.value).toEqual({
+      kind: "money",
+      value: { currency: "USD", minorUnits: 14_000 },
+    });
+    const cohorts = result.tables?.find(
+      ({ metric }) => metric.key === "customers.realized_ltv_cohorts",
+    );
+    expect(cohorts?.rows).toEqual([
+      expect.objectContaining({
+        cohortMonth: "2026-01",
+        customerCount: 1,
+        ltv30dMinorUnits: 14_000,
+        lifetimeLtvMinorUnits: 14_000,
+      }),
+    ]);
+    expect(JSON.stringify(cohorts?.rows)).not.toContain("C-PRIVATE");
+  });
+
   it("values latest on-hand inventory while keeping low inventory in Phase 2", async () => {
     const source = new FakeSource({
       Inventory_Snapshots: [

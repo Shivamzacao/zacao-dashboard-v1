@@ -27,7 +27,13 @@ import type {
 import { ChartLegend } from "./tooltip-legend";
 import { StateSurface } from "./state-surface";
 
-const tones = { forest: "#005d45", gold: "#c8a86b", terracotta: "#b5532f" } as const;
+const tones = {
+  forest: "#005d45",
+  sage: "#7fa68f",
+  gold: "#c8a86b",
+  terracotta: "#b5532f",
+  plum: "#74546f",
+} as const;
 
 export type ChartValueFormat = "money" | "percent" | "count";
 
@@ -77,10 +83,34 @@ function ChartFrame({
   height = 260,
   legend,
   valueFormat = "count",
+  series,
   children,
-}: BaseChartProps & { readonly children: React.ReactNode }) {
-  const usableData = data?.filter((item) => item.value !== null) ?? [];
+}: BaseChartProps & {
+  readonly children: React.ReactNode;
+  readonly series?: readonly ChartSeriesDefinition[];
+}) {
+  const usableData =
+    data?.filter((item) =>
+      series?.length
+        ? series.some((definition) => {
+            const value =
+              definition.key === "value"
+                ? item.value
+                : definition.key === "secondaryValue"
+                  ? item.secondaryValue
+                  : item.seriesValues?.[definition.key];
+            return value !== null && value !== undefined;
+          })
+        : item.value !== null,
+    ) ?? [];
   const dataState = state === "current" && usableData.length === 0 ? "empty" : state;
+  const displayedLegend =
+    legend ??
+    series?.map((definition) => ({
+      key: definition.key,
+      label: definition.label,
+      tone: definition.tone,
+    }));
   return (
     <div
       className={`chart-frame state-${dataState}`}
@@ -91,13 +121,18 @@ function ChartFrame({
           {summary}
         </p>
       ) : null}
-      {legend?.length ? <ChartLegend items={legend} /> : null}
+      {displayedLegend?.length ? <ChartLegend items={displayedLegend} /> : null}
       {["current", "partial", "stale"].includes(dataState) && usableData.length ? (
         <>
           <div className="chart-visual" aria-hidden="true">
             {children}
           </div>
-          <AccessibleChartTable title={title} data={data ?? []} valueFormat={valueFormat} />
+          <AccessibleChartTable
+            title={title}
+            data={data ?? []}
+            valueFormat={valueFormat}
+            {...(series ? { series } : {})}
+          />
         </>
       ) : (
         <StateSurface state={dataState === "current" ? "empty" : dataState} />
@@ -117,10 +152,12 @@ function AccessibleChartTable({
   title,
   data,
   valueFormat,
+  series,
 }: {
   readonly title: string;
   readonly data: readonly ChartDatum[];
   readonly valueFormat: ChartValueFormat;
+  readonly series?: readonly ChartSeriesDefinition[];
 }) {
   const format = (value: number | null | undefined) =>
     value === null || value === undefined ? "Unavailable" : valueFormatters[valueFormat](value);
@@ -130,8 +167,16 @@ function AccessibleChartTable({
       <thead>
         <tr>
           <th scope="col">Label</th>
-          <th scope="col">Value</th>
-          <th scope="col">Comparison</th>
+          {(
+            series ?? [
+              { key: "value", label: "Value", tone: "forest" as const },
+              { key: "secondaryValue", label: "Comparison", tone: "gold" as const },
+            ]
+          ).map((item) => (
+            <th scope="col" key={item.key}>
+              {item.label}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
@@ -141,8 +186,22 @@ function AccessibleChartTable({
                 just the column value for the visual grid; restore the group
                 here so the row stays self-describing without it. */}
             <th scope="row">{item.group ? `${item.group} ${item.label}` : item.label}</th>
-            <td>{format(item.value)}</td>
-            <td>{format(item.secondaryValue)}</td>
+            {(
+              series ?? [
+                { key: "value", label: "Value", tone: "forest" as const },
+                { key: "secondaryValue", label: "Comparison", tone: "gold" as const },
+              ]
+            ).map((definition) => (
+              <td key={definition.key}>
+                {format(
+                  definition.key === "value"
+                    ? item.value
+                    : definition.key === "secondaryValue"
+                      ? item.secondaryValue
+                      : item.seriesValues?.[definition.key],
+                )}
+              </td>
+            ))}
           </tr>
         ))}
       </tbody>
@@ -154,6 +213,10 @@ function seriesOrDefault(
   series: readonly ChartSeriesDefinition[] | undefined,
 ): readonly ChartSeriesDefinition[] {
   return series ?? [{ key: "value", label: "Value", tone: "forest" }];
+}
+
+function plottedData(data: readonly ChartDatum[] | null): readonly Record<string, unknown>[] {
+  return (data ?? []).map((item) => ({ ...item, ...item.seriesValues }));
 }
 
 const commonAxis = {
@@ -170,7 +233,7 @@ export function LineChartView(props: SeriesChartProps) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           accessibilityLayer={false}
-          data={props.data ?? []}
+          data={plottedData(props.data)}
           margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
         >
           <CartesianGrid stroke="#e7e9e2" vertical={false} />
@@ -215,7 +278,7 @@ export function AreaChartView(props: SeriesChartProps) {
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           accessibilityLayer={false}
-          data={props.data ?? []}
+          data={plottedData(props.data)}
           margin={{ top: 12, right: 12, bottom: 8, left: 0 }}
         >
           <CartesianGrid stroke="#e7e9e2" vertical={false} />
@@ -270,7 +333,7 @@ function BarChartView(
       <ResponsiveContainer width="100%" height="100%">
         <BarChart
           accessibilityLayer={false}
-          data={props.data ?? []}
+          data={plottedData(props.data)}
           layout={props.horizontal ? "vertical" : "horizontal"}
           margin={{ top: 12, right: 12, bottom: 8, left: props.horizontal ? 28 : 0 }}
         >

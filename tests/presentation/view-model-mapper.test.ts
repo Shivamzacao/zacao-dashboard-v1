@@ -47,6 +47,62 @@ function pageWith(
 }
 
 describe("mapDashboardPageToDisplayData", () => {
+  it("maps aggregate cohort LTV into five nullable money series without PII", () => {
+    const cohortMetric = createMetricViewModel({
+      metricKey: "customers.realized_ltv_cohorts",
+      environment: "production",
+      dataPeriod,
+      sources: [shopifyCurrent],
+      value: { kind: "money", value: { currency: "USD", minorUnits: 20_000 } },
+    });
+    const table = metricTableViewModelSchema.parse({
+      metric: cohortMetric,
+      columns: [
+        "cohortMonth",
+        "customerCount",
+        "ltv30dMinorUnits",
+        "ltv60dMinorUnits",
+        "ltv90dMinorUnits",
+        "ltv180dMinorUnits",
+        "lifetimeLtvMinorUnits",
+      ],
+      rows: [
+        {
+          cohortMonth: "2026-07",
+          customerCount: 4,
+          ltv30dMinorUnits: 10_000,
+          ltv60dMinorUnits: null,
+          ltv90dMinorUnits: null,
+          ltv180dMinorUnits: null,
+          lifetimeLtvMinorUnits: 20_000,
+        },
+      ],
+    });
+    const display = mapDashboardPageToDisplayData(
+      { ...pageWith([cohortMetric]), tables: [table] },
+      "production",
+    );
+
+    expect(display.chartValueFormats?.["customers.realized_ltv_cohorts"]).toBe("money");
+    expect(display.chartData["customers.realized_ltv_cohorts"]).toEqual([
+      {
+        key: "2026-07",
+        label: "2026-07",
+        value: 200,
+        seriesValues: {
+          ltv30d: 100,
+          ltv60d: null,
+          ltv90d: null,
+          ltv180d: null,
+          lifetime: 200,
+        },
+      },
+    ]);
+    expect(JSON.stringify(display.rowsByDataset["customer-ltv-cohorts"])).not.toContain(
+      "customerId",
+    );
+  });
+
   it("maps real values into currentValues and never fabricates blocked entries", () => {
     const returningRate = createMetricViewModel({
       metricKey: "customers.returning_rate",

@@ -28,7 +28,8 @@
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:google-readonly": "node scripts/check-google-readonly.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
-    "check:sheets": "vitest run tests/infrastructure/sheets-api"
+    "check:sheets": "vitest run tests/infrastructure/sheets-api",
+    "build:realized-ltv-workbook": "node scripts/db/update-realized-ltv-workbook.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "4.3.3",

@@ -10,7 +10,7 @@ export interface SheetsTabReadResult {
 }
 
 export type SheetsDashboardPage =
-  "insights" | "product" | "finance" | "marketing" | "growth" | "operations";
+  "insights" | "product" | "finance" | "marketing" | "growth" | "operations" | "customers";
 
 /** Read-only, server-side source for normalized Google Sheet tab records. */
 export interface SheetsTabDataSource {

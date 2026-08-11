@@ -27,6 +27,7 @@ const knownTabs = new Set<string>(MANUAL_WORKBOOK_TABS);
 const numericKinds = new Set(["integer", "usd", "decimal", "percent"]);
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const TIMESTAMP = /^\d{4}-\d{2}-\d{2}(?:[ T].*)?$/;
+const US_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const FRESH_MS = 30_000;
 const STALE_MS = 900_000;
 
@@ -45,7 +46,23 @@ function normalizeCell(value: unknown, column: ManualColumnContract): string | n
   }
   const text = typeof value === "string" ? value.trim() : String(value);
   if (text === "") return null;
-  if (column.kind === "date" && !DATE.test(text)) return null;
+  if (column.kind === "date") {
+    if (DATE.test(text)) return text;
+    const match = US_DATE.exec(text);
+    if (!match) return null;
+    const month = Number(match[1]);
+    const day = Number(match[2]);
+    const year = Number(match[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) {
+      return null;
+    }
+    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  }
   if (column.kind === "timestamp" && !TIMESTAMP.test(text)) return null;
   if (column.enumValues && !column.enumValues.includes(text)) return null;
   return text;

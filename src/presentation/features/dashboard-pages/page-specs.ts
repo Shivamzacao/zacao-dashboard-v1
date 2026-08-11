@@ -1,4 +1,5 @@
 import type { DashboardSlug } from "@/src/application/api";
+import type { ChartSeriesDefinition } from "@/src/presentation/components/dashboard/display-contracts";
 
 export type ChartKind =
   "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
@@ -9,6 +10,7 @@ export interface PageChartSpec {
   readonly metricKey: string;
   readonly kind: ChartKind;
   readonly secondaryMetricKey?: string;
+  readonly series?: readonly ChartSeriesDefinition[];
 }
 
 export interface PageTableSpec {
@@ -165,9 +167,17 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
         {
           title: "Customer cohorts",
-          description: "Repeat behavior requires complete detailed order history.",
-          metricKey: "customers.cohorts",
+          description:
+            "Revenue LTV by acquisition month; immature fixed-horizon cohorts remain unavailable.",
+          metricKey: "customers.realized_ltv_cohorts",
           kind: "area",
+          series: [
+            { key: "ltv30d", label: "30d", tone: "sage" },
+            { key: "ltv60d", label: "60d", tone: "gold" },
+            { key: "ltv90d", label: "90d", tone: "terracotta" },
+            { key: "ltv180d", label: "180d", tone: "plum" },
+            { key: "lifetime", label: "Lifetime", tone: "forest" },
+          ],
         },
       ],
       tables: [],
