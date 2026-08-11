@@ -22,6 +22,7 @@ test("desktop shell, URL state, navigation, and accessibility", async ({ page })
   await page.goForward();
   await expect(page.getByLabel("Comparison period")).toHaveValue("previous_year");
   await page.getByLabel("Comparison period").selectOption("none");
+  await expect(page).toHaveURL(/comparison=none/);
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);

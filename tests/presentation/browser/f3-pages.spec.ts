@@ -36,13 +36,17 @@ for (const [slug, title] of pages) {
   });
 }
 
-test("dashboard pages remain usable at an effective 200% zoom width", async ({ page }) => {
-  await page.goto("/executive");
-  await page.setViewportSize({ width: 640, height: 720 });
-  await expect(page.getByRole("heading", { name: "Executive health" })).toBeVisible();
-  expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
-    ),
-  ).toBe(true);
-});
+for (const width of [760, 640]) {
+  test(`dashboard remains usable without page overflow at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 720 });
+    await page.goto("/executive");
+    await expect(page.getByRole("heading", { name: "Executive health" })).toBeVisible();
+    await expect(page.getByLabel("Reporting period")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
+  });
+}
