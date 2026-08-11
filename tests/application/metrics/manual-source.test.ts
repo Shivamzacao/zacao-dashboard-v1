@@ -97,7 +97,10 @@ describe("B5 governed manual-source calculations", () => {
     });
     expect(
       result.tables.find(({ metric }) => metric.key === "partners.performance")?.rows,
-    ).toHaveLength(1);
+    ).toHaveLength(0);
+    expect(
+      result.tables.find(({ metric }) => metric.key === "partners.performance")?.metric.warnings,
+    ).toContain("PHASE_2_NOT_CONFIGURED");
   });
 
   it("returns DATA_PENDING without numeric values for the empty production workbook", () => {

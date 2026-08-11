@@ -60,7 +60,7 @@ function contributor(source: SheetsTabDataSource, dataset: string) {
 }
 
 describe("Sheets API contributors", () => {
-  it("values latest on-hand inventory and evaluates active SKU reorder targets", async () => {
+  it("values latest on-hand inventory while keeping low inventory in Phase 2", async () => {
     const source = new FakeSource({
       Inventory_Snapshots: [
         {
@@ -79,8 +79,18 @@ describe("Sheets API contributors", () => {
         },
       ],
       COGS_By_SKU: [
-        { sku: "SKU-01", effective_from: "2026-07-01", total_unit_cost_usd: 2.5 },
-        { sku: "SKU-02", effective_from: "2026-07-01", total_unit_cost_usd: 2.15 },
+        {
+          sku: "SKU-01",
+          effective_from: "2026-07-01",
+          cost_basis: "landed",
+          total_unit_cost_usd: 2.5,
+        },
+        {
+          sku: "SKU-02",
+          effective_from: "2026-07-01",
+          cost_basis: "landed",
+          total_unit_cost_usd: 2.15,
+        },
       ],
       Metric_Targets: [
         {
@@ -110,8 +120,9 @@ describe("Sheets API contributors", () => {
     });
     const insights = await contributor(source, "sheets-insights").load(context);
     const alert = insights.breakdowns?.find(({ metric }) => metric.key === "alerts.low_inventory");
-    expect(alert?.metric.value).toEqual({ kind: "status", value: "1 SKU(s) below threshold" });
-    expect(alert?.items[0]).toMatchObject({ key: "SKU-01", warnings: ["REORDER_POINT:1300"] });
+    expect(alert?.metric.value).toBeNull();
+    expect(alert?.metric.warnings).toContain("PHASE_2_NOT_CONFIGURED");
+    expect(alert?.items).toEqual([]);
   });
 
   it("keeps a missing depletions tab empty while serving valid operations data", async () => {
