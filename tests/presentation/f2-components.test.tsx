@@ -12,6 +12,7 @@ import {
   SourceIndicator,
 } from "@/src/presentation/components/dashboard/cards";
 import {
+  AreaChartView,
   FunnelChartView,
   HorizontalBarChartView,
   LineChartView,
@@ -107,6 +108,49 @@ describe("F2 reusable dashboard components", () => {
     );
     expect(screen.getByText("One point is present.")).toBeTruthy();
     expect(screen.getByRole("table", { name: "Revenue data" })).toBeTruthy();
+    expect(screen.getAllByRole("cell", { name: "Unavailable" })).toHaveLength(3);
+  });
+
+  it("exposes every declared LTV series and unavailable immature cells accessibly", () => {
+    render(
+      <AreaChartView
+        title="Customer cohorts"
+        data={[
+          {
+            key: "2026-07",
+            label: "2026-07",
+            value: 200,
+            seriesValues: {
+              ltv30d: 100,
+              ltv60d: null,
+              ltv90d: null,
+              ltv180d: null,
+              lifetime: 200,
+            },
+          },
+        ]}
+        valueFormat="money"
+        series={[
+          { key: "ltv30d", label: "30d", tone: "sage" },
+          { key: "ltv60d", label: "60d", tone: "gold" },
+          { key: "ltv90d", label: "90d", tone: "terracotta" },
+          { key: "ltv180d", label: "180d", tone: "plum" },
+          { key: "lifetime", label: "Lifetime", tone: "forest" },
+        ]}
+      />,
+    );
+
+    const table = screen.getByRole("table", { name: "Customer cohorts data" });
+    expect(screen.getAllByText("30d").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Lifetime").length).toBeGreaterThan(1);
+    expect([...table.querySelectorAll("thead th")].map((cell) => cell.textContent)).toEqual([
+      "Label",
+      "30d",
+      "60d",
+      "90d",
+      "180d",
+      "Lifetime",
+    ]);
     expect(screen.getAllByRole("cell", { name: "Unavailable" })).toHaveLength(3);
   });
 

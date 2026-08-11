@@ -29,6 +29,7 @@ export interface ChartDatum {
   readonly label: string;
   readonly value: number | null;
   readonly secondaryValue?: number | null;
+  readonly seriesValues?: Readonly<Record<string, number | null>>;
   readonly group?: string;
 }
 
@@ -36,15 +37,15 @@ export interface ChartDatum {
 export type ChartValueFormat = "money" | "percent" | "count";
 
 export interface ChartSeriesDefinition {
-  readonly key: "value" | "secondaryValue";
+  readonly key: string;
   readonly label: string;
-  readonly tone: "forest" | "gold" | "terracotta";
+  readonly tone: "forest" | "gold" | "terracotta" | "sage" | "plum";
 }
 
 export interface LegendItem {
   readonly key: string;
   readonly label: string;
-  readonly tone: "forest" | "gold" | "terracotta" | "muted";
+  readonly tone: "forest" | "gold" | "terracotta" | "sage" | "plum" | "muted";
   readonly pattern?: "solid" | "dashed" | "dotted";
 }
 

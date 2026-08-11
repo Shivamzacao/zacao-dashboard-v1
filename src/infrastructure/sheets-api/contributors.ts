@@ -14,6 +14,7 @@ import {
   buildMarketingSpendBreakdown,
   buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
+  buildRealizedLtvViews,
   buildSocialMetricsTable,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
@@ -63,6 +64,23 @@ class SheetsContributor implements DashboardDatasetContributor {
 export function createSheetsApiContributors(
   source: SheetsTabDataSource,
 ): readonly DashboardDatasetContributor[] {
+  const customers = new SheetsContributor("sheets-customers", async (value) => {
+    const result = await source.readPageTabs("customers", ["Sales_Actuals", "Channel_Mapping"]);
+    const views = buildRealizedLtvViews({
+      context: context(value, result.sourceStatus),
+      records: result.tabs["Sales_Actuals"] ?? [],
+      channelMapping: result.tabs["Channel_Mapping"] ?? [],
+      channels: value.filters.channels,
+      sourceWarnings: result.warnings,
+    });
+    return {
+      metrics: [views.metric],
+      tables: [views.cohorts],
+      sourceStatuses: [result.sourceStatus],
+      warnings: result.warnings,
+    };
+  });
+
   const operations = new SheetsContributor("sheets-operations", async (value) => {
     const result = await source.readPageTabs("operations", [
       "Inventory_Snapshots",
@@ -230,5 +248,5 @@ export function createSheetsApiContributors(
     };
   });
 
-  return [operations, product, insights, marketing, growth, financial];
+  return [customers, operations, product, insights, marketing, growth, financial];
 }

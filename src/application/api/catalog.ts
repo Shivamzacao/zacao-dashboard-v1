@@ -28,6 +28,27 @@ const definition = (value: DrilldownDefinition): DrilldownDefinition => Object.f
 
 export const drilldownCatalog = Object.freeze([
   definition({
+    dataset: "customer-ltv-cohorts",
+    section: "Customer Intelligence",
+    metricKey: "customers.realized_ltv_cohorts",
+    fields: [
+      "cohortMonth",
+      "customerCount",
+      "ltv30dMinorUnits",
+      "ltv60dMinorUnits",
+      "ltv90dMinorUnits",
+      "ltv180dMinorUnits",
+      "lifetimeLtvMinorUnits",
+      "mature30d",
+      "mature60d",
+      "mature90d",
+      "mature180d",
+      "excludedRows",
+    ],
+    sortFields: ["cohortMonth", "customerCount"],
+    exportable: true,
+  }),
+  definition({
     dataset: "product-catalog",
     section: "Product Intelligence",
     metricKey: "products.catalog",

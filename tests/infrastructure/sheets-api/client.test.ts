@@ -72,6 +72,57 @@ function clientFetch(options: {
 }
 
 describe("SheetsApiClient direct Google source", () => {
+  it("normalizes native Sheets table dates from the workbook locale", async () => {
+    const rows = [
+      [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "first_order_date",
+        "gross_product_sales_usd",
+        "discounts_usd",
+        "refunds_returns_usd",
+        "cancellations_usd",
+        "net_product_revenue_usd",
+        "order_status",
+        "acquisition_channel",
+        "currency",
+        "is_test",
+        "data_as_of",
+        "source_status",
+      ],
+      [
+        "O-1",
+        "C-1",
+        "9/5/2025",
+        "9/5/2025",
+        100,
+        0,
+        0,
+        0,
+        100,
+        "paid",
+        "Online Store",
+        "USD",
+        "no",
+        "8/11/2026",
+        "production",
+      ],
+    ];
+    const fetchMock = clientFetch({ titles: ["Sales_Actuals"], rows });
+    const client = new SheetsApiClient(configuration(), {
+      fetch: fetchMock as typeof fetch,
+      accessToken: async () => "token",
+    });
+    const result = await client.readPageTabs("customers", ["Sales_Actuals"]);
+
+    expect(result.tabs["Sales_Actuals"]?.[0]).toMatchObject({
+      order_date: "2025-09-05",
+      first_order_date: "2025-09-05",
+      data_as_of: "2026-08-11",
+    });
+  });
+
   it("batch reads and normalizes requested tabs", async () => {
     const fetchMock = clientFetch({});
     const client = new SheetsApiClient(configuration(), {

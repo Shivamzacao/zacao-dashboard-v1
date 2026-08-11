@@ -94,6 +94,7 @@ function displayStateFor(metric: MetricViewModel): DisplayState {
   if (metric.implementationStatus === "BUSINESS_RULE_REQUIRED") return "business_rule_required";
   if (metric.implementationStatus === "SOURCE_LIMITED") return "source_limited";
   if (metric.implementationStatus === "NOT_V1") return "not_configured";
+  if (metric.warnings.includes("LTV_SOURCE_ROWS_REQUIRED")) return "data_pending";
   if (
     metric.readiness.state === "no_activity" &&
     metric.implementationStatus === "DATA_PENDING" &&
@@ -320,6 +321,25 @@ export function mapDashboardPageToDisplayData(
         label: String(row["partner"] ?? index),
         value: typeof row["revenueMinorUnits"] === "number" ? row["revenueMinorUnits"] / 100 : null,
       }));
+      chartValueFormats[table.metric.key] = "money";
+    }
+    if (table.metric.key === "customers.realized_ltv_cohorts") {
+      chartData[table.metric.key] = table.rows.map((row, index) => {
+        const dollars = (key: string) =>
+          typeof row[key] === "number" ? (row[key] as number) / 100 : null;
+        return {
+          key: String(row["cohortMonth"] ?? index),
+          label: String(row["cohortMonth"] ?? index),
+          value: dollars("lifetimeLtvMinorUnits"),
+          seriesValues: {
+            ltv30d: dollars("ltv30dMinorUnits"),
+            ltv60d: dollars("ltv60dMinorUnits"),
+            ltv90d: dollars("ltv90dMinorUnits"),
+            ltv180d: dollars("ltv180dMinorUnits"),
+            lifetime: dollars("lifetimeLtvMinorUnits"),
+          },
+        };
+      });
       chartValueFormats[table.metric.key] = "money";
     }
   }

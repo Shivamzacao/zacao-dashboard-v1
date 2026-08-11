@@ -214,6 +214,59 @@ export interface WeeklyProductUnitsFact {
   readonly units: number;
 }
 
+export type LtvHorizon = "30d" | "60d" | "90d" | "180d" | "lifetime";
+
+export interface SalesActualRow {
+  readonly orderId: string;
+  readonly customerId: string | null;
+  readonly orderDate: string;
+  readonly firstOrderDate: string;
+  readonly grossProductSalesMinorUnits: number;
+  readonly discountsMinorUnits: number;
+  readonly refundsReturnsMinorUnits: number;
+  readonly cancellationsMinorUnits: number;
+  readonly netProductRevenueMinorUnits: number;
+  readonly orderStatus: "paid" | "partially_refunded" | "refunded" | "cancelled";
+  readonly acquisitionChannel: string;
+  readonly currency: "USD";
+  readonly isTest: boolean;
+  readonly dataAsOf: string;
+}
+
+export interface LtvReconciliationDiagnostic {
+  readonly rowNumber: number;
+  readonly orderId: string | null;
+  readonly reason:
+    | "duplicate_order"
+    | "missing_customer"
+    | "test_order"
+    | "non_usd"
+    | "unsupported_status"
+    | "malformed_date"
+    | "negative_deduction"
+    | "net_revenue_mismatch"
+    | "inconsistent_first_order_date"
+    | "after_cutoff"
+    | "unmapped_channel"
+    | "channel_filtered";
+}
+
+export interface CustomerLtvCohortResult {
+  readonly cohortMonth: string;
+  readonly customerCount: number;
+  readonly ltvMinorUnits: Readonly<Record<LtvHorizon, number | null>>;
+  readonly maturity: Readonly<Record<Exclude<LtvHorizon, "lifetime">, boolean>>;
+  readonly excludedRows: number;
+}
+
+export interface RealizedLtvResult {
+  readonly headlineMinorUnits: number | null;
+  readonly eligibleCustomers: number;
+  readonly cohorts: readonly CustomerLtvCohortResult[];
+  readonly diagnostics: readonly LtvReconciliationDiagnostic[];
+  readonly warnings: readonly string[];
+}
+
 export interface ProductionIncomingFact {
   readonly poNumber: string;
   readonly poLine: string;

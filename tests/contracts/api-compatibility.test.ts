@@ -36,6 +36,7 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       "insights",
     ]);
     expect(apiContractManifest.drilldowns.map(({ dataset }) => dataset)).toEqual([
+      "customer-ltv-cohorts",
       "product-catalog",
       "product-velocity",
       "klaviyo-campaigns",

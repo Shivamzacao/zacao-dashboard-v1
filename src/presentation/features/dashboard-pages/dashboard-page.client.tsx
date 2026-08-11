@@ -109,16 +109,18 @@ function Chart({
     // conversion-rate metric).
     valueFormat: fixture.chartValueFormats?.[spec.metricKey] ?? chartValueFormat(metric.valueKind),
   };
-  const series = spec.secondaryMetricKey
-    ? [
-        { key: "value" as const, label: metric.label, tone: "forest" as const },
-        {
-          key: "secondaryValue" as const,
-          label: requiredMetric(spec.secondaryMetricKey).label,
-          tone: "gold" as const,
-        },
-      ]
-    : undefined;
+  const series =
+    spec.series ??
+    (spec.secondaryMetricKey
+      ? [
+          { key: "value" as const, label: metric.label, tone: "forest" as const },
+          {
+            key: "secondaryValue" as const,
+            label: requiredMetric(spec.secondaryMetricKey).label,
+            tone: "gold" as const,
+          },
+        ]
+      : undefined);
   const seriesProps = series ? { series } : {};
   const view = {
     line: <LineChartView {...props} {...seriesProps} />,
