@@ -184,18 +184,11 @@ export function buildGrowthPipelineViews(
       return id ? [id] : [];
     }),
   );
-  const openValues = open.flatMap((record) => {
-    const value = number(record, "Value USD");
-    return value === null ? [] : [usdFromDecimalNumber(value)];
-  });
   const openMetric = metric(
     context,
     "growth.open_pipeline",
-    ids.size === 0 || openValues.length === 0 ? null : { kind: "money", value: addUsd(openValues) },
-    [
-      ...(open.length > ids.size ? ["OPPORTUNITY_ID_COVERAGE_PARTIAL"] : []),
-      ...(openValues.length < open.length ? ["PIPELINE_VALUE_COVERAGE_PARTIAL"] : []),
-    ],
+    ids.size === 0 ? null : { kind: "count", value: ids.size },
+    [...(open.length > ids.size ? ["OPPORTUNITY_ID_COVERAGE_PARTIAL"] : [])],
   );
   const grouped = new Map<string, ManualMetricRecord[]>();
   for (const record of open.filter((record) => text(record, "Opportunity ID") !== null)) {

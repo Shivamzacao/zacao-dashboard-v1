@@ -114,12 +114,11 @@ export function parseDrilldownQuery(
     .parse(search.get("limit") ?? "50");
   const cursor = search.get("cursor");
   if (cursor && cursor.length > 500) throw new ApiQueryError("Cursor is too long", ["cursor"]);
-  if (definition.sourceLimited) {
+  if (definition.sourceLimited || definition.implementationPending) {
     if (search.has("sort") || search.has("fields"))
-      throw new ApiQueryError(
-        "Sorting and fields are unavailable for this source-limited dataset",
-        ["sort"],
-      );
+      throw new ApiQueryError("Sorting and fields are unavailable for this pending dataset", [
+        "sort",
+      ]);
     return {
       filters,
       limit,

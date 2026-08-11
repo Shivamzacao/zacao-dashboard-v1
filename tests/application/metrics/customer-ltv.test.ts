@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildRealizedLtvViews,
+  calculateActiveCustomers,
   calculateRealizedLtv,
 } from "@/src/application/metrics/customer-ltv";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
@@ -71,7 +72,7 @@ describe("Realized LTV", () => {
     );
   });
 
-  it("uses distinct eligible customers and includes later refunds and cancellations", () => {
+  it("uses distinct eligible customers and excludes refunded, cancelled, and zero-value orders", () => {
     const result = calculateRealizedLtv({
       records: [
         order("O-1", "C-1", "2025-09-05", "2025-09-05"),
@@ -101,8 +102,45 @@ describe("Realized LTV", () => {
       endDate: "2026-08-11",
     });
 
-    expect(result.eligibleCustomers).toBe(2);
-    expect(result.headlineMinorUnits).toBe(3_500);
+    expect(result.eligibleCustomers).toBe(1);
+    expect(result.headlineMinorUnits).toBe(9_000);
+  });
+
+  it("counts active customers in the inclusive trailing 90-day window with identity fallback", () => {
+    const records = [
+      order("BOUNDARY", "C-1", "2026-05-14", "2026-05-14"),
+      order("DUPLICATE-CUSTOMER", "C-1", "2026-08-10", "2026-05-14"),
+      order("CONFIRMED", null, "2026-08-11", "2026-08-11", {
+        normalized_email: " Buyer@Example.com ",
+        order_status: "confirmed",
+      }),
+      order("PARTIAL", "C-3", "2026-08-11", "2026-08-11", {
+        order_status: "partially_refunded",
+      }),
+      order("TOO-OLD", "C-4", "2026-05-13", "2026-05-13"),
+      order("REFUNDED", "C-5", "2026-08-11", "2026-08-11", {
+        refunds_returns_usd: 100,
+        discounts_usd: 0,
+        net_product_revenue_usd: 0,
+        order_status: "refunded",
+      }),
+      order("UNPAID", "C-6", "2026-08-11", "2026-08-11", {
+        order_status: "unpaid",
+      }),
+      order("SAMPLE", "C-7", "2026-08-11", "2026-08-11", { is_sample: "yes" }),
+      order("ZERO", "C-8", "2026-08-11", "2026-08-11", {
+        gross_product_sales_usd: 0,
+        discounts_usd: 0,
+        net_product_revenue_usd: 0,
+      }),
+      order("NO-ID", null, "2026-08-11", "2026-08-11"),
+    ];
+
+    expect(calculateActiveCustomers({ records, endDate: "2026-08-11" })).toEqual({
+      count: 3,
+      excludedWithoutIdentity: 1,
+      malformedRows: 0,
+    });
   });
 
   it("uses exact horizon boundaries and withholds immature monthly cohorts", () => {

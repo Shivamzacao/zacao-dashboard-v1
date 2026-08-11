@@ -17,8 +17,15 @@ import type {
 import { createMetricViewModel } from "./view-model";
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-const SUPPORTED_STATUSES = new Set(["paid", "partially_refunded", "refunded", "cancelled"]);
-const QUALIFYING_STATUSES = new Set(["paid", "partially_refunded", "refunded"]);
+const SUPPORTED_STATUSES = new Set([
+  "paid",
+  "confirmed",
+  "partially_refunded",
+  "refunded",
+  "cancelled",
+  "unpaid",
+]);
+const QUALIFYING_STATUSES = new Set(["paid", "confirmed", "partially_refunded"]);
 const HORIZONS = ["30d", "60d", "90d", "180d", "lifetime"] as const satisfies readonly LtvHorizon[];
 const HORIZON_DAYS: Readonly<Record<Exclude<LtvHorizon, "lifetime">, number>> = {
   "30d": 30,
@@ -35,6 +42,13 @@ function text(record: SheetRecord, key: string): string | null {
 function number(record: SheetRecord, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function customerIdentity(record: SheetRecord): string | null {
+  const customerId = text(record, "customer_id");
+  if (customerId) return `shopify:${customerId}`;
+  const email = text(record, "normalized_email")?.toLocaleLowerCase("en-US");
+  return email ? `email:${email}` : null;
 }
 
 function minorUnits(value: number): number {
@@ -116,7 +130,7 @@ function parseRows(input: {
   for (const [index, record] of input.records.entries()) {
     const rowNumber = index + 2;
     const orderId = text(record, "order_id");
-    const customerId = text(record, "customer_id");
+    const customerId = customerIdentity(record);
     const orderDate = text(record, "order_date");
     const firstOrderDate = text(record, "first_order_date");
     const currency = text(record, "currency");
@@ -129,6 +143,7 @@ function parseRows(input: {
     const cancellations = number(record, "cancellations_usd");
     const suppliedNet = number(record, "net_product_revenue_usd");
     const isTest = text(record, "is_test") === "yes";
+    const isSample = text(record, "is_sample") === "yes";
     const reject = (reason: LtvReconciliationDiagnostic["reason"]) =>
       diagnostics.push({ rowNumber, orderId, reason });
 
@@ -149,6 +164,10 @@ function parseRows(input: {
       reject("test_order");
       continue;
     }
+    if (isSample) {
+      reject("sample_order");
+      continue;
+    }
     if (currency !== "USD") {
       reject("non_usd");
       continue;
@@ -159,6 +178,10 @@ function parseRows(input: {
     }
     if ([gross, discounts, refunds, cancellations, suppliedNet].some((value) => value === null)) {
       reject("net_revenue_mismatch");
+      continue;
+    }
+    if ((gross ?? 0) <= 0) {
+      reject("zero_value_order");
       continue;
     }
     if ((discounts ?? 0) < 0 || (refunds ?? 0) < 0 || (cancellations ?? 0) < 0) {
@@ -269,7 +292,10 @@ export function calculateRealizedLtv(input: {
       QUALIFYING_STATUSES.has(item.row.orderStatus) ? [item.row.customerId] : [],
     ),
   );
-  const included = parsed.rows.filter((item) => eligibleCustomers.has(item.row.customerId));
+  const included = parsed.rows.filter(
+    (item) =>
+      QUALIFYING_STATUSES.has(item.row.orderStatus) && eligibleCustomers.has(item.row.customerId),
+  );
   const headlineRevenue = included.reduce(
     (total, item) => total + item.row.netProductRevenueMinorUnits,
     0,
@@ -333,6 +359,83 @@ export function calculateRealizedLtv(input: {
   };
 }
 
+export function calculateActiveCustomers(input: {
+  readonly records: readonly SheetRecord[];
+  readonly endDate: string;
+}): {
+  readonly count: number;
+  readonly excludedWithoutIdentity: number;
+  readonly malformedRows: number;
+} {
+  const startDate = addDays(input.endDate, -89);
+  const customers = new Set<string>();
+  let excludedWithoutIdentity = 0;
+  let malformedRows = 0;
+
+  for (const record of input.records) {
+    const orderDate = text(record, "order_date");
+    if (!validDate(orderDate)) {
+      malformedRows += 1;
+      continue;
+    }
+    if (orderDate < startDate || orderDate > input.endDate) continue;
+    const identity = customerIdentity(record);
+    if (!identity) {
+      excludedWithoutIdentity += 1;
+      continue;
+    }
+    const status = text(record, "order_status");
+    const gross = number(record, "gross_product_sales_usd");
+    const net = number(record, "net_product_revenue_usd");
+    if (
+      !status ||
+      !QUALIFYING_STATUSES.has(status) ||
+      text(record, "is_test") === "yes" ||
+      text(record, "is_sample") === "yes" ||
+      gross === null ||
+      net === null ||
+      gross <= 0 ||
+      net <= 0
+    ) {
+      continue;
+    }
+    customers.add(identity);
+  }
+
+  return { count: customers.size, excludedWithoutIdentity, malformedRows };
+}
+
+export function buildActiveCustomersMetric(input: {
+  readonly context: MetricServiceContext;
+  readonly records: readonly SheetRecord[];
+  readonly sourceWarnings?: readonly string[];
+}): MetricViewModel {
+  const result = calculateActiveCustomers({
+    records: input.records,
+    endDate: input.context.dataPeriod.endDate,
+  });
+  const warnings = [
+    ...(input.sourceWarnings ?? []),
+    ...(result.excludedWithoutIdentity > 0
+      ? [`ACTIVE_CUSTOMERS_MISSING_IDENTITY:${result.excludedWithoutIdentity}`]
+      : []),
+    ...(result.malformedRows > 0
+      ? [`ACTIVE_CUSTOMERS_MALFORMED_ROWS:${result.malformedRows}`]
+      : []),
+  ];
+  return createMetricViewModel({
+    metricKey: "customers.active",
+    environment: input.context.environment,
+    dataPeriod: input.context.dataPeriod,
+    sources: input.context.sourceStatuses,
+    value: input.records.length === 0 ? null : { kind: "count", value: result.count },
+    warnings,
+    ...(input.records.length === 0
+      ? { dataPendingReason: "Sales_Actuals has no order rows for the approved 90-day window." }
+      : {}),
+  });
+}
+
 function metricSources(
   context: MetricServiceContext,
   state: SourceStatus["state"] | null,
@@ -368,6 +471,7 @@ export function buildRealizedLtvViews(input: {
     "duplicate_order",
     "missing_customer",
     "test_order",
+    "sample_order",
     "non_usd",
     "unsupported_status",
     "malformed_date",

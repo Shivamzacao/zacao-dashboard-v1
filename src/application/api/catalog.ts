@@ -22,6 +22,7 @@ export interface DrilldownDefinition {
   readonly sortFields: readonly string[];
   readonly exportable: boolean;
   readonly sourceLimited?: boolean;
+  readonly implementationPending?: boolean;
 }
 
 const definition = (value: DrilldownDefinition): DrilldownDefinition => Object.freeze(value);
@@ -200,7 +201,7 @@ export const drilldownCatalog = Object.freeze([
     fields: [],
     sortFields: [],
     exportable: false,
-    sourceLimited: true,
+    implementationPending: true,
   }),
 ] satisfies readonly DrilldownDefinition[]);
 

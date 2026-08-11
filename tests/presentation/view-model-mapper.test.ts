@@ -120,9 +120,9 @@ describe("mapDashboardPageToDisplayData", () => {
     });
     expect(display.states?.["customers.returning_rate"]).toBe("current");
 
-    // Business-rule-blocked metrics get a state and a reason but never a value.
+    // Metrics without their required connector get a state and a reason but never a value.
     expect(display.currentValues["customers.active"]).toBeUndefined();
-    expect(display.states?.["customers.active"]).toBe("business_rule_required");
+    expect(display.states?.["customers.active"]).toBe("not_configured");
     expect(display.stateReasons?.["customers.active"]).toBeTruthy();
 
     // Source-limited metrics keep their explicit display state.

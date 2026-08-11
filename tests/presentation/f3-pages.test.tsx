@@ -37,7 +37,7 @@ describe("F3 dashboard pages", () => {
   it("renders Executive truthfully without converting blocked metrics to zero", () => {
     render(<DashboardPageView spec={dashboardPageSpecs.executive} fixture={f3PageFixtureData} />);
     expect(screen.getByLabelText("Key performance indicators")).toBeTruthy();
-    expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Returning customer rate: 38.4%")).toBeTruthy();
     expect(screen.queryByText("Deterministic V1 rules")).toBeNull();
     expect(screen.getAllByRole("article")).toHaveLength(9);
@@ -91,7 +91,7 @@ describe("F3 dashboard pages", () => {
     );
     expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
     rerender(<DashboardPageView spec={dashboardPageSpecs.financial} fixture={f3PageFixtureData} />);
-    expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
   });
 
   it("renders live catalog rows as readable columns without provider URIs", () => {

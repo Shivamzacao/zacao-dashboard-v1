@@ -15,13 +15,22 @@ export const apiContractManifest = Object.freeze({
   },
   dashboards: Object.entries(dashboardSlugToSection).map(([slug, section]) => ({ slug, section })),
   drilldowns: drilldownCatalog.map(
-    ({ dataset, metricKey, fields, sortFields, exportable, sourceLimited }) => ({
+    ({
+      dataset,
+      metricKey,
+      fields,
+      sortFields,
+      exportable,
+      sourceLimited,
+      implementationPending,
+    }) => ({
       dataset,
       metricKey,
       fields,
       sortFields,
       exportable,
       sourceLimited: sourceLimited ?? false,
+      implementationPending: implementationPending ?? false,
     }),
   ),
 });

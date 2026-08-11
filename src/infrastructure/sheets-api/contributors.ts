@@ -1,5 +1,6 @@
 import {
   buildCashPositionMetric,
+  buildActiveCustomersMetric,
   buildCashPositionBreakdown,
   buildCombinedInventoryBreakdown,
   buildDepletionsBreakdown,
@@ -74,7 +75,14 @@ export function createSheetsApiContributors(
       sourceWarnings: result.warnings,
     });
     return {
-      metrics: [views.metric],
+      metrics: [
+        buildActiveCustomersMetric({
+          context: context(value, result.sourceStatus),
+          records: result.tabs["Sales_Actuals"] ?? [],
+          sourceWarnings: result.warnings,
+        }),
+        views.metric,
+      ],
       tables: [views.cohorts],
       sourceStatuses: [result.sourceStatus],
       warnings: result.warnings,
@@ -222,6 +230,7 @@ export function createSheetsApiContributors(
       "Cash_Position",
       "Inventory_Snapshots",
       "COGS_By_SKU",
+      "Production_Orders",
     ]);
     const metricContext = context(value, result.sourceStatus);
     const finance = buildFinanceActualMetrics(
@@ -242,6 +251,7 @@ export function createSheetsApiContributors(
       breakdowns: [
         finance.composition,
         buildCashPositionBreakdown(metricContext, result.tabs["Cash_Position"] ?? []),
+        buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
       ],
       sourceStatuses: [result.sourceStatus],
       warnings: result.warnings,
