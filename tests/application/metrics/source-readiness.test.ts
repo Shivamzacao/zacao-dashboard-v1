@@ -56,5 +56,24 @@ describe("B5 source readiness metrics", () => {
     expect(sop.warnings).toEqual(
       expect.arrayContaining(["SOP_FORMULA_ERRORS", "SOP_PLACEHOLDERS"]),
     );
+    expect(sop.value).toEqual({ kind: "status", value: "FAIL" });
+    expect(
+      buildSopValidationMetric(context([source("google_drive")]), {
+        worksheetNames: ["Production Schedule"],
+        nonEmptyCellCount: 10,
+        formulaCount: 2,
+        formulaErrorCells: [],
+        placeholderCellCount: 1,
+      }).value,
+    ).toEqual({ kind: "status", value: "WARN" });
+    expect(
+      buildSopValidationMetric(context([source("google_drive")]), {
+        worksheetNames: ["Production Schedule"],
+        nonEmptyCellCount: 10,
+        formulaCount: 2,
+        formulaErrorCells: [],
+        placeholderCellCount: 0,
+      }).value,
+    ).toEqual({ kind: "status", value: "PASS" });
   });
 });

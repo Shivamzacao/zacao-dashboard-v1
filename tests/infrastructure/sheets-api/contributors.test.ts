@@ -77,6 +77,13 @@ describe("Sheets API contributors", () => {
           on_hand: 860,
           available: 770,
         },
+        {
+          snapshot_at: "2026-08-01 06:00",
+          warehouse: "YBYD",
+          sku: "SKU-02",
+          on_hand: 860,
+          available: 770,
+        },
       ],
       COGS_By_SKU: [
         {
@@ -112,11 +119,19 @@ describe("Sheets API contributors", () => {
           status: "active",
         },
       ],
+      SKU_Master: [
+        { sku_id: "SKU-01", is_active: "yes" },
+        { sku_id: "SKU-02", is_active: "yes" },
+      ],
     });
     const product = await contributor(source, "sheets-product").load(context);
     expect(product.metrics?.find(({ key }) => key === "inventory.value")?.value).toEqual({
       kind: "money",
       value: { currency: "USD", minorUnits: 494_900 },
+    });
+    expect(product.metrics?.find(({ key }) => key === "quality.missing_sku_cost")?.value).toEqual({
+      kind: "count",
+      value: 0,
     });
     const insights = await contributor(source, "sheets-insights").load(context);
     const alert = insights.breakdowns?.find(({ metric }) => metric.key === "alerts.low_inventory");

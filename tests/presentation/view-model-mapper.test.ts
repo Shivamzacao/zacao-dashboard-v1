@@ -111,7 +111,7 @@ describe("mapDashboardPageToDisplayData", () => {
     ]);
   });
 
-  it("creates alert cards only from certified low-inventory breakdown rows", () => {
+  it("omits Phase 2 low-inventory alerts even when rows are supplied", () => {
     const alertMetric = createMetricViewModel({
       metricKey: "alerts.low_inventory",
       environment: "production",
@@ -140,15 +140,7 @@ describe("mapDashboardPageToDisplayData", () => {
     const page = { ...pageWith([]), breakdowns: [alert] };
     const display = mapDashboardPageToDisplayData(page, "production");
 
-    expect(display.alerts).toEqual([
-      {
-        key: "alerts.low_inventory:SKU-LOW",
-        severity: "danger",
-        title: "SKU-LOW is below its reorder point",
-        description: "46 on hand against an approved reorder point of 110.",
-        metadata: ["Inventory risk", "SKU-LOW", "Reorder point 110"],
-      },
-    ]);
+    expect(display.alerts).toEqual([]);
   });
 
   it("formats a comparison metric into a signed percent change with a direction", () => {

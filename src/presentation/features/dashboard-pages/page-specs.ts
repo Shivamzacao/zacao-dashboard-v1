@@ -181,6 +181,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "inventory.value",
         "quality.missing_sku_cost",
         "inventory.sell_through",
+        "inventory.runway_reorder",
       ],
       charts: [
         {
@@ -202,13 +203,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           // Product-and-state categories read left-to-right; upright bars force
           // the axis to drop most of their labels.
           kind: "horizontal",
-        },
-        {
-          title: "Inventory runway & reorder",
-          description:
-            "Runway, stockout, and reorder guidance requires approved operational inputs and rules.",
-          metricKey: "inventory.runway_reorder",
-          kind: "area",
         },
       ],
       tables: [

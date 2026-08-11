@@ -34,6 +34,18 @@ import { SystemClock } from "@/src/infrastructure/time";
 import { createSheetsApiContributors } from "@/src/infrastructure/sheets-api/contributors";
 import { SheetsApiClient } from "@/src/infrastructure/sheets-api/client";
 import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/config";
+import { createV1CompositeContributor } from "@/src/infrastructure/composite/v1-metrics";
+import { GoogleReadClient } from "@/src/infrastructure/google/client";
+import {
+  APPROVED_GOOGLE_FILE_IDS,
+  REQUIRED_GOOGLE_READ_SCOPES,
+  type GoogleSourceConfiguration,
+} from "@/src/infrastructure/google/config";
+import { createGoogleAccessTokenProvider } from "@/src/infrastructure/google/auth";
+import {
+  GoogleReferenceAdapter,
+  type SopWorkbookInspection,
+} from "@/src/infrastructure/google/reference-adapters";
 
 import { DefaultBackendApiRuntime } from "./default-runtime";
 
@@ -83,9 +95,13 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
   "Executive Health": [
     "shopify-customers",
     "shopify-funnel",
+    "shopify-product-units",
+    "shopify-catalog-inventory",
     "shopify-sales",
     "shopify-channels",
     "shopify-fulfillment",
+    "insights-freshness",
+    "v1-composite-metrics",
   ],
   "Revenue Intelligence": [
     "shopify-product-units",
@@ -94,11 +110,17 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-channels",
   ],
   "Customer Intelligence": ["shopify-customers", "shopify-funnel", "shopify-geography"],
-  "Product Intelligence": ["shopify-product-units", "shopify-catalog-inventory", "sheets-product"],
+  "Product Intelligence": [
+    "shopify-product-units",
+    "shopify-catalog-inventory",
+    "sheets-product",
+    "v1-composite-metrics",
+  ],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
     "shopify-fulfillment",
     "sheets-operations",
+    "v1-composite-metrics",
     "deferred-google_drive",
   ],
   "Marketing Intelligence": [
@@ -116,6 +138,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "klaviyo-readiness",
     "insights-freshness",
     "sheets-insights",
+    "v1-composite-metrics",
   ],
 };
 
@@ -133,6 +156,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
   private readonly shopifyAdapters: (() => Promise<ShopifyAdapters>) | null;
   private readonly klaviyoAdapter: KlaviyoAdapter | null;
   private readonly sheetsSource: SheetsTabDataSource | null;
+  private readonly sopInspection: (() => Promise<SopWorkbookInspection>) | null;
 
   constructor(
     shopifySettings: ShopifyRuntimeSettings | null,
@@ -149,10 +173,35 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     const clientFetch = dependencies.fetchImplementation
       ? { fetch: dependencies.fetchImplementation }
       : {};
-    this.sheetsSource = dependencies.sheetsConfiguration
-      ? new SheetsApiClient(dependencies.sheetsConfiguration, {
+    const sheetsConfiguration = dependencies.sheetsConfiguration ?? null;
+    this.sheetsSource = sheetsConfiguration
+      ? new SheetsApiClient(sheetsConfiguration, {
           ...clientFetch,
           now: () => this.clock.now(),
+        })
+      : null;
+    this.sopInspection = sheetsConfiguration
+      ? lazy(async () => {
+          const googleConfiguration: GoogleSourceConfiguration = {
+            environment: "production",
+            activeWorkbookId: sheetsConfiguration.workbookId,
+            productionWorkbookId: sheetsConfiguration.workbookId,
+            budgetWorkbookId: APPROVED_GOOGLE_FILE_IDS.budgetWorkbook,
+            sopWorkbookId: APPROVED_GOOGLE_FILE_IDS.sopWorkbook,
+            reportingTimeZone: "America/New_York",
+            grantedScopes: [...REQUIRED_GOOGLE_READ_SCOPES],
+            requestTimeoutMs: sheetsConfiguration.timeoutMs,
+            rowChunkSize: sheetsConfiguration.rowChunkSize,
+          };
+          const client = new GoogleReadClient(googleConfiguration, {
+            fetch: dependencies.fetchImplementation ?? fetch,
+            accessToken: createGoogleAccessTokenProvider(
+              sheetsConfiguration.credential,
+              REQUIRED_GOOGLE_READ_SCOPES,
+            ),
+          });
+          const result = await new GoogleReferenceAdapter(client, googleConfiguration).readSop();
+          return result.inspection;
         })
       : null;
 
@@ -207,6 +256,16 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           now,
         }),
       );
+      if (this.sheetsSource) {
+        contributors.push(
+          createV1CompositeContributor({
+            sheets: this.sheetsSource,
+            shopify: this.shopifyAdapters,
+            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+            now,
+          }),
+        );
+      }
     } else {
       contributors.push(
         new DeferredSourceContributor("shopify-customers", "shopify", now),
@@ -219,6 +278,16 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         new DeferredSourceContributor("shopify-geography", "shopify", now),
         new DeferredSourceContributor("shopify-channels", "shopify", now),
         new DeferredSourceContributor("shopify-fulfillment", "shopify", now),
+      );
+    }
+
+    if (!this.sheetsSource || !this.shopifyAdapters) {
+      contributors.push(
+        new DeferredSourceContributor(
+          "v1-composite-metrics",
+          this.sheetsSource ? "shopify" : "google_sheets",
+          now,
+        ),
       );
     }
 
@@ -298,21 +367,40 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           )
       : Promise.resolve(deferredStatus("google_sheets", checkedAt()));
 
-    const [shopifyStatus, klaviyoStatus, sheetsStatus] = await Promise.all([
+    const drive: Promise<SourceStatus> = this.sopInspection
+      ? this.sopInspection()
+          .then(() => ({
+            source: "google_drive" as const,
+            state: "current" as const,
+            checkedAt: checkedAt(),
+            lastSuccessfulAt: checkedAt(),
+            dataAsOf: null,
+            completeness: "complete" as const,
+            warningCodes: [],
+          }))
+          .catch(() => ({
+            source: "google_drive" as const,
+            state: "unavailable" as const,
+            checkedAt: checkedAt(),
+            lastSuccessfulAt: null,
+            dataAsOf: null,
+            completeness: "unknown" as const,
+            warningCodes: ["SOP_WORKBOOK_UNAVAILABLE"],
+          }))
+      : Promise.resolve(deferredStatus("google_drive", checkedAt()));
+
+    const [shopifyStatus, klaviyoStatus, sheetsStatus, driveStatus] = await Promise.all([
       shopify,
       klaviyo,
       sheets,
+      drive,
     ]);
-    return [
-      shopifyStatus,
-      klaviyoStatus,
-      sheetsStatus,
-      deferredStatus("google_drive", checkedAt()),
-    ];
+    return [shopifyStatus, klaviyoStatus, sheetsStatus, driveStatus];
   }
 
   private createFreshnessContributor(): DashboardDatasetContributor {
     const probe = () => this.probeSources();
+    const readSop = this.sopInspection;
     return new (class implements DashboardDatasetContributor {
       readonly dataset = "insights-freshness";
       readonly source = "shopify" as const;
@@ -331,11 +419,12 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           sourceStatuses: metricSources,
         };
         const sopStatus = statuses.find((status) => status.source === "google_drive");
+        const inspection = sopStatus?.state === "current" && readSop ? await readSop() : null;
         return {
           metrics: [
             buildSopValidationMetric(
               { ...serviceContext, sourceStatuses: sopStatus ? [sopStatus] : [] },
-              null,
+              inspection,
             ),
           ],
           tables: [buildSourceFreshnessTable(serviceContext, statuses, { metricSources })],

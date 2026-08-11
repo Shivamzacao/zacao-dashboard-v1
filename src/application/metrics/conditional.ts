@@ -108,6 +108,7 @@ export function buildInventoryLotsTable(
 export function buildForecastVarianceTable(
   context: MetricServiceContext,
   facts: readonly ForecastVarianceFact[],
+  warnings: readonly string[] = [],
 ): MetricTableViewModel {
   const totalVariance = sumFiniteNumbers(
     facts.map(({ actualUnits, forecastUnits }) => actualUnits - forecastUnits),
@@ -116,7 +117,7 @@ export function buildForecastVarianceTable(
     context,
     "forecast.variance",
     facts.length === 0 ? null : { kind: "quantity", value: totalVariance },
-    { warnings: ["UNIT_VARIANCE_ONLY"] },
+    { warnings: ["UNIT_VARIANCE_ONLY", ...warnings] },
   );
   return metricTableViewModelSchema.parse({
     metric: base,

@@ -8,7 +8,7 @@ import {
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 import { usdFromDecimalNumber } from "@/src/domain/metrics/calculations";
 
-import type { MetricServiceContext } from "./types";
+import type { ForecastVarianceFact, MetricServiceContext, WeeklyProductUnitsFact } from "./types";
 import { createMetricViewModel } from "./view-model";
 
 function text(record: SheetRecord, key: string): string | null {
@@ -37,13 +37,46 @@ function metric(
   });
 }
 
-function latestSnapshots(records: readonly SheetRecord[]): readonly SheetRecord[] {
+interface SnapshotSelection {
+  readonly records: readonly SheetRecord[];
+  readonly warnings: readonly string[];
+}
+
+function latestSnapshots(records: readonly SheetRecord[]): SnapshotSelection {
   const latest = records
     .map((record) => text(record, "snapshot_at"))
     .filter((value): value is string => value !== null)
     .sort()
     .at(-1);
-  return latest ? records.filter((record) => text(record, "snapshot_at") === latest) : [];
+  if (!latest) return { records: [], warnings: [] };
+  const groups = new Map<string, SheetRecord[]>();
+  for (const record of records.filter((row) => text(row, "snapshot_at") === latest)) {
+    const warehouse = text(record, "warehouse");
+    const sku = text(record, "sku");
+    if (!warehouse || !sku) continue;
+    const key = `${latest}:${warehouse}:${sku}`;
+    groups.set(key, [...(groups.get(key) ?? []), record]);
+  }
+  const selected: SheetRecord[] = [];
+  const warnings: string[] = [];
+  for (const [key, duplicates] of groups) {
+    const signatures = new Set(
+      duplicates.map((record) =>
+        ["on_hand", "committed", "available", "damaged", "incoming"]
+          .map((field) => String(record[field] ?? ""))
+          .join("|"),
+      ),
+    );
+    if (signatures.size > 1) {
+      warnings.push(`INVENTORY_DUPLICATE_CONFLICT:${key}`);
+      continue;
+    }
+    const first = duplicates[0];
+    if (!first) continue;
+    selected.push(first);
+    if (duplicates.length > 1) warnings.push(`INVENTORY_DUPLICATE_COLLAPSED:${key}`);
+  }
+  return { records: selected, warnings };
 }
 
 function applicableCostRecord(
@@ -57,7 +90,7 @@ function applicableCostRecord(
       const to = text(record, "effective_to");
       return (
         text(record, "sku") === sku &&
-        text(record, "cost_basis") === "landed" &&
+        ["landed", "standard"].includes(text(record, "cost_basis") ?? "") &&
         from !== null &&
         from <= snapshotDate &&
         (!to || to >= snapshotDate)
@@ -81,7 +114,7 @@ export function buildInventoryValueMetric(
 ): MetricViewModel {
   const latest = latestSnapshots(snapshots);
   const selectedCostBases = new Set(
-    latest.flatMap((snapshot) => {
+    latest.records.flatMap((snapshot) => {
       const sku = text(snapshot, "sku");
       const date = text(snapshot, "snapshot_at")?.slice(0, 10);
       const record = sku && date ? applicableCostRecord(costs, sku, date) : null;
@@ -91,7 +124,7 @@ export function buildInventoryValueMetric(
   );
   let value = 0;
   let valuedRows = 0;
-  for (const snapshot of latest) {
+  for (const snapshot of latest.records) {
     const sku = text(snapshot, "sku");
     const date = text(snapshot, "snapshot_at")?.slice(0, 10);
     const onHand = numeric(snapshot, "on_hand");
@@ -107,8 +140,9 @@ export function buildInventoryValueMetric(
     "inventory.value",
     valuedRows ? { kind: "money", value: usdFromDecimalNumber(value) } : null,
     [
-      ...(valuedRows < latest.length ? ["INVENTORY_COST_COVERAGE_PARTIAL"] : []),
-      ...latest.flatMap((snapshot) => {
+      ...latest.warnings,
+      ...(valuedRows < latest.records.length ? ["INVENTORY_COST_COVERAGE_PARTIAL"] : []),
+      ...latest.records.flatMap((snapshot) => {
         const sku = text(snapshot, "sku");
         const date = text(snapshot, "snapshot_at")?.slice(0, 10);
         return sku && date && applicableCost(costs, sku, date) === null
@@ -128,30 +162,206 @@ export function buildInventoryValueMetric(
 export function buildMissingSkuCostMetric(
   context: MetricServiceContext,
   skuMaster: readonly SheetRecord[],
-  componentCosts: readonly SheetRecord[],
+  costs: readonly SheetRecord[],
 ): MetricViewModel {
-  const required = ["co_packing_fee_usd", "coconut_sugar_cost_usd", "packaging_cost_usd"];
-  if (skuMaster.length === 0 || componentCosts.length === 0) {
-    return metric(context, "quality.missing_sku_cost", null, ["MISSING_COST_COMPONENT_SOURCE"]);
+  if (skuMaster.length === 0) {
+    return metric(context, "quality.missing_sku_cost", null, ["SKU_COST_SOURCE_REQUIRED"]);
   }
-  const costsBySku = new Map(
-    componentCosts.flatMap((record) => {
-      const sku = text(record, "sku");
-      return sku ? [[sku, record] as const] : [];
-    }),
-  );
+  const asOf = context.dataPeriod.endDate;
   const missing = skuMaster.flatMap((skuRecord) => {
     const sku = text(skuRecord, "sku_id");
-    if (!sku) return [];
-    const cost = costsBySku.get(sku);
-    const components = required.filter((field) => !cost || numeric(cost, field) === null);
-    return components.length ? [{ sku, components }] : [];
+    if (!sku || text(skuRecord, "is_active") === "no") return [];
+    const cost = applicableCost(costs, sku, asOf);
+    return cost === null || cost <= 0 ? [sku] : [];
   });
   return metric(
     context,
     "quality.missing_sku_cost",
     { kind: "count", value: missing.length },
-    missing.map(({ sku, components }) => `MISSING_COST:${sku}:${components.join(",")}`),
+    missing.map((sku) => `MISSING_COST:${sku}`),
+  );
+}
+
+function addDays(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+export function reconcileForecastActuals(
+  context: MetricServiceContext,
+  forecasts: readonly SheetRecord[],
+  skuMaster: readonly SheetRecord[],
+  actuals: readonly WeeklyProductUnitsFact[],
+): {
+  readonly facts: readonly ForecastVarianceFact[];
+  readonly warnings: readonly string[];
+} {
+  const masterByShopifySku = new Map(
+    skuMaster.flatMap((record) => {
+      const shopifySku = text(record, "shopify_variant_sku");
+      const sku = text(record, "sku_id");
+      const packSize = numeric(record, "pack_size_bars");
+      return shopifySku && sku && packSize && packSize > 0
+        ? [[shopifySku, { sku, packSize }] as const]
+        : [];
+    }),
+  );
+  const actualByKey = new Map<string, number>();
+  const warnings: string[] = [];
+  for (const actual of actuals) {
+    if (!actual.merchandise || actual.units === 0) continue;
+    const mapped = actual.shopifySku ? masterByShopifySku.get(actual.shopifySku) : undefined;
+    if (!mapped) {
+      warnings.push(`UNMAPPED_SHOPIFY_SKU:${actual.shopifySku ?? "blank"}`);
+      continue;
+    }
+    const key = `${actual.weekStart}:${mapped.sku}:DTC (Shopify)`;
+    actualByKey.set(key, (actualByKey.get(key) ?? 0) + actual.units * mapped.packSize);
+  }
+  const grouped = new Map<
+    string,
+    { period: string; sku: string; channel: string; forecastUnits: number }
+  >();
+  for (const record of forecasts) {
+    if (text(record, "status") !== "approved") continue;
+    const period = text(record, "week_start");
+    const sku = text(record, "sku");
+    const channel = text(record, "channel");
+    const forecastUnits = numeric(record, "forecast_units");
+    if (!period || !sku || !channel || forecastUnits === null) continue;
+    if (addDays(period, 6) > context.dataPeriod.endDate) continue;
+    const key = `${period}:${sku}:${channel}`;
+    const prior = grouped.get(key);
+    grouped.set(key, {
+      period,
+      sku,
+      channel,
+      forecastUnits: (prior?.forecastUnits ?? 0) + forecastUnits,
+    });
+  }
+  return {
+    facts: [...grouped].map(([key, row]) => ({ ...row, actualUnits: actualByKey.get(key) ?? 0 })),
+    warnings: [...new Set(warnings)],
+  };
+}
+
+export function buildInventoryRunwayMetric(
+  context: MetricServiceContext,
+  snapshots: readonly SheetRecord[],
+  forecasts: readonly SheetRecord[],
+): MetricViewModel {
+  const latest = latestSnapshots(snapshots);
+  const asOf = latest.records
+    .map((row) => text(row, "snapshot_at")?.slice(0, 10) ?? "")
+    .sort()
+    .at(-1);
+  if (!asOf) return metric(context, "inventory.runway_reorder", null, latest.warnings);
+  const onHand = latest.records.reduce(
+    (sum, row) => sum + (numeric(row, "available") ?? numeric(row, "on_hand") ?? 0),
+    0,
+  );
+  const futureWeeks = [
+    ...new Set(
+      forecasts.flatMap((row) => {
+        const week = text(row, "week_start");
+        return text(row, "status") === "approved" && week && week > asOf ? [week] : [];
+      }),
+    ),
+  ]
+    .sort()
+    .slice(0, 4);
+  if (futureWeeks.length < 4) {
+    return metric(context, "inventory.runway_reorder", null, [
+      ...latest.warnings,
+      "FOUR_WEEK_FORECAST_REQUIRED",
+    ]);
+  }
+  const forecastUnits = forecasts.reduce((sum, row) => {
+    const week = text(row, "week_start");
+    return text(row, "status") === "approved" && week && futureWeeks.includes(week)
+      ? sum + (numeric(row, "forecast_units") ?? 0)
+      : sum;
+  }, 0);
+  if (forecastUnits <= 0)
+    return metric(context, "inventory.runway_reorder", null, ["ZERO_FORECAST"]);
+  return metric(
+    context,
+    "inventory.runway_reorder",
+    {
+      kind: "quantity",
+      value: Math.round((onHand / (forecastUnits / 28)) * 10) / 10,
+    },
+    [...latest.warnings, "REORDER_RECOMMENDATION_PHASE_2"],
+  );
+}
+
+export function buildSellThroughMetric(
+  context: MetricServiceContext,
+  snapshots: readonly SheetRecord[],
+  productionOrders: readonly SheetRecord[],
+  actuals: readonly WeeklyProductUnitsFact[],
+  skuMaster: readonly SheetRecord[],
+): MetricViewModel {
+  const openingCandidates = snapshots.filter(
+    (row) => (text(row, "snapshot_at")?.slice(0, 10) ?? "") <= context.dataPeriod.startDate,
+  );
+  const opening = latestSnapshots(openingCandidates);
+  if (opening.records.length === 0)
+    return metric(context, "inventory.sell_through", null, ["OPENING_INVENTORY_REQUIRED"]);
+  const openingUnits = opening.records.reduce(
+    (sum, row) => sum + (numeric(row, "available") ?? numeric(row, "on_hand") ?? 0),
+    0,
+  );
+  const received = productionOrders.reduce((sum, row) => {
+    const date = text(row, "received_date");
+    return date && date >= context.dataPeriod.startDate && date <= context.dataPeriod.endDate
+      ? sum + (numeric(row, "received_units") ?? 0)
+      : sum;
+  }, 0);
+  const map = new Map(
+    skuMaster.flatMap((row) => {
+      const shopifySku = text(row, "shopify_variant_sku");
+      const pack = numeric(row, "pack_size_bars");
+      return shopifySku && pack && pack > 0 ? [[shopifySku, pack] as const] : [];
+    }),
+  );
+  const sold = actuals.reduce((sum, row) => {
+    const pack = row.shopifySku ? map.get(row.shopifySku) : undefined;
+    return row.merchandise && pack ? sum + row.units * pack : sum;
+  }, 0);
+  const denominator = openingUnits + received;
+  return denominator > 0
+    ? metric(
+        context,
+        "inventory.sell_through",
+        { kind: "rate_basis_points", value: Math.round((sold / denominator) * 10_000) },
+        opening.warnings,
+      )
+    : metric(context, "inventory.sell_through", null, ["SELL_THROUGH_DENOMINATOR_REQUIRED"]);
+}
+
+export function buildUnclassifiedChannelMetric(
+  context: MetricServiceContext,
+  mappings: readonly SheetRecord[],
+  channels: readonly string[],
+): MetricViewModel {
+  const mapped = new Set(
+    mappings.flatMap((row) => {
+      const source = text(row, "source_system");
+      const channel = text(row, "source_channel_or_name");
+      const status = text(row, "status");
+      return source === "shopify" && channel && status === "active" ? [channel] : [];
+    }),
+  );
+  if (mappings.length === 0)
+    return metric(context, "quality.unclassified_channel", null, ["CHANNEL_MAPPING_REQUIRED"]);
+  const missing = [...new Set(channels.filter((channel) => !mapped.has(channel)))];
+  return metric(
+    context,
+    "quality.unclassified_channel",
+    { kind: "count", value: missing.length },
+    missing.map((channel) => `UNCLASSIFIED_CHANNEL:${channel}`),
   );
 }
 

@@ -41,13 +41,24 @@ export function toCombinedInventoryFacts(
   snapshots: readonly SheetRecord[],
   locationMaster: readonly SheetRecord[],
 ): CombinedInventoryMapping {
-  const dated = snapshots.flatMap((record) => {
+  const requiredNames = new Set(["SNAPL 3PL", "YBYD"]);
+  const byBusinessKey = new Map<string, CombinedInventoryFact[]>();
+  for (const record of snapshots) {
     const snapshotAt = text(record, "snapshot_at");
     const warehouse = text(record, "warehouse");
     const sku = text(record, "sku");
     const onHand = numeric(record, "on_hand");
-    if (!snapshotAt || !warehouse || !sku || onHand === null) return [];
-    return [{ asOfDate: snapshotAt.slice(0, 10), warehouse, sku, quantity: onHand }];
+    if (!snapshotAt || !warehouse || !sku || onHand === null || !requiredNames.has(warehouse)) {
+      continue;
+    }
+    const key = `${snapshotAt}:${warehouse}:${sku}`;
+    const fact = { asOfDate: snapshotAt.slice(0, 10), warehouse, sku, quantity: onHand };
+    byBusinessKey.set(key, [...(byBusinessKey.get(key) ?? []), fact]);
+  }
+  const dated = [...byBusinessKey.values()].flatMap((duplicates) => {
+    const quantities = new Set(duplicates.map(({ quantity }) => quantity));
+    const first = duplicates[0];
+    return quantities.size === 1 && first ? [first] : [];
   });
   const latestDate = dated
     .map(({ asOfDate }) => asOfDate)
@@ -55,11 +66,14 @@ export function toCombinedInventoryFacts(
     .at(-1);
   const facts = latestDate ? dated.filter(({ asOfDate }) => asOfDate === latestDate) : [];
 
-  const requiredWarehouses = locationMaster.flatMap((record) => {
-    const name = text(record, "location_name");
-    const active = text(record, "is_active");
-    return name && active === "yes" ? [name] : [];
-  });
+  const activeLocations = new Set(
+    locationMaster.flatMap((record) => {
+      const name = text(record, "location_name");
+      const active = text(record, "is_active");
+      return name && active === "yes" ? [name] : [];
+    }),
+  );
+  const requiredWarehouses = [...requiredNames].filter((name) => activeLocations.has(name));
   const presentWarehouses = new Set(facts.map(({ warehouse }) => warehouse));
   const completeRequiredLocations =
     facts.length > 0 &&
@@ -126,8 +140,7 @@ export function toProductionIncomingFacts(
         incomingValueMinorUnits:
           unitCost === null ? null : usdFromDecimalNumber(units * unitCost).minorUnits,
         freightMinorUnits: freight === null ? null : usdFromDecimalNumber(freight).minorUnits,
-        // The workbook records no received-unit quantity; unknown stays null.
-        unitsReceived: null,
+        unitsReceived: numeric(record, "received_units"),
       },
     ];
   });

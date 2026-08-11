@@ -7,6 +7,7 @@ export const shopifyQlDatasetSchema = z.enum([
   "sales_trend",
   "product_sales",
   "product_line_classification",
+  "product_units_weekly",
   "new_returning_customers",
   "returning_customer_rate",
   "web_funnel",
@@ -33,6 +34,8 @@ const datasets: Record<ShopifyQlDataset, string> = {
   product_sales: "FROM sales SHOW gross_sales, net_sales, orders GROUP BY product_title",
   product_line_classification:
     "FROM sales SHOW net_sales, orders, net_items_sold GROUP BY line_type, product_title, product_variant_title, product_variant_sku",
+  product_units_weekly:
+    "FROM sales SHOW net_items_sold GROUP BY line_type, product_variant_sku, sales_channel",
   new_returning_customers: "FROM sales SHOW orders, customers GROUP BY new_or_returning_customer",
   returning_customer_rate:
     "FROM sales SHOW returning_customers, customers, returning_customer_rate",
@@ -56,6 +59,7 @@ const timeSeriesDatasets = new Set<ShopifyQlDataset>([
   "returning_customer_rate",
   "web_funnel",
   "fulfillment_trend",
+  "product_units_weekly",
 ]);
 
 export function buildShopifyQlQuery(input: {
