@@ -20,7 +20,7 @@ function workbookRows(): Record<ApprovedInputTab, unknown[][]> {
 }
 
 describe("B5 governed manual-source calculations", () => {
-  it("publishes stated open-pipeline value, type counts, and next actions", () => {
+  it("publishes open-opportunity count, type counts, and next actions", () => {
     const result = buildGrowthPipelineViews(context([source("google_sheets")]), [
       {
         "Opportunity ID": "PIPE-1",
@@ -51,10 +51,7 @@ describe("B5 governed manual-source calculations", () => {
       },
     ]);
 
-    expect(result.open.value).toEqual({
-      kind: "money",
-      value: { currency: "USD", minorUnits: 9_800_000 },
-    });
+    expect(result.open.value).toEqual({ kind: "count", value: 3 });
     expect(result.byType.items).toHaveLength(2);
     expect(result.nextActions.rows).toHaveLength(3);
   });

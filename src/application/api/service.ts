@@ -103,8 +103,9 @@ export class BackendApiService {
   async drilldown(dataset: string, query: DrilldownQuery) {
     const definition = drilldownDefinition(dataset);
     if (!definition) throw new ApiQueryError("Unsupported drill-down dataset", ["dataset"]);
-    if (definition.sourceLimited) {
+    if (definition.sourceLimited || definition.implementationPending) {
       const sources = await this.runtime.sourceStatuses();
+      const implementationPending = definition.implementationPending === true;
       return {
         data: {
           dataset,
@@ -112,9 +113,13 @@ export class BackendApiService {
           rows: [],
           pagination: { nextCursor: null, hasNextPage: false },
           readiness: {
-            state: "partial" as const,
-            message: "Detailed Shopify history is incomplete for this drill-down.",
-            warningCodes: ["SOURCE_LIMITED", "DETAILED_HISTORY_INCOMPLETE"],
+            state: implementationPending ? ("not_configured" as const) : ("partial" as const),
+            message: implementationPending
+              ? "The approved PII-safe drill-down contract and implementation are pending."
+              : "Detailed Shopify history is incomplete for this drill-down.",
+            warningCodes: implementationPending
+              ? ["IMPLEMENTATION_PENDING"]
+              : ["SOURCE_LIMITED", "DETAILED_HISTORY_INCOMPLETE"],
           },
           sources: sources.filter(({ source }) => source === "shopify"),
         },

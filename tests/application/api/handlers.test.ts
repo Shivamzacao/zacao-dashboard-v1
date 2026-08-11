@@ -99,7 +99,7 @@ describe("B7 JSON route contracts", () => {
     expect(drilldownApiResponseSchema.parse(await next.json()).data.rows).toHaveLength(1);
   });
 
-  it("returns explicit SOURCE_LIMITED readiness for detailed orders", async () => {
+  it("returns explicit implementation-pending readiness for detailed orders", async () => {
     const response = await setup().drilldown(
       new Request(`https://example.test/api/v1/drilldowns/detailed-orders?${API_QUERY}`),
       "detailed-orders",
@@ -107,8 +107,8 @@ describe("B7 JSON route contracts", () => {
     const body = drilldownApiResponseSchema.parse(await response.json());
     expect(body.data.rows).toEqual([]);
     expect(body.data.readiness).toMatchObject({
-      state: "partial",
-      warningCodes: expect.arrayContaining(["SOURCE_LIMITED"]),
+      state: "not_configured",
+      warningCodes: expect.arrayContaining(["IMPLEMENTATION_PENDING"]),
     });
   });
 

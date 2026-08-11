@@ -137,7 +137,7 @@ export const CONTROLLED_LISTS: Readonly<Record<string, readonly string[]>> = {
   target_scope: ["company", "channel", "sku", "location", "campaign"],
   yes_no: ["yes", "no"],
   currency: ["USD"],
-  order_status: ["paid", "partially_refunded", "refunded", "cancelled"],
+  order_status: ["paid", "confirmed", "partially_refunded", "refunded", "cancelled", "unpaid"],
 };
 
 export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabContract>> = {
@@ -323,7 +323,7 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
         header: "order_status",
         kind: "text",
         required: true,
-        enumValues: ["paid", "partially_refunded", "refunded", "cancelled"],
+        enumValues: ["paid", "confirmed", "partially_refunded", "refunded", "cancelled", "unpaid"],
       },
       { header: "acquisition_channel", kind: "text", required: true },
       { header: "currency", kind: "text", required: true, enumValues: ["USD"] },

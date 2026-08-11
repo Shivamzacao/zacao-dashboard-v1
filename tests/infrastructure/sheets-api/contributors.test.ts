@@ -111,6 +111,10 @@ describe("Sheets API contributors", () => {
       kind: "money",
       value: { currency: "USD", minorUnits: 14_000 },
     });
+    expect(result.metrics?.find(({ key }) => key === "customers.active")?.value).toEqual({
+      kind: "count",
+      value: 0,
+    });
     const cohorts = result.tables?.find(
       ({ metric }) => metric.key === "customers.realized_ltv_cohorts",
     );
@@ -277,5 +281,24 @@ describe("Sheets API contributors", () => {
     expect(result.warnings).toContain("PRODUCTION_ROWS_WITHOUT_EXPECTED_DATE:1");
     const lots = result.tables?.find(({ metric }) => metric.key === "inventory.lots");
     expect(lots?.rows.map((row) => row["lotCode"])).toEqual(["DATED", "UNDATED"]);
+  });
+
+  it("publishes production cost and payment exposure on the financial page", async () => {
+    const source = new FakeSource({
+      Production_Orders: [
+        {
+          po_number: "PO 3",
+          units: 100,
+          unit_cost_usd: 2.5,
+          freight_usd: 40,
+        },
+      ],
+    });
+
+    const result = await contributor(source, "sheets-financial").load(context);
+    expect(
+      result.breakdowns?.find(({ metric }) => metric.key === "production.cost_payment")?.metric
+        .value,
+    ).toEqual({ kind: "money", value: { currency: "USD", minorUnits: 29_000 } });
   });
 });

@@ -226,7 +226,8 @@ export interface SalesActualRow {
   readonly refundsReturnsMinorUnits: number;
   readonly cancellationsMinorUnits: number;
   readonly netProductRevenueMinorUnits: number;
-  readonly orderStatus: "paid" | "partially_refunded" | "refunded" | "cancelled";
+  readonly orderStatus:
+    "paid" | "confirmed" | "partially_refunded" | "refunded" | "cancelled" | "unpaid";
   readonly acquisitionChannel: string;
   readonly currency: "USD";
   readonly isTest: boolean;
@@ -240,6 +241,8 @@ export interface LtvReconciliationDiagnostic {
     | "duplicate_order"
     | "missing_customer"
     | "test_order"
+    | "sample_order"
+    | "zero_value_order"
     | "non_usd"
     | "unsupported_status"
     | "malformed_date"

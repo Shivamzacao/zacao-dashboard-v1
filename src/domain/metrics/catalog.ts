@@ -311,9 +311,9 @@ export const metricCatalog = Object.freeze([
     sources: "Shopify Admin GraphQL orders",
     sourceFields: "order and line-item history",
     calculation: "Return sanitized detailed records only when the requested range is complete.",
-    status: "SOURCE_LIMITED",
+    status: "DATA_PENDING",
     blockingReason:
-      "The order-level drill-down dataset has not been implemented. The read_all_orders scope it depends on is granted, so this is an implementation gap, not a source limit.",
+      "The PII-safe order-level field contract and drill-down implementation are pending; Shopify read_all_orders access is available.",
   }),
   entry({
     key: "commerce.predictive_forecast",
@@ -388,12 +388,14 @@ export const metricCatalog = Object.freeze([
     sections: ["Customer Intelligence"],
     v1Class: "conditional",
     valueKind: "count",
-    sourceKeys: ["shopify"],
-    sources: "Detailed or approved aggregate customer history",
-    sourceFields: "customer/order history",
-    calculation: "Apply an approved activity window to complete customer history.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Activity definition and complete detailed history are absent.",
+    sourceKeys: ["google_sheets"],
+    sources: "Google Sheets Sales_Actuals",
+    sourceFields:
+      "customer_id, normalized_email fallback, order_date, order_status, gross/net product revenue, is_test, is_sample",
+    calculation:
+      "Count distinct identified customers with a positive paid, confirmed, or partially-refunded order in the inclusive trailing 90-day window; exclude cancelled, fully refunded, unpaid, test, sample, and zero-value orders.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "customers.cohorts",
@@ -1016,7 +1018,7 @@ export const metricCatalog = Object.freeze([
   }),
   entry({
     key: "social.performance",
-    label: "Social growth and engagement",
+    label: "Social Audience Growth",
     sections: ["Marketing Intelligence", "Growth Intelligence"],
     v1Class: "conditional",
     valueKind: "count",
@@ -1205,12 +1207,12 @@ export const metricCatalog = Object.freeze([
     label: "Open pipeline",
     sections: ["Growth Intelligence"],
     v1Class: "conditional",
-    valueKind: "money",
+    valueKind: "count",
     sourceKeys: ["google_sheets"],
     sources: "Google Sheets Growth_Pipeline",
     sourceFields: "pipeline type, opportunity, status, optional value",
     calculation:
-      "Sum the stated value of distinct live nonterminal opportunities; expose opportunity counts by type and in next actions.",
+      "Count distinct live nonterminal opportunities; retain stated values only as supporting next-action detail.",
     status: "DATA_PENDING",
     blockingReason: "PRODUCTION growth-pipeline rows are empty.",
   }),
@@ -1311,30 +1313,33 @@ export const metricCatalog = Object.freeze([
   }),
   entry({
     key: "finance.actual_margin",
-    label: "Actual margin",
+    label: "Actual Gross Margin",
     sections: ["Financial Intelligence", "Product Intelligence"],
     v1Class: "conditional",
     valueKind: "money",
     sourceKeys: ["shopify", "google_sheets", "google_drive"],
-    sources: "Approved sales and effective SKU costs",
-    sourceFields: "approved net sales, units, effective costs, mappings",
+    sources: "Eligible Shopify product revenue and corrected Budget V5 SKU COGS",
+    sourceFields: "net product revenue, sold SKU quantities, approved effective SKU COGS",
     calculation:
-      "Approved revenue minus approved realized cost without overlapping-cost double counting.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Sales policy and SKU cost-authority conflict remain unresolved.",
+      "Actual Gross Margin = Net Product Revenue minus approved SKU COGS; never impute missing COGS as zero and disclose sold-SKU COGS coverage.",
+    status: "DATA_PENDING",
+    blockingReason:
+      "Corrected Budget V5 and complete sold-SKU quantity/cost coverage are not available to the runtime.",
   }),
   entry({
     key: "finance.monthly_burn",
-    label: "Monthly burn",
+    label: "Monthly Net Burn",
     sections: ["Financial Intelligence"],
     v1Class: "conditional",
     valueKind: "money",
     sourceKeys: ["google_sheets"],
     sources: "PRODUCTION Finance_Actuals",
-    sourceFields: "approved cash/accrual expense scope",
-    calculation: "Calculate only from an approved burn definition and complete expense scope.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Burn scope and cash-versus-accrual policy are not approved.",
+    sourceFields: "cleared operating cash inflows/outflows and approved operating categories",
+    calculation:
+      "Cash-basis operating outflows minus operating inflows, with inventory payments included once and accounting COGS excluded from duplicate counting.",
+    status: "DATA_PENDING",
+    blockingReason:
+      "Finance_Actuals does not yet provide complete cleared cash direction and operating-scope history.",
   }),
   entry({
     key: "finance.cash_runway",
@@ -1344,10 +1349,13 @@ export const metricCatalog = Object.freeze([
     valueKind: "duration_seconds",
     sourceKeys: ["google_sheets"],
     sources: "PRODUCTION Cash and approved burn",
-    sourceFields: "approved available cash and burn",
-    calculation: "Available cash divided by approved burn under an approved runway policy.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Available-cash and burn/runway definitions are not approved.",
+    sourceFields:
+      "cleared unrestricted balances and trailing three complete months of net cash burn",
+    calculation:
+      "Unrestricted available cash divided by trailing three-month average net cash burn; return 'No current net burn' for zero/negative burn and unavailable for incomplete inputs.",
+    status: "DATA_PENDING",
+    blockingReason:
+      "A complete trailing three-month cash-burn series is not available to the runtime.",
   }),
   entry({
     key: "finance.fairafric_rebate",

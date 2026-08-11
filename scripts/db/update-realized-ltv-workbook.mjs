@@ -50,7 +50,12 @@ const definitions = [
     "yes",
     "Gross product sales minus discounts, refunds/returns, and cancellations.",
   ],
-  ["order_status", "text", "yes", "paid, partially_refunded, refunded, or cancelled."],
+  [
+    "order_status",
+    "text",
+    "yes",
+    "paid, confirmed, partially_refunded, refunded, cancelled, or unpaid.",
+  ],
   ["acquisition_channel", "text", "yes", "Source channel mapped through Channel_Mapping."],
   ["currency", "text", "yes", "V1 supports USD only."],
   ["is_test", "text", "yes", "yes/no. Test orders are excluded."],
@@ -195,7 +200,7 @@ export async function updateRealizedLtvWorkbook(output = fixture) {
   sheet.dataValidations.add("J2:J1000", {
     type: "list",
     allowBlank: false,
-    formulae: ['"paid,partially_refunded,refunded,cancelled"'],
+    formulae: ['"paid,confirmed,partially_refunded,refunded,cancelled,unpaid"'],
   });
   sheet.dataValidations.add("L2:L1000", { type: "list", allowBlank: false, formulae: ['"USD"'] });
   sheet.dataValidations.add("M2:M1000", {
@@ -250,7 +255,14 @@ export async function updateRealizedLtvWorkbook(output = fixture) {
   const listHeaders = new Set(lists.getRow(1).values.slice(1).map(String));
   if (!listHeaders.has("currency")) appendList("currency", ["USD"]);
   if (!listHeaders.has("order_status"))
-    appendList("order_status", ["paid", "partially_refunded", "refunded", "cancelled"]);
+    appendList("order_status", [
+      "paid",
+      "confirmed",
+      "partially_refunded",
+      "refunded",
+      "cancelled",
+      "unpaid",
+    ]);
 
   await fs.mkdir(path.dirname(output), { recursive: true });
   await workbook.xlsx.writeFile(output);
