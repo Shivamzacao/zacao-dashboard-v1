@@ -13,6 +13,7 @@ import type {
   ShopifyFunnelFact,
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
+  WeeklyProductUnitsFact,
 } from "@/src/application/metrics/types";
 import { ratioToBasisPoints } from "@/src/domain/utilities/money";
 
@@ -128,6 +129,18 @@ export function mapProductUnitsFacts(
     product: optionalText(requireColumn(row, "product_title")) ?? "(blank product)",
     variant: optionalText(requireColumn(row, "product_variant_title")),
     sku: optionalText(requireColumn(row, "product_variant_sku")),
+    merchandise: optionalText(requireColumn(row, "line_type"))?.toLowerCase() === "product",
+    units: parseShopifyQlCount(requireColumn(row, "net_items_sold"), "net_items_sold"),
+  }));
+}
+
+export function mapWeeklyProductUnitsFacts(
+  rows: readonly ShopifyQlRow[],
+): readonly WeeklyProductUnitsFact[] {
+  return rows.map((row) => ({
+    weekStart: String(requireColumn(row, "week")).slice(0, 10),
+    shopifySku: optionalText(requireColumn(row, "product_variant_sku")),
+    sourceChannel: optionalText(requireColumn(row, "sales_channel")) ?? "Unclassified",
     merchandise: optionalText(requireColumn(row, "line_type"))?.toLowerCase() === "product",
     units: parseShopifyQlCount(requireColumn(row, "net_items_sold"), "net_items_sold"),
   }));

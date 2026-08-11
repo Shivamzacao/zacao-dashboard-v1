@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildManualWorkbookMetrics } from "@/src/application/metrics";
+import { buildGrowthPipelineViews, buildManualWorkbookMetrics } from "@/src/application/metrics";
 import {
   APPROVED_INPUT_TABS,
   APPROVED_TAB_CONTRACTS,
@@ -20,6 +20,45 @@ function workbookRows(): Record<ApprovedInputTab, unknown[][]> {
 }
 
 describe("B5 governed manual-source calculations", () => {
+  it("publishes stated open-pipeline value, type counts, and next actions", () => {
+    const result = buildGrowthPipelineViews(context([source("google_sheets")]), [
+      {
+        "Opportunity ID": "PIPE-1",
+        "Pipeline Type": "retail",
+        Stage: "proposal_sent",
+        Status: "Open",
+        "Value USD": 32000,
+        "Next Action": "Send pricing",
+        "Due Date": "2026-08-08",
+      },
+      {
+        "Opportunity ID": "PIPE-2",
+        "Pipeline Type": "partnership",
+        Stage: "in_discussion",
+        Status: "Open",
+        "Value USD": 18000,
+        "Next Action": "Book tasting",
+        "Due Date": "2026-08-10",
+      },
+      {
+        "Opportunity ID": "PIPE-3",
+        "Pipeline Type": "retail",
+        Stage: "in_discussion",
+        Status: "Open",
+        "Value USD": 48000,
+        "Next Action": "Send deck",
+        "Due Date": "2026-08-15",
+      },
+    ]);
+
+    expect(result.open.value).toEqual({
+      kind: "money",
+      value: { currency: "USD", minorUnits: 9_800_000 },
+    });
+    expect(result.byType.items).toHaveLength(2);
+    expect(result.nextActions.rows).toHaveLength(3);
+  });
+
   it("calculates only validated TEST rows with inclusive date filters and negative corrections", () => {
     const rows = workbookRows();
     rows.Mappings.push(

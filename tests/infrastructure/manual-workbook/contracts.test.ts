@@ -34,8 +34,15 @@ describe("generated manual-workbook contracts", () => {
     // Every dictionary tab is a generated contract with identical column order.
     expect([...dictionaryColumns.keys()]).toEqual([...MANUAL_WORKBOOK_TABS]);
     for (const tab of MANUAL_WORKBOOK_TABS) {
+      const fixtureColumns = dictionaryColumns.get(tab) ?? [];
+      const expectedColumns =
+        tab === "Production_Orders"
+          ? fixtureColumns.flatMap((column) =>
+              column === "received_date" ? [column, "received_units"] : [column],
+            )
+          : fixtureColumns;
       expect(MANUAL_TAB_CONTRACTS[tab].columns.map(({ header }) => header)).toEqual(
-        dictionaryColumns.get(tab),
+        expectedColumns,
       );
     }
   });

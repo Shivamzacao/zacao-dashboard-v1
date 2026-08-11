@@ -193,6 +193,20 @@ export function mapDashboardPageToDisplayData(
   const chartData: Record<string, readonly ChartDatum[]> = {};
   const chartValueFormats: Record<string, ChartValueFormat> = {};
 
+  const newCustomers = currentValues["customers.new_count"];
+  const returningCustomers = currentValues["customers.returning_count"];
+  if (newCustomers || returningCustomers) {
+    chartData["customers.new_count"] = [
+      {
+        key: "selected-period",
+        label: "Selected period",
+        value: numericValue(newCustomers ?? null),
+        secondaryValue: numericValue(returningCustomers ?? null),
+      },
+    ];
+    chartValueFormats["customers.new_count"] = "count";
+  }
+
   for (const series of page.series) {
     registerMetric(series.metric);
     chartData[series.metric.key] = series.points.map((point) => ({
@@ -273,6 +287,22 @@ export function mapDashboardPageToDisplayData(
         key: String(row["poNumber"] ?? index),
         label: String(row["expectedArrivalDate"] ?? row["poNumber"] ?? index),
         value: typeof row["incomingUnits"] === "number" ? row["incomingUnits"] : null,
+      }));
+      chartValueFormats[table.metric.key] = "count";
+    }
+    if (table.metric.key === "forecast.variance") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: `${String(row["period"] ?? index)}-${String(row["sku"] ?? "sku")}`,
+        label: `${String(row["period"] ?? index)} · ${String(row["sku"] ?? "SKU")}`,
+        value: typeof row["varianceUnits"] === "number" ? row["varianceUnits"] : null,
+      }));
+      chartValueFormats[table.metric.key] = "count";
+    }
+    if (table.metric.key === "sources.freshness") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: String(row["source"] ?? index),
+        label: String(row["source"] ?? index),
+        value: row["state"] === "current" ? 1 : row["state"] === "stale" ? 0.5 : 0,
       }));
       chartValueFormats[table.metric.key] = "count";
     }

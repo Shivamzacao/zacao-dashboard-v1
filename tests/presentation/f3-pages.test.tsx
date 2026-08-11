@@ -76,7 +76,7 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByRole("table", { name: "Product catalog" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Export CSV" })).toHaveLength(2);
     expect(screen.getAllByRole("button", { name: /View details for/ })).toHaveLength(6);
-    expect(screen.getByText("Inventory runway & reorder")).toBeTruthy();
+    expect(screen.getByText("Inventory Runway & Reorder Alert")).toBeTruthy();
   });
 
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {

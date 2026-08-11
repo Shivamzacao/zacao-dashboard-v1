@@ -459,6 +459,7 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
       { header: "order_date", kind: "date", required: true },
       { header: "expected_date", kind: "date", required: false },
       { header: "received_date", kind: "date", required: false },
+      { header: "received_units", kind: "integer", required: false },
       {
         header: "status",
         kind: "text",

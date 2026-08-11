@@ -101,7 +101,12 @@ export function buildSopValidationMetric(
         ? null
         : {
             kind: "status",
-            value: warnings.length === 0 ? "Validation passed" : "Reference limitations detected",
+            value:
+              inspection.formulaErrorCells.length > 0
+                ? "FAIL"
+                : inspection.placeholderCellCount > 0
+                  ? "WARN"
+                  : "PASS",
           },
     warnings,
   });

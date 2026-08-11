@@ -206,6 +206,14 @@ export interface ForecastVarianceFact {
   readonly actualUnits: number;
 }
 
+export interface WeeklyProductUnitsFact {
+  readonly weekStart: string;
+  readonly shopifySku: string | null;
+  readonly sourceChannel: string;
+  readonly merchandise: boolean;
+  readonly units: number;
+}
+
 export interface ProductionIncomingFact {
   readonly poNumber: string;
   readonly poLine: string;

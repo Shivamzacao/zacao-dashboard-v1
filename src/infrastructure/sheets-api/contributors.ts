@@ -4,7 +4,6 @@ import {
   buildCombinedInventoryBreakdown,
   buildDepletionsBreakdown,
   buildFinanceActualMetrics,
-  buildForecastPendingTable,
   buildGrowthPipelineViews,
   buildIncomingProductionTable,
   buildInventoryLotsTable,
@@ -16,7 +15,6 @@ import {
   buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
   buildSocialMetricsTable,
-  buildUnclassifiedChannelPendingMetric,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -100,7 +98,6 @@ export function createSheetsApiContributors(
           toInventoryLotFacts(result.tabs["Inventory_Lots"] ?? [], fallback),
         ),
         buildIncomingProductionTable(metricContext, incoming.facts),
-        buildForecastPendingTable(metricContext, result.tabs["Sales_Forecast"] ?? []),
       ],
       sourceStatuses: [result.sourceStatus],
       warnings: [
@@ -126,7 +123,11 @@ export function createSheetsApiContributors(
           result.tabs["Inventory_Snapshots"] ?? [],
           result.tabs["COGS_By_SKU"] ?? [],
         ),
-        buildMissingSkuCostMetric(metricContext, result.tabs["SKU_Master"] ?? [], []),
+        buildMissingSkuCostMetric(
+          metricContext,
+          result.tabs["SKU_Master"] ?? [],
+          result.tabs["COGS_By_SKU"] ?? [],
+        ),
       ],
       sourceStatuses: [result.sourceStatus],
       warnings: result.warnings,
@@ -134,16 +135,9 @@ export function createSheetsApiContributors(
   });
 
   const insights = new SheetsContributor("sheets-insights", async (value) => {
-    const result = await source.readPageTabs("insights", [
-      "Inventory_Snapshots",
-      "Metric_Targets",
-      "Channel_Mapping",
-    ]);
+    const result = await source.readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"]);
     const metricContext = context(value, result.sourceStatus);
     return {
-      metrics: [
-        buildUnclassifiedChannelPendingMetric(metricContext, result.tabs["Channel_Mapping"] ?? []),
-      ],
       breakdowns: [
         buildLowInventoryBreakdown(
           metricContext,
