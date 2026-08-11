@@ -10,7 +10,7 @@
   --color-zacao-forest-deep: #12342c;
   --color-zacao-sidebar: #0d3028;
   --color-zacao-ink: #1b2925;
-  --color-zacao-muted: #6c7b75;
+  --color-zacao-muted: #66736d;
   --color-zacao-line: #e7e9e2;
   --color-zacao-gold: #c8a86b;
   --color-zacao-terracotta: #b5532f;
@@ -29,7 +29,9 @@
   --forest-deep: #12342c;
   --sidebar: #0d3028;
   --ink: #1b2925;
-  --muted: #6c7b75;
+  /* Darkened slightly from the reference swatch so 9–10px chart labels clear
+     WCAG AA on white cards while remaining visually neutral. */
+  --muted: #66736d;
   --line: #e7e9e2;
   --gold: #c8a86b;
   --terracotta: #b5532f;
@@ -1351,6 +1353,11 @@ select {
   display: grid;
   gap: 18px;
   padding-bottom: 42px;
+}
+
+.attention-grid {
+  display: grid;
+  gap: 10px;
 }
 
 .intelligence-kpi-grid {

@@ -9,6 +9,14 @@ import type {
 
 export type DisplayTableRow = Record<string, string | number | boolean | null>;
 
+export interface DashboardAlertDisplayModel {
+  readonly key: string;
+  readonly severity: "warning" | "danger";
+  readonly title: string;
+  readonly description: string;
+  readonly metadata: readonly string[];
+}
+
 /**
  * The single data shape every dashboard page renders from. Phase 2 fixtures
  * and the live Phase 3 view-model mapper both narrow to this contract, so
@@ -33,4 +41,6 @@ export interface DashboardPageDisplayData {
   readonly stateReasons?: Readonly<Record<string, string>>;
   /** Live previous-period/previous-year comparison per metric key. */
   readonly comparisonValues?: Readonly<Record<string, DisplayComparison>>;
+  /** Certified alert rows only. An absent or empty collection renders no alert section. */
+  readonly alerts?: readonly DashboardAlertDisplayModel[];
 }

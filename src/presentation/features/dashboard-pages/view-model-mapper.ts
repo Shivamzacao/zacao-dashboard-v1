@@ -13,7 +13,11 @@ import type {
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
 
-import type { DashboardPageDisplayData, DisplayTableRow } from "./display-data";
+import type {
+  DashboardAlertDisplayModel,
+  DashboardPageDisplayData,
+  DisplayTableRow,
+} from "./display-data";
 
 const SOURCE_LABELS: Readonly<Record<SourceStatus["source"], string>> = {
   shopify: "Shopify",
@@ -48,6 +52,8 @@ const COMPARISON_LABELS = {
   previous_period: "vs previous period",
   previous_year: "vs previous year",
 } as const;
+
+const DISPLAY_NUMBER = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 /**
  * Percent change between two same-kind values. Returns null when a
@@ -168,6 +174,7 @@ export function mapDashboardPageToDisplayData(
   const states: Record<string, DisplayState> = {};
   const stateReasons: Record<string, string> = {};
   const comparisonValues: Record<string, DisplayComparison> = {};
+  const alerts: DashboardAlertDisplayModel[] = [];
 
   const registerMetric = (metric: MetricViewModel) => {
     states[metric.key] = displayStateFor(metric);
@@ -197,6 +204,27 @@ export function mapDashboardPageToDisplayData(
 
   for (const breakdown of page.breakdowns) {
     registerMetric(breakdown.metric);
+    if (breakdown.metric.key === "alerts.low_inventory" && breakdown.metric.value !== null) {
+      for (const item of breakdown.items) {
+        const thresholdCode = item.warnings.find((warning) => warning.startsWith("REORDER_POINT:"));
+        const threshold = thresholdCode
+          ? Number(thresholdCode.slice("REORDER_POINT:".length))
+          : NaN;
+        const available = numericValue(item.values[0] ?? null);
+        if (!Number.isFinite(threshold) || available === null || available >= threshold) continue;
+        alerts.push({
+          key: `${breakdown.metric.key}:${item.key}`,
+          severity: available <= threshold * 0.5 ? "danger" : "warning",
+          title: `${item.label} is below its reorder point`,
+          description: `${DISPLAY_NUMBER.format(available)} on hand against an approved reorder point of ${DISPLAY_NUMBER.format(threshold)}.`,
+          metadata: [
+            "Inventory risk",
+            item.label,
+            `Reorder point ${DISPLAY_NUMBER.format(threshold)}`,
+          ],
+        });
+      }
+    }
     // The day/hour heatmap key is "<day>:<hour>" (see buildPurchaseHeatmapBreakdown);
     // splitting it into a group/label pair lets HeatmapChartView lay the data
     // out as a day-by-hour grid instead of 168 flat category-axis ticks.
@@ -277,5 +305,6 @@ export function mapDashboardPageToDisplayData(
     states,
     stateReasons,
     comparisonValues,
+    alerts,
   };
 }

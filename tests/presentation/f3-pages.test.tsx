@@ -40,6 +40,35 @@ describe("F3 dashboard pages", () => {
     expect(screen.getAllByText("Business rule required").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Returning customer rate: 38.4%")).toBeTruthy();
     expect(screen.queryByText("Deterministic V1 rules")).toBeNull();
+    expect(screen.getAllByRole("article")).toHaveLength(9);
+  });
+
+  it("renders certified alerts and omits the attention section when none exist", () => {
+    const alertFixture = {
+      ...f3PageFixtureData,
+      alerts: [
+        {
+          key: "alerts.low_inventory:SYNTH-LOW-01",
+          severity: "warning" as const,
+          title: "SYNTH-LOW-01 is below its reorder point",
+          description: "46 on hand against an approved reorder point of 110.",
+          metadata: ["Inventory risk", "SYNTH-LOW-01", "Reorder point 110"],
+        },
+      ],
+    };
+    const { rerender } = render(
+      <DashboardPageView spec={dashboardPageSpecs.executive} fixture={alertFixture} />,
+    );
+    expect(screen.getByRole("region", { name: "Needs attention" })).toBeTruthy();
+    expect(screen.getByText("SYNTH-LOW-01 is below its reorder point")).toBeTruthy();
+
+    rerender(
+      <DashboardPageView
+        spec={dashboardPageSpecs.executive}
+        fixture={{ ...f3PageFixtureData, alerts: [] }}
+      />,
+    );
+    expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
   });
 
   it("uses the approved F2 table, drill-down, and export path for Product Intelligence", () => {

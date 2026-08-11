@@ -13,7 +13,7 @@ import {
   StackedBarChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
-import { ChartCard, KpiCard } from "@/src/presentation/components/dashboard/cards";
+import { ChartCard, KpiCard, WarningCard } from "@/src/presentation/components/dashboard/cards";
 import { DataTable } from "@/src/presentation/components/dashboard/data-table.client";
 import { DetailDrawer } from "@/src/presentation/components/dashboard/detail-drawer.client";
 import type {
@@ -224,6 +224,21 @@ export function DashboardPageView({
 }) {
   return (
     <div className={`intelligence-page intelligence-${spec.slug}`} data-page={spec.slug}>
+      {fixture.alerts?.length ? (
+        <section className="attention-grid" aria-label="Needs attention">
+          {fixture.alerts.map((alert) => (
+            <WarningCard
+              key={alert.key}
+              title={alert.title}
+              severity={alert.severity}
+              metadata={alert.metadata}
+            >
+              {alert.description}
+            </WarningCard>
+          ))}
+        </section>
+      ) : null}
+
       <section className="intelligence-kpi-grid" aria-label="Key performance indicators">
         {spec.kpis.map((metricKey) => (
           <KpiCard key={metricKey} model={kpi(metricKey, fixture)} />

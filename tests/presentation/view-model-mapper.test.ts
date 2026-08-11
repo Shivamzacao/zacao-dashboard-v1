@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { composeDashboardPage, createMetricViewModel } from "@/src/application/metrics";
-import { metricTableViewModelSchema, type MetricViewModel } from "@/src/application/view-models";
+import {
+  metricBreakdownViewModelSchema,
+  metricTableViewModelSchema,
+  type MetricViewModel,
+} from "@/src/application/view-models";
 import type { SourceStatus } from "@/src/domain/contracts";
 import { mapDashboardPageToDisplayData } from "@/src/presentation/features/dashboard-pages/view-model-mapper";
 
@@ -104,6 +108,46 @@ describe("mapDashboardPageToDisplayData", () => {
     expect(display.sources).toEqual([
       expect.objectContaining({ label: "Shopify", state: "current" }),
       expect.objectContaining({ label: "Klaviyo", state: "no_activity" }),
+    ]);
+  });
+
+  it("creates alert cards only from certified low-inventory breakdown rows", () => {
+    const alertMetric = createMetricViewModel({
+      metricKey: "alerts.low_inventory",
+      environment: "production",
+      dataPeriod,
+      sources: [shopifyCurrent],
+      value: { kind: "status", value: "1 SKU(s) below threshold" },
+    });
+    const alert = metricBreakdownViewModelSchema.parse({
+      metric: alertMetric,
+      dimension: "sku",
+      items: [
+        {
+          key: "SKU-LOW",
+          label: "SKU-LOW",
+          values: [{ kind: "quantity", value: 46 }],
+          warnings: ["REORDER_POINT:110"],
+        },
+        {
+          key: "SKU-HEALTHY",
+          label: "SKU-HEALTHY",
+          values: [{ kind: "quantity", value: 140 }],
+          warnings: [],
+        },
+      ],
+    });
+    const page = { ...pageWith([]), breakdowns: [alert] };
+    const display = mapDashboardPageToDisplayData(page, "production");
+
+    expect(display.alerts).toEqual([
+      {
+        key: "alerts.low_inventory:SKU-LOW",
+        severity: "danger",
+        title: "SKU-LOW is below its reorder point",
+        description: "46 on hand against an approved reorder point of 110.",
+        metadata: ["Inventory risk", "SKU-LOW", "Reorder point 110"],
+      },
     ]);
   });
 

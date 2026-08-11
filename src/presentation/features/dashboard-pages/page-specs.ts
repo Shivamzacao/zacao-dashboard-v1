@@ -1,14 +1,7 @@
 import type { DashboardSlug } from "@/src/application/api";
 
 export type ChartKind =
-  | "line"
-  | "area"
-  | "bar"
-  | "horizontal"
-  | "stacked"
-  | "donut"
-  | "funnel"
-  | "heatmap";
+  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
 
 export interface PageChartSpec {
   readonly title: string;
@@ -44,6 +37,11 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "commerce.orders",
         "commerce.average_order_value",
         "customers.returning_rate",
+        "finance.cash_runway",
+        "inventory.shopify_current",
+        "operations.shipped_delivered",
+        "inventory.value",
+        "finance.actual_margin",
       ],
       charts: [
         {
@@ -53,22 +51,40 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "area",
         },
         {
-          title: "Channel contribution",
-          description: "Approved native channel mix; unmapped sales remain unclassified.",
-          metricKey: "commerce.native_channel_mix",
-          kind: "donut",
-        },
-        {
           title: "Fulfillment health",
           description: "Provider fulfillment statuses under the approved status policy.",
           metricKey: "operations.fulfillment_summary",
           kind: "horizontal",
         },
         {
-          title: "Revenue versus plan",
-          description: "Actual and plan values only when their basis and period are approved.",
-          metricKey: "plan.revenue_variance",
-          kind: "bar",
+          title: "Revenue mix by channel",
+          description: "Approved native channel mix; unmapped sales remain unclassified.",
+          metricKey: "commerce.native_channel_mix",
+          kind: "horizontal",
+        },
+        {
+          title: "Inventory on hand",
+          description: "Current inventory available from verified Shopify locations.",
+          metricKey: "inventory.shopify_current",
+          kind: "horizontal",
+        },
+        {
+          title: "Product revenue",
+          description: "Approved merchandise revenue by product.",
+          metricKey: "products.sales",
+          kind: "horizontal",
+        },
+        {
+          title: "Units sold",
+          description: "Net merchandise items sold by approved product.",
+          metricKey: "products.units_sold",
+          kind: "horizontal",
+        },
+        {
+          title: "Source readiness",
+          description: "Freshness evidence for each connected source.",
+          metricKey: "sources.freshness",
+          kind: "horizontal",
         },
       ],
       tables: [],
