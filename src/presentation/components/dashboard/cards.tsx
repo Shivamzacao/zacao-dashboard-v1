@@ -104,6 +104,7 @@ interface MessageCardProps {
   readonly children: ReactNode;
   readonly tone?: "insight" | "warning" | "danger";
   readonly metadata?: readonly string[];
+  readonly headingLevel?: 2 | 3;
 }
 
 export function InsightCard({
@@ -111,7 +112,9 @@ export function InsightCard({
   children,
   tone = "insight",
   metadata = [],
+  headingLevel = 3,
 }: MessageCardProps) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <article className={`message-card message-${tone}`}>
       <span className="message-icon" aria-hidden="true">
@@ -119,7 +122,7 @@ export function InsightCard({
       </span>
       <div>
         <div className="message-heading-row">
-          <h3>{title}</h3>
+          <Heading>{title}</Heading>
           {tone === "danger" || tone === "warning" ? (
             <span className={`severity-badge severity-${tone}`}>
               {tone === "danger" ? "High" : "Medium"}

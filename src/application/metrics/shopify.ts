@@ -216,6 +216,37 @@ export function buildProductVelocityTable(
   });
 }
 
+export function buildProductSkuVelocityBreakdown(
+  context: MetricServiceContext,
+  facts: readonly ProductUnitsFact[],
+  days = 30,
+): MetricBreakdownViewModel {
+  const grouped = new Map<string, { product: string; units: number[] }>();
+  for (const fact of facts.filter(({ merchandise }) => merchandise)) {
+    if (!fact.sku) continue;
+    const key = fact.sku;
+    const existing = grouped.get(key);
+    if (existing) existing.units.push(fact.units);
+    else grouped.set(key, { product: fact.product, units: [fact.units] });
+  }
+  const totalUnits = sumSafeNumbers([...grouped.values()].flatMap(({ units }) => units));
+  const base = metric(
+    context,
+    "products.sku_velocity",
+    grouped.size === 0 ? null : { kind: "quantity", value: totalUnits / days },
+  );
+  return metricBreakdownViewModelSchema.parse({
+    metric: base,
+    dimension: "sku",
+    items: [...grouped.entries()].map(([sku, { product, units }]) => ({
+      key: sku,
+      label: `${product} · ${sku}`,
+      values: [{ kind: "quantity", value: sumSafeNumbers(units) / days }],
+      warnings: [],
+    })),
+  });
+}
+
 export function buildCatalogTable(
   context: MetricServiceContext,
   facts: readonly CatalogVariantFact[],

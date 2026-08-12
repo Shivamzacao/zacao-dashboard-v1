@@ -423,6 +423,71 @@ export function HorizontalBarChartView(props: SeriesChartProps) {
     </ChartFrame>
   );
 }
+
+export function StockBandChartView(props: BaseChartProps) {
+  const format = props.valueFormat ?? "quantity";
+  const usable = (props.data ?? []).filter(
+    (item) => item.value !== null && item.minValue !== null && item.maxValue !== null,
+  );
+  const scale = Math.max(...usable.map((item) => Math.max(item.value ?? 0, item.maxValue ?? 0)), 1);
+  const accessibleData = (props.data ?? []).map((item) => ({
+    ...item,
+    seriesValues: {
+      ...item.seriesValues,
+      minimum: item.minValue ?? null,
+      maximum: item.maxValue ?? null,
+    },
+  }));
+  return (
+    <ChartFrame
+      {...props}
+      data={accessibleData}
+      series={[
+        { key: "value", label: "Current stock", tone: "forest" },
+        { key: "minimum", label: "Ideal minimum", tone: "gold" },
+        { key: "maximum", label: "Ideal maximum", tone: "sage" },
+      ]}
+    >
+      <ol className="stock-band-chart">
+        {usable.map((item) => {
+          const minimum = item.minValue ?? 0;
+          const maximum = item.maxValue ?? 0;
+          const current = item.value ?? 0;
+          const status =
+            current < minimum ? "Below band" : current > maximum ? "Above band" : "In band";
+          return (
+            <li className="stock-band-row" key={item.key}>
+              <span className="stock-band-label" title={item.label}>
+                {item.label}
+              </span>
+              <span className="stock-band-track">
+                <span
+                  className="stock-band-ideal"
+                  style={{
+                    left: `${(minimum / scale) * 100}%`,
+                    width: `${Math.max(((maximum - minimum) / scale) * 100, 1)}%`,
+                  }}
+                />
+                <span
+                  className="stock-band-current"
+                  style={{ width: `${Math.max((current / scale) * 100, 1)}%` }}
+                />
+              </span>
+              <span
+                className={`stock-band-status stock-band-status-${status.replace(" ", "-").toLowerCase()}`}
+              >
+                <strong>{valueFormatters[format](current)}</strong>
+                {status}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="stock-band-note">Gold bands show each SKU’s approved ideal stock range.</p>
+    </ChartFrame>
+  );
+}
+
 export function StackedBarChartView(props: SeriesChartProps) {
   return <BarChartView {...props} stacked />;
 }

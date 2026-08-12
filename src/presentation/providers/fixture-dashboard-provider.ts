@@ -14,6 +14,7 @@ import type { DashboardSlug } from "@/src/application/api";
 import {
   f3CustomerPageFixtureData,
   f3PageFixtureData,
+  f3ProductPageFixtureData,
   type F3PageFixtureData,
 } from "@/src/presentation/fixtures/f3-page-data";
 
@@ -60,8 +61,11 @@ export function createFixtureDashboardProvider(
       }),
     getRepresentativeDashboard: () => dashboard,
     getRepresentativeDrilldown: () => drilldown,
-    getF3PageData: (slug?: DashboardSlug) =>
-      slug === "customers" ? f3CustomerPageFixtureData : f3PageFixtureData,
+    getF3PageData: (slug?: DashboardSlug) => {
+      if (slug === "customers") return f3CustomerPageFixtureData;
+      if (slug === "products") return f3ProductPageFixtureData;
+      return f3PageFixtureData;
+    },
   });
 }
 

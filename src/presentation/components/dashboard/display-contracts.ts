@@ -31,6 +31,8 @@ export interface ChartDatum {
   readonly secondaryValue?: number | null;
   readonly seriesValues?: Readonly<Record<string, number | null>>;
   readonly group?: string;
+  readonly minValue?: number | null;
+  readonly maxValue?: number | null;
 }
 
 /** How a chart's plotted numbers are rendered on axes, tooltips, and labels. */

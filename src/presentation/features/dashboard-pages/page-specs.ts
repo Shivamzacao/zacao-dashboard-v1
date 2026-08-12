@@ -2,7 +2,7 @@ import type { DashboardSlug } from "@/src/application/api";
 import type { ChartSeriesDefinition } from "@/src/presentation/components/dashboard/display-contracts";
 
 export type ChartKind =
-  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
+  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap" | "band";
 
 export interface PageKpiSpec {
   readonly metricKey: string;
@@ -33,6 +33,8 @@ export interface PageTableSpec {
   readonly hiddenColumns?: readonly string[];
   readonly columnOrder?: readonly string[];
   readonly columnLabels?: Readonly<Record<string, string>>;
+  readonly hideExport?: boolean;
+  readonly span?: 1 | 2;
 }
 
 export interface DashboardPageSpec {
@@ -361,13 +363,43 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
     products: spec({
       slug: "products",
       kpis: [
-        "products.units_sold",
-        "products.units_velocity",
-        "inventory.shopify_current",
+        { metricKey: "products.units_sold", valuePresentation: "full" },
+        {
+          metricKey: "products.sku_velocity",
+          label: "Units-sold velocity trend",
+          sourceLabel: "Shopify",
+          valuePresentation: "full",
+          unitSuffix: "bars / day",
+        },
+        {
+          metricKey: "inventory.on_hand_bars",
+          label: "Current Shopify inventory",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "full",
+          unitSuffix: "bars",
+        },
         "inventory.value",
         "quality.missing_sku_cost",
         "inventory.sell_through",
-        "inventory.runway_reorder",
+        {
+          metricKey: "inventory.weeks_cover",
+          label: "Weeks of cover",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "full",
+          unitSuffix: "weeks",
+        },
+        {
+          metricKey: "products.cogs_flags",
+          label: "SKUs above COGS target",
+          sourceLabel: "Shopify + Fairafric",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "manufacturing.cogs_per_bar",
+          label: "COGS per bar",
+          sourceLabel: "Fairafric",
+          valuePresentation: "full",
+        },
       ],
       charts: [
         {
@@ -384,11 +416,49 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
         {
           title: "Inventory position",
-          description: "Current inventory available from verified Shopify locations.",
-          metricKey: "inventory.shopify_current",
-          // Product-and-state categories read left-to-right; upright bars force
-          // the axis to drop most of their labels.
+          description: "Sellable bar-equivalent inventory by canonical SKU.",
+          metricKey: "inventory.on_hand_bars",
+          sourceLabel: "Shopify + Google Sheets",
           kind: "horizontal",
+        },
+        {
+          title: "SKU velocity",
+          description: "Average net bars sold per day over the trailing 30 days.",
+          metricKey: "products.sku_velocity",
+          sourceLabel: "Shopify",
+          kind: "horizontal",
+        },
+        {
+          title: "Sales by SKU",
+          description: "Merchandise net sales grouped by canonical SKU.",
+          metricKey: "products.sales",
+          sourceLabel: "Shopify",
+          kind: "horizontal",
+        },
+        {
+          title: "Margin by SKU",
+          description: "Gross margin after approved landed COGS by canonical SKU.",
+          metricKey: "products.sku_margin",
+          sourceLabel: "Shopify + Fairafric",
+          kind: "horizontal",
+        },
+        {
+          title: "Stock versus ideal band",
+          description: "Current sellable stock against approved minimum and maximum levels.",
+          metricKey: "inventory.sku_stock",
+          sourceLabel: "Shopify + Google Sheets",
+          kind: "band",
+        },
+        {
+          title: "Per-bar COGS versus target",
+          description: "Landed manufacturing cost per bar against the approved target.",
+          metricKey: "manufacturing.cogs_trend",
+          sourceLabel: "Fairafric",
+          kind: "line",
+          series: [
+            { key: "value", label: "Actual COGS", tone: "forest" },
+            { key: "secondaryValue", label: "Target", tone: "gold", pattern: "dashed" },
+          ],
         },
       ],
       tables: [
@@ -398,12 +468,35 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "products.catalog",
           dataset: "product-catalog",
           hiddenColumns: ["sku"],
+          hideExport: true,
         },
         {
-          title: "SKU velocity",
-          description: "Approved unit velocity by SKU and reporting period.",
-          metricKey: "products.units_velocity",
-          dataset: "product-velocity",
+          title: "SKU margin & cost",
+          description: "Certified sales and cost coverage by canonical SKU.",
+          coverageNote:
+            "Cost, target, margin, and status remain unavailable for any SKU without approved landed-cost and target records.",
+          metricKey: "products.sku_margin",
+          sourceLabel: "Shopify + Fairafric",
+          dataset: "sku-margin",
+          span: 2,
+          columnOrder: [
+            "sku",
+            "units",
+            "revenueMinorUnits",
+            "cogsPerBarMinorUnits",
+            "targetPerBarMinorUnits",
+            "marginBasisPoints",
+            "status",
+          ],
+          columnLabels: {
+            sku: "SKU",
+            units: "Units",
+            revenueMinorUnits: "Revenue",
+            cogsPerBarMinorUnits: "COGS per bar",
+            targetPerBarMinorUnits: "Target per bar",
+            marginBasisPoints: "Margin",
+            status: "Status",
+          },
         },
       ],
     }),
