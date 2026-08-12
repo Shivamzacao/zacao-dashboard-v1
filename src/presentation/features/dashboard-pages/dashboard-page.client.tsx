@@ -25,6 +25,7 @@ import {
   type ExportState,
 } from "@/src/presentation/components/dashboard/export-status.client";
 import type { DashboardPageDisplayData, DisplayTableRow } from "./display-data";
+import { metricDisplayLabel } from "./metric-copy";
 import type { DashboardPageSpec, PageChartSpec, PageTableSpec } from "./page-specs";
 import { columnLabel, describeColumns, formatCell } from "./table-presentation";
 
@@ -65,7 +66,7 @@ function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayMo
   const value = fixture.currentValues[metricKey] ?? null;
   const comparison = fixture.comparisonValues?.[metricKey];
   return {
-    label: metric.label,
+    label: metricDisplayLabel(metric),
     value,
     state: metricState(metric, fixture),
     helpText: `${metric.sources}. ${metric.calculation}`,
@@ -82,9 +83,10 @@ function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayMo
 
 function chartValueFormat(
   valueKind: MetricCatalogEntry["valueKind"],
-): "money" | "percent" | "count" {
+): "money" | "percent" | "count" | "quantity" {
   if (valueKind === "money") return "money";
   if (valueKind === "rate_basis_points") return "percent";
+  if (valueKind === "quantity") return "quantity";
   return "count";
 }
 
@@ -113,10 +115,14 @@ function Chart({
     spec.series ??
     (spec.secondaryMetricKey
       ? [
-          { key: "value" as const, label: metric.label, tone: "forest" as const },
+          {
+            key: "value" as const,
+            label: metricDisplayLabel(metric),
+            tone: "forest" as const,
+          },
           {
             key: "secondaryValue" as const,
-            label: requiredMetric(spec.secondaryMetricKey).label,
+            label: metricDisplayLabel(requiredMetric(spec.secondaryMetricKey)),
             tone: "gold" as const,
           },
         ]
@@ -133,7 +139,11 @@ function Chart({
     heatmap: <HeatmapChartView {...props} />,
   }[spec.kind];
   return (
-    <ChartCard title={spec.title} description={spec.description} eyebrow={metric.label}>
+    <ChartCard
+      title={spec.title}
+      description={spec.description}
+      eyebrow={metricDisplayLabel(metric)}
+    >
       {view}
     </ChartCard>
   );
@@ -179,7 +189,7 @@ function TableCard({
     <ChartCard
       title={spec.title}
       description={spec.description}
-      eyebrow={metric.label}
+      eyebrow={metricDisplayLabel(metric)}
       actions={
         spec.dataset ? <ExportStatus state={exportState} onRequest={exportRows} /> : undefined
       }

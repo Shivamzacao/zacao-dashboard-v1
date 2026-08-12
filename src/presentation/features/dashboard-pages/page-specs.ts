@@ -172,10 +172,10 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "customers.realized_ltv_cohorts",
           kind: "area",
           series: [
-            { key: "ltv30d", label: "30d", tone: "sage" },
-            { key: "ltv60d", label: "60d", tone: "gold" },
-            { key: "ltv90d", label: "90d", tone: "terracotta" },
-            { key: "ltv180d", label: "180d", tone: "plum" },
+            { key: "ltv30d", label: "30 days", tone: "sage" },
+            { key: "ltv60d", label: "60 days", tone: "gold" },
+            { key: "ltv90d", label: "90 days", tone: "terracotta" },
+            { key: "ltv180d", label: "180 days", tone: "plum" },
             { key: "lifetime", label: "Lifetime", tone: "forest" },
           ],
         },
@@ -274,7 +274,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
       ],
       tables: [
         {
-          title: "Inventory lots & FEFO",
+          title: "Inventory lots and FEFO",
           description: "Lot, best-by, and FEFO readiness from validated source rows.",
           metricKey: "inventory.lots",
           dataset: "inventory-lots",
@@ -386,7 +386,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "horizontal",
         },
         {
-          title: "Social Audience Growth",
+          title: "Social audience growth",
           description: "Month-end follower totals and growth for Instagram, TikTok, and LinkedIn.",
           metricKey: "social.performance",
           kind: "line",
@@ -438,7 +438,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "line",
         },
         {
-          title: "Production cost & payment",
+          title: "Production cost and payment",
           description: "Approved production cost and payment-date records.",
           metricKey: "production.cost_payment",
           kind: "area",

@@ -21,9 +21,11 @@ import {
 import type {
   ChartDatum,
   ChartSeriesDefinition,
+  ChartValueFormat,
   DisplayState,
   LegendItem,
 } from "./display-contracts";
+import { formatChartValue, formatPercent } from "./format-display-value";
 import { ChartLegend } from "./tooltip-legend";
 import { StateSurface } from "./state-surface";
 
@@ -35,26 +37,18 @@ const tones = {
   plum: "#74546f",
 } as const;
 
-export type ChartValueFormat = "money" | "percent" | "count";
-
 const tickFormatters: Record<ChartValueFormat, (value: number) => string> = {
-  money: (value) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      notation: Math.abs(value) >= 1000 ? "compact" : "standard",
-      maximumFractionDigits: Math.abs(value) >= 1000 ? 1 : 0,
-    }).format(value),
-  percent: (value) => `${value}%`,
-  count: (value) => new Intl.NumberFormat("en-US").format(value),
+  money: (value) => formatChartValue(value, "money", "compact"),
+  percent: (value) => formatChartValue(value, "percent", "compact"),
+  count: (value) => formatChartValue(value, "count", "compact"),
+  quantity: (value) => formatChartValue(value, "quantity", "compact"),
 };
 
 const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
-  money: (value) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value),
-  percent: (value) =>
-    `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 }).format(value)}%`,
-  count: (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value),
+  money: (value) => formatChartValue(value, "money", "full"),
+  percent: (value) => formatChartValue(value, "percent", "full"),
+  count: (value) => formatChartValue(value, "count", "full"),
+  quantity: (value) => formatChartValue(value, "quantity", "full"),
 };
 
 interface BaseChartProps {
@@ -619,7 +613,7 @@ export function FunnelChartView(props: BaseChartProps) {
                   {item.label}
                 </span>
                 <span className="funnel-row-step">
-                  {step === null ? "entry" : `${(step * 100).toFixed(1)}% of previous`}
+                  {step === null ? "Entry" : `${formatPercent(step * 100)} of previous`}
                 </span>
               </span>
               <FunnelBand

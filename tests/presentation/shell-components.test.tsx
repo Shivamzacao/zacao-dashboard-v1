@@ -7,6 +7,7 @@ import axe from "axe-core";
 import DashboardError from "@/app/(dashboard)/error";
 import DashboardNotFound from "@/app/(dashboard)/not-found";
 import { FixtureReadinessShell } from "@/src/presentation/components/fixture-readiness-shell";
+import { GlobalFilterBar } from "@/src/presentation/components/global-filter-bar";
 import { LoadingPageShell } from "@/src/presentation/components/loading-page-shell";
 import { PageHeader } from "@/src/presentation/components/page-header";
 import { SidebarNavigation } from "@/src/presentation/components/sidebar-navigation";
@@ -77,6 +78,27 @@ describe("F1 shell components", () => {
 
     rerender(<DashboardNotFound />);
     expect(screen.getByText(/not approved for V1/)).toBeTruthy();
+  });
+
+  it("uses readable global filter labels while preserving source-provided options", () => {
+    const supported = phase2FixtureProvider.getShellContext().supportedFilters;
+    render(
+      <GlobalFilterBar
+        filters={{
+          startDate: "2026-08-01",
+          endDate: "2026-08-07",
+          channels: [],
+          productSkus: [],
+          locations: [],
+        }}
+        supported={supported}
+        onFilterChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Product or SKU")).toBeTruthy();
+    expect(screen.getByLabelText("Warehouse or location")).toBeTruthy();
+    expect(screen.getByRole("option", { name: "SYNTH-SKU-1" })).toBeTruthy();
   });
 
   it("has no automated WCAG violations in the F1 shell primitives", async () => {

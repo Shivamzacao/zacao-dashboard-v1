@@ -1,14 +1,10 @@
 import type { SourceStatus } from "@/src/domain/contracts";
+import { formatDate } from "@/src/presentation/components/dashboard/format-display-value";
 import type { DashboardRouteDefinition } from "@/src/presentation/shell/routes";
 
 function formatDataAsOf(source: SourceStatus | undefined): string {
   if (!source?.dataAsOf) return "Data time unavailable";
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "America/New_York",
-  }).format(new Date(source.dataAsOf));
+  return formatDate(new Date(source.dataAsOf));
 }
 
 interface PageHeaderProps {

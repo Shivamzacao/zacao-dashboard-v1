@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { formatDisplayValue, fullDisplayValue } from "./format-display-value";
+import { formatDateTime, formatDisplayValue, fullDisplayValue } from "./format-display-value";
 import type { DisplayState, KpiDisplayModel, SourceIndicatorModel } from "./display-contracts";
 import { StateSurface, stateLabel } from "./state-surface";
 import { Tooltip } from "./tooltip.client";
@@ -173,13 +173,7 @@ export function WarningCard(
 }
 
 export function SourceIndicator({ model }: { readonly model: SourceIndicatorModel }) {
-  const date = model.dataAsOf
-    ? new Intl.DateTimeFormat("en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "America/New_York",
-      }).format(new Date(model.dataAsOf))
-    : "Unavailable";
+  const date = model.dataAsOf ? formatDateTime(model.dataAsOf) : "Unavailable";
   return (
     <div
       className={`source-indicator state-${model.state}`}

@@ -38,10 +38,10 @@ describe("F2 reusable dashboard components", () => {
     expect(formatDisplayValue({ kind: "quantity", value: 12.75 })).toBe("12.75");
     expect(
       formatDisplayValue({ kind: "money", value: { currency: "USD", minorUnits: -125050 } }),
-    ).toBe("-$1,250.50");
+    ).toBe("-$1.3K");
     expect(
       formatDisplayValue({ kind: "money", value: { currency: "USD", minorUnits: 98765432100 } }),
-    ).toBe("$987,654,321.00");
+    ).toBe("$987.7M");
     expect(formatDisplayValue({ kind: "rate_basis_points", value: 264 })).toBe("2.64%");
     expect(formatDisplayValue(null)).toBe("Unavailable");
   });
@@ -55,6 +55,21 @@ describe("F2 reusable dashboard components", () => {
     rerender(<KpiCard model={{ label: "Margin", value: null, state: "business_rule_required" }} />);
     expect(screen.getByText("Business rule required")).toBeTruthy();
     expect(screen.queryByText("0")).toBeNull();
+  });
+
+  it("shows compact KPI values while disclosing the full value accessibly", () => {
+    render(
+      <KpiCard
+        model={{
+          label: "Net sales",
+          value: { kind: "money", value: { currency: "USD", minorUnits: 125_050 } },
+          state: "current",
+        }}
+      />,
+    );
+
+    expect(screen.getByText("$1.3K").getAttribute("title")).toBe("$1,250.50");
+    expect(screen.getByLabelText("Net sales: $1,250.50")).toBeTruthy();
   });
 
   it("covers every approved presentation readiness state without provider logic", () => {
@@ -177,12 +192,13 @@ describe("F2 reusable dashboard components", () => {
         rowKey={(row) => row.id}
         page={0}
         pageSize={2}
-        totalRows={4}
+        totalRows={1_234}
         onPageChange={onPage}
         onRowOpen={onOpen}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Sort by Label" }));
+    expect(screen.getByText("1–2 of 1,234")).toBeTruthy();
     const bodyRows = screen.getAllByRole("row").slice(1);
     expect(bodyRows[0]?.textContent).toContain("Alpha");
     await userEvent.click(screen.getByRole("button", { name: "Next" }));
@@ -254,9 +270,9 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getAllByText("187").length).toBeGreaterThan(0);
     expect(screen.getAllByText("67").length).toBeGreaterThan(0);
     // Step-over-step conversion carries the drop-off the bar widths cannot.
-    expect(screen.getByText("3.0% of previous")).toBeTruthy();
-    expect(screen.getByText("35.8% of previous")).toBeTruthy();
-    expect(screen.getByText("entry")).toBeTruthy();
+    expect(screen.getByText("3.01% of previous")).toBeTruthy();
+    expect(screen.getByText("35.83% of previous")).toBeTruthy();
+    expect(screen.getByText("Entry")).toBeTruthy();
     // One band per stage, each clipped to a trapezoid.
     const bands = [...document.querySelectorAll<HTMLElement>(".funnel-band-shape")];
     expect(bands).toHaveLength(3);

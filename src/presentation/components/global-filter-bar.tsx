@@ -55,7 +55,7 @@ export function GlobalFilterBar({ filters, supported, onFilterChange }: GlobalFi
       ) : null}
       {supported.productSkus.length > 0 ? (
         <FilterSelect
-          label="Product / SKU"
+          label="Product or SKU"
           value={filters.productSkus[0] ?? ""}
           options={supported.productSkus}
           onChange={(value) => onFilterChange({ productSkus: value ? [value] : [] })}
@@ -63,7 +63,7 @@ export function GlobalFilterBar({ filters, supported, onFilterChange }: GlobalFi
       ) : null}
       {supported.locations.length > 0 ? (
         <FilterSelect
-          label="Warehouse / location"
+          label="Warehouse or location"
           value={filters.locations[0] ?? ""}
           options={supported.locations}
           onChange={(value) => onFilterChange({ locations: value ? [value] : [] })}

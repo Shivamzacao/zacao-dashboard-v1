@@ -34,7 +34,7 @@ export interface ChartDatum {
 }
 
 /** How a chart's plotted numbers are rendered on axes, tooltips, and labels. */
-export type ChartValueFormat = "money" | "percent" | "count";
+export type ChartValueFormat = "money" | "percent" | "count" | "quantity";
 
 export interface ChartSeriesDefinition {
   readonly key: string;
