@@ -22,7 +22,9 @@ describe("F3 dashboard pages", () => {
       new Set(dashboardRoutes.map(({ slug }) => slug)),
     );
     for (const page of Object.values(dashboardPageSpecs)) {
-      for (const key of page.kpis) expect(metrics.has(key), `${page.slug}: ${key}`).toBe(true);
+      for (const kpi of page.kpis) {
+        expect(metrics.has(kpi.metricKey), `${page.slug}: ${kpi.metricKey}`).toBe(true);
+      }
       for (const chart of page.charts) {
         expect(metrics.has(chart.metricKey), `${page.slug}: ${chart.metricKey}`).toBe(true);
         if (chart.secondaryMetricKey) expect(metrics.has(chart.secondaryMetricKey)).toBe(true);
@@ -40,8 +42,25 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByLabelText("Key performance indicators")).toBeTruthy();
     expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("Returning customer rate: 38.4%")).toBeTruthy();
+    expect(screen.getByLabelText("Website sessions: 1,280")).toBeTruthy();
     expect(screen.queryByText("Deterministic V1 rules")).toBeNull();
     expect(screen.getAllByRole("article")).toHaveLength(9);
+    expect(
+      screen.getAllByRole("heading", { level: 2 }).map(({ textContent }) => textContent),
+    ).toEqual([
+      "Sales momentum",
+      "Fulfillment health",
+      "Units sold",
+      "Product revenue",
+      "Source readiness",
+      "Revenue mix by channel",
+      "Per-bar COGS versus target",
+      "Input cost movement",
+      "Manufacturer delivery performance",
+      "Inventory on hand by channel",
+    ]);
+    expect(screen.getAllByText(/^Source:/)).toHaveLength(19);
+    expect(screen.getAllByText("Source: Fairafric")).toHaveLength(3);
   });
 
   it("renders certified alerts and omits the attention section when none exist", () => {
@@ -62,6 +81,7 @@ describe("F3 dashboard pages", () => {
     );
     expect(screen.getByRole("region", { name: "Needs attention" })).toBeTruthy();
     expect(screen.getByText("SYNTH-LOW-01 is below its reorder point")).toBeTruthy();
+    expect(screen.getByText("Medium")).toBeTruthy();
 
     rerender(
       <DashboardPageView

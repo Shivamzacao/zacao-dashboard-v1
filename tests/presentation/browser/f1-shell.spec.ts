@@ -16,6 +16,7 @@ test("desktop shell, URL state, navigation, and accessibility", async ({ page })
   await expect(page.getByLabel("Reporting period")).toHaveValue("last_90_days");
   await expect(page.locator(".dashboard-view")).not.toHaveAttribute("data-pending", "");
   await expect(page.getByLabel("Comparison period")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Executive health", level: 1 })).toBeVisible();
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);

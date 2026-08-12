@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { formatDateTime, formatDisplayValue, fullDisplayValue } from "./format-display-value";
+import { formatDateTime, formatKpiDisplayValue, fullDisplayValue } from "./format-display-value";
 import type { DisplayState, KpiDisplayModel, SourceIndicatorModel } from "./display-contracts";
 import { StateSurface, stateLabel } from "./state-surface";
 import { Tooltip } from "./tooltip.client";
@@ -44,80 +44,46 @@ export function ChartCard(props: CardShellProps) {
   return <CardShell {...props} className={`chart-card ${props.className ?? ""}`.trim()} />;
 }
 
-function Sparkline({
-  values,
-  label,
-}: {
-  readonly values: readonly number[];
-  readonly label: string;
-}) {
-  const width = 90;
-  const height = 28;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const points = values
-    .map(
-      (value, index) =>
-        `${(index / Math.max(values.length - 1, 1)) * width},${height - ((value - min) / span) * (height - 4) - 2}`,
-    )
-    .join(" ");
-  return (
-    <svg
-      className="kpi-sparkline"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={`${label} trend: ${values.join(", ")}`}
-    >
-      <polyline
-        points={points}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  );
+export function SourceBadge({ label }: { readonly label: string }) {
+  return <span className="source-badge">Source: {label}</span>;
 }
 
 export function KpiCard({ model }: { readonly model: KpiDisplayModel }) {
   const isValueAvailable =
     model.value !== null && ["current", "partial", "stale"].includes(model.state);
+  const displayedValue = formatKpiDisplayValue(model.value, {
+    ...(model.valuePresentation ? { presentation: model.valuePresentation } : {}),
+    ...(model.unitSuffix ? { unitSuffix: model.unitSuffix } : {}),
+  });
+  const accessibleValue =
+    model.valuePresentation === "ratio"
+      ? displayedValue
+      : `${fullDisplayValue(model.value)}${model.unitSuffix ? ` ${model.unitSuffix}` : ""}`;
   return (
     <article
       className={`kpi-card state-${model.state}`}
-      aria-label={`${model.label}: ${isValueAvailable ? fullDisplayValue(model.value) : stateLabel(model.state)}`}
+      aria-label={`${model.label}: ${isValueAvailable ? accessibleValue : stateLabel(model.state)}`}
     >
       <div className="kpi-card-label-row">
         <p>{model.label}</p>
-        {model.helpText ? (
-          <Tooltip
-            label={model.helpText}
-            className="help-marker"
-            accessibleName={`About ${model.label}`}
-          >
-            <span aria-hidden="true">?</span>
-          </Tooltip>
-        ) : null}
+        <div className="kpi-card-tools">
+          {model.sourceLabel ? <SourceBadge label={model.sourceLabel} /> : null}
+          {model.helpText ? (
+            <Tooltip
+              label={model.helpText}
+              className="help-marker"
+              accessibleName={`About ${model.label}`}
+            >
+              <span aria-hidden="true">?</span>
+            </Tooltip>
+          ) : null}
+        </div>
       </div>
       {isValueAvailable ? (
         <>
-          <p className="kpi-card-value" title={fullDisplayValue(model.value)}>
-            {formatDisplayValue(model.value)}
+          <p className="kpi-card-value" title={accessibleValue}>
+            {displayedValue}
           </p>
-          <div className="kpi-card-bottom">
-            {model.comparison ? (
-              <span className={`comparison-pill tone-${model.comparison.tone ?? "neutral"}`}>
-                {model.comparison.value ?? "Comparison unavailable"}{" "}
-                <span>{model.comparison.label}</span>
-              </span>
-            ) : (
-              <span className="comparison-unavailable">Comparison unavailable</span>
-            )}
-            {model.sparkline && model.sparkline.length > 0 ? (
-              <Sparkline values={model.sparkline} label={model.label} />
-            ) : null}
-          </div>
           {model.state !== "current" ? (
             <span className="kpi-state-label">{stateLabel(model.state)}</span>
           ) : null}
@@ -152,7 +118,14 @@ export function InsightCard({
         {tone === "insight" ? "✦" : "!"}
       </span>
       <div>
-        <h3>{title}</h3>
+        <div className="message-heading-row">
+          <h3>{title}</h3>
+          {tone === "danger" || tone === "warning" ? (
+            <span className={`severity-badge severity-${tone}`}>
+              {tone === "danger" ? "High" : "Medium"}
+            </span>
+          ) : null}
+        </div>
         <div className="message-copy">{children}</div>
         {metadata.length ? (
           <ul className="message-metadata" aria-label="Insight metadata">

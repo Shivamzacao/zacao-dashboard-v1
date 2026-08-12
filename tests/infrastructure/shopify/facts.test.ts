@@ -5,6 +5,8 @@ import {
   mapCustomerClassificationSummary,
   mapInventoryFacts,
   mapProductUnitsFacts,
+  mapSalesTotalsFact,
+  mapSalesTrendPoints,
   mapShopifyFunnelFact,
   parseShopifyQlCount,
   parseShopifyQlMoneyMinorUnits,
@@ -107,6 +109,48 @@ describe("web funnel fact", () => {
         },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("sales no-activity rows", () => {
+  it("maps Shopify's fully empty aggregate row to no activity", () => {
+    expect(
+      mapSalesTotalsFact([
+        {
+          orders: "0",
+          gross_sales: null,
+          discounts: null,
+          returns: null,
+          net_sales: null,
+          shipping_charges: null,
+          taxes: null,
+          total_sales: null,
+          average_order_value: null,
+        },
+      ]),
+    ).toBeNull();
+    expect(mapSalesTrendPoints([{ month: null, net_sales: null }])).toEqual([]);
+  });
+
+  it("rejects partially null sales rows instead of hiding malformed data", () => {
+    expect(() =>
+      mapSalesTotalsFact([
+        {
+          orders: "2",
+          gross_sales: null,
+          discounts: "0",
+          returns: "0",
+          net_sales: "10",
+          shipping_charges: "0",
+          taxes: "0",
+          total_sales: "10",
+          average_order_value: "5",
+        },
+      ]),
+    ).toThrow(/partially null/);
+    expect(() => mapSalesTrendPoints([{ month: "2026-08-01", net_sales: null }])).toThrow(
+      /partially null/,
+    );
   });
 });
 

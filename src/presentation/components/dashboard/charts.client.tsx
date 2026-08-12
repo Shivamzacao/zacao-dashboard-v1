@@ -104,6 +104,7 @@ function ChartFrame({
       key: definition.key,
       label: definition.label,
       tone: definition.tone,
+      ...(definition.pattern ? { pattern: definition.pattern } : {}),
     }));
   return (
     <div
@@ -253,7 +254,12 @@ export function LineChartView(props: SeriesChartProps) {
               name={item.label}
               stroke={tones[item.tone]}
               strokeWidth={2.5}
-              dot={{ r: 2.5 }}
+              {...(item.pattern === "dashed"
+                ? { strokeDasharray: "7 5" }
+                : item.pattern === "dotted"
+                  ? { strokeDasharray: "2 4" }
+                  : {})}
+              dot={item.pattern && item.pattern !== "solid" ? false : { r: 2.5 }}
               connectNulls={false}
               isAnimationActive={false}
             />

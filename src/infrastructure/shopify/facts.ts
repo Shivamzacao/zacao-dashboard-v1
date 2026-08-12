@@ -74,6 +74,16 @@ function optionalText(value: unknown): string | null {
   return trimmed ? trimmed : null;
 }
 
+function isProviderZero(value: unknown): boolean {
+  if (typeof value === "number") return value === 0;
+  if (typeof value !== "string") return false;
+  return /^-?0+(?:\.0+)?$/.test(value.trim());
+}
+
+function isNoActivityMeasure(value: unknown): boolean {
+  return value === null || isProviderZero(value);
+}
+
 export function mapCustomerClassificationSummary(
   rows: readonly ShopifyQlRow[],
 ): CustomerClassificationSummary {
@@ -153,6 +163,22 @@ export function mapSalesTotalsFact(rows: readonly ShopifyQlRow[]): ShopifySalesT
   if (rows.length > 1) {
     throw new Error("ShopifyQL sales totals must be a single aggregate row");
   }
+  const measureColumns = [
+    "orders",
+    "gross_sales",
+    "discounts",
+    "returns",
+    "net_sales",
+    "shipping_charges",
+    "taxes",
+    "total_sales",
+    "average_order_value",
+  ] as const;
+  const measures = measureColumns.map((column) => requireColumn(row, column));
+  if (measures.some((value) => value === null)) {
+    if (measures.every(isNoActivityMeasure)) return null;
+    throw new Error("ShopifyQL sales totals returned a partially null aggregate row");
+  }
   return {
     orders: parseShopifyQlCount(requireColumn(row, "orders"), "orders"),
     grossSalesMinorUnits: parseShopifyQlMoneyMinorUnits(
@@ -185,10 +211,20 @@ export function mapSalesTrendPoints(
   rows: readonly ShopifyQlRow[],
   periodColumn = "month",
 ): readonly ShopifySalesTrendPoint[] {
-  return rows.map((row) => ({
-    period: String(requireColumn(row, periodColumn)),
-    netSalesMinorUnits: parseShopifyQlMoneyMinorUnits(requireColumn(row, "net_sales"), "net_sales"),
-  }));
+  return rows.flatMap((row) => {
+    const period = requireColumn(row, periodColumn);
+    const netSales = requireColumn(row, "net_sales");
+    if (period === null || netSales === null) {
+      if (period === null && isNoActivityMeasure(netSales)) return [];
+      throw new Error("ShopifyQL sales trend returned a partially null period row");
+    }
+    return [
+      {
+        period: String(period),
+        netSalesMinorUnits: parseShopifyQlMoneyMinorUnits(netSales, "net_sales"),
+      },
+    ];
+  });
 }
 
 /**

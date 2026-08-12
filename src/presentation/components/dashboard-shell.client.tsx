@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { DashboardSidebar } from "./dashboard-sidebar";
 import { FilterPendingOverlay } from "./filter-pending-overlay";
-import { GlobalFilterBar } from "./global-filter-bar";
 import { TopBar } from "./top-bar";
 import { useDashboardUrlFilters } from "@/src/presentation/filters/use-dashboard-url-filters.client";
 import { dashboardRouteByPath, exportDatasetsForRoute } from "@/src/presentation/shell/routes";
@@ -30,7 +29,7 @@ export function DashboardShellClient({
   const pathname = usePathname();
   const router = useRouter();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const { state, push, selectPreset, pending } = useDashboardUrlFilters(supportedFilters, today);
+  const { state, selectPreset, pending } = useDashboardUrlFilters(supportedFilters, today);
   const activeRoute = dashboardRouteByPath(pathname);
   const exportDataset = activeRoute ? exportDatasetsForRoute(activeRoute.slug)[0] : undefined;
   const exportHref = exportDataset ? "/api/v1/exports/" + exportDataset + "?" + state.query : null;
@@ -90,11 +89,6 @@ export function DashboardShellClient({
           menuButtonRef={menuButtonRef}
           exportHref={exportHref}
           pending={pending}
-        />
-        <GlobalFilterBar
-          filters={state.filters}
-          supported={supportedFilters}
-          onFilterChange={push}
         />
         <div className="dashboard-view" data-pending={pending ? "" : undefined} aria-busy={pending}>
           {children}

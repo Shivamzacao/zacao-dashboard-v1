@@ -13,7 +13,12 @@ import {
   StackedBarChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
-import { ChartCard, KpiCard, WarningCard } from "@/src/presentation/components/dashboard/cards";
+import {
+  ChartCard,
+  KpiCard,
+  SourceBadge,
+  WarningCard,
+} from "@/src/presentation/components/dashboard/cards";
 import { DataTable } from "@/src/presentation/components/dashboard/data-table.client";
 import { DetailDrawer } from "@/src/presentation/components/dashboard/detail-drawer.client";
 import type {
@@ -26,7 +31,8 @@ import {
 } from "@/src/presentation/components/dashboard/export-status.client";
 import type { DashboardPageDisplayData, DisplayTableRow } from "./display-data";
 import { metricDisplayLabel } from "./metric-copy";
-import type { DashboardPageSpec, PageChartSpec, PageTableSpec } from "./page-specs";
+import { metricSourceLabel } from "./metric-source-label";
+import type { DashboardPageSpec, PageChartSpec, PageKpiSpec, PageTableSpec } from "./page-specs";
 import { columnLabel, describeColumns, formatCell } from "./table-presentation";
 
 const catalog = new Map(metricCatalog.map((metric) => [metric.key, metric]));
@@ -61,14 +67,17 @@ function stateReason(metric: MetricCatalogEntry, fixture: DashboardPageDisplayDa
   return metric.blockingReason ?? "No genuine activity in the selected period.";
 }
 
-function kpi(metricKey: string, fixture: DashboardPageDisplayData): KpiDisplayModel {
-  const metric = requiredMetric(metricKey);
-  const value = fixture.currentValues[metricKey] ?? null;
-  const comparison = fixture.comparisonValues?.[metricKey];
+function kpi(spec: PageKpiSpec, fixture: DashboardPageDisplayData): KpiDisplayModel {
+  const metric = requiredMetric(spec.metricKey);
+  const value = fixture.currentValues[spec.metricKey] ?? null;
+  const comparison = fixture.comparisonValues?.[spec.metricKey];
   return {
-    label: metricDisplayLabel(metric),
+    label: spec.label ?? metricDisplayLabel(metric),
     value,
     state: metricState(metric, fixture),
+    sourceLabel: metricSourceLabel(metric, spec.sourceLabel),
+    ...(spec.valuePresentation ? { valuePresentation: spec.valuePresentation } : {}),
+    ...(spec.unitSuffix ? { unitSuffix: spec.unitSuffix } : {}),
     helpText: `${metric.sources}. ${metric.calculation}`,
     ...(!value ? { unavailableReason: stateReason(metric, fixture) } : {}),
     ...(comparison ? { comparison } : {}),
@@ -142,7 +151,8 @@ function Chart({
     <ChartCard
       title={spec.title}
       description={spec.description}
-      eyebrow={metricDisplayLabel(metric)}
+      eyebrow={spec.eyebrow ?? metricDisplayLabel(metric)}
+      actions={<SourceBadge label={metricSourceLabel(metric, spec.sourceLabel)} />}
     >
       {view}
     </ChartCard>
@@ -191,7 +201,10 @@ function TableCard({
       description={spec.description}
       eyebrow={metricDisplayLabel(metric)}
       actions={
-        spec.dataset ? <ExportStatus state={exportState} onRequest={exportRows} /> : undefined
+        <>
+          <SourceBadge label={metricSourceLabel(metric, spec.sourceLabel)} />
+          {spec.dataset ? <ExportStatus state={exportState} onRequest={exportRows} /> : null}
+        </>
       }
     >
       <DataTable
@@ -252,8 +265,8 @@ export function DashboardPageView({
       ) : null}
 
       <section className="intelligence-kpi-grid" aria-label="Key performance indicators">
-        {spec.kpis.map((metricKey) => (
-          <KpiCard key={metricKey} model={kpi(metricKey, fixture)} />
+        {spec.kpis.map((kpiSpec) => (
+          <KpiCard key={kpiSpec.metricKey} model={kpi(kpiSpec, fixture)} />
         ))}
       </section>
 

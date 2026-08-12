@@ -72,6 +72,22 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getByLabelText("Net sales: $1,250.50")).toBeTruthy();
   });
 
+  it("renders source metadata and reference-specific KPI presentation", () => {
+    render(
+      <KpiCard
+        model={{
+          label: "LTV:CAC",
+          value: { kind: "rate_basis_points", value: 360 },
+          state: "current",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "ratio",
+        }}
+      />,
+    );
+    expect(screen.getByText("Source: Shopify + Google Sheets")).toBeTruthy();
+    expect(screen.getByLabelText("LTV:CAC: 3.6 : 1")).toBeTruthy();
+  });
+
   it("covers every approved presentation readiness state without provider logic", () => {
     const states = [
       "loading",
@@ -124,6 +140,22 @@ describe("F2 reusable dashboard components", () => {
     expect(screen.getByText("One point is present.")).toBeTruthy();
     expect(screen.getByRole("table", { name: "Revenue data" })).toBeTruthy();
     expect(screen.getAllByRole("cell", { name: "Unavailable" })).toHaveLength(3);
+  });
+
+  it("exposes dashed comparison series in the legend and accessible table", () => {
+    const { container } = render(
+      <LineChartView
+        title="Per-bar COGS versus target"
+        data={[{ key: "jul", label: "Jul", value: 1.42, secondaryValue: 1.35 }]}
+        valueFormat="money"
+        series={[
+          { key: "value", label: "Actual COGS", tone: "forest" },
+          { key: "secondaryValue", label: "Target", tone: "gold", pattern: "dashed" },
+        ]}
+      />,
+    );
+    expect(container.querySelector(".pattern-dashed")).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Per-bar COGS versus target data" })).toBeTruthy();
   });
 
   it("exposes every declared LTV series and unavailable immature cells accessibly", () => {

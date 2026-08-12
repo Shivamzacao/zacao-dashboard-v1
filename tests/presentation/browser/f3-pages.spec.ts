@@ -55,7 +55,7 @@ test("product detail drawer remains responsive after opening", async ({ page }) 
   await expect(detailDrawer).toBeHidden();
 });
 
-for (const width of [760, 640]) {
+for (const width of [760, 640, 390]) {
   test(`dashboard remains usable without page overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
     await page.goto("/executive");
