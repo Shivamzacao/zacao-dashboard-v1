@@ -82,7 +82,7 @@ describe("F3 dashboard pages", () => {
     await userEvent.click(viewButtons[0]!);
     expect(screen.getByRole("dialog", { name: "Product catalog detail" })).toBeTruthy();
     expect(screen.getAllByText("Synthetic Dark Bar").length).toBeGreaterThan(1);
-    expect(screen.getByText("Inventory Runway & Reorder Alert")).toBeTruthy();
+    expect(screen.getByText("Inventory runway and reorder alert")).toBeTruthy();
   });
 
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {

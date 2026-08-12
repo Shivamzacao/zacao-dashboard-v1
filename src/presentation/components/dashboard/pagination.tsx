@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCount } from "./format-display-value";
+
 export interface PaginationModel {
   readonly page: number;
   readonly pageSize: number;
@@ -24,14 +26,14 @@ export function Pagination({
   return (
     <nav className="pagination" aria-label={ariaLabel}>
       <span>
-        {start}–{end} of {totalRows}
+        {formatCount(start)}–{formatCount(end)} of {formatCount(totalRows)}
       </span>
       <div>
         <button type="button" disabled={page <= 0} onClick={() => onPageChange(page - 1)}>
           Previous
         </button>
         <span aria-live="polite">
-          Page {page + 1} of {pageCount}
+          Page {formatCount(page + 1)} of {formatCount(pageCount)}
         </span>
         <button
           type="button"

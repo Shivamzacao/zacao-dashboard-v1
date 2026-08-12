@@ -12,6 +12,10 @@ import type {
   DisplayState,
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
+import {
+  formatPercent,
+  formatQuantity,
+} from "@/src/presentation/components/dashboard/format-display-value";
 
 import type {
   DashboardAlertDisplayModel,
@@ -49,11 +53,9 @@ function numericValue(value: MetricDisplayValue | null): number | null {
 }
 
 const COMPARISON_LABELS = {
-  previous_period: "vs previous period",
-  previous_year: "vs previous year",
+  previous_period: "vs. previous period",
+  previous_year: "vs. previous year",
 } as const;
-
-const DISPLAY_NUMBER = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 /**
  * Percent change between two same-kind values. Returns null when a
@@ -74,7 +76,7 @@ function percentChange(
   const percent = (delta / Math.abs(previousNumeric)) * 100;
   return {
     direction: delta > 0 ? "up" : "down",
-    value: `${percent > 0 ? "+" : ""}${percent.toFixed(1)}%`,
+    value: formatPercent(percent, true),
   };
 }
 
@@ -231,12 +233,8 @@ export function mapDashboardPageToDisplayData(
           key: `${breakdown.metric.key}:${item.key}`,
           severity: available <= threshold * 0.5 ? "danger" : "warning",
           title: `${item.label} is below its reorder point`,
-          description: `${DISPLAY_NUMBER.format(available)} on hand against an approved reorder point of ${DISPLAY_NUMBER.format(threshold)}.`,
-          metadata: [
-            "Inventory risk",
-            item.label,
-            `Reorder point ${DISPLAY_NUMBER.format(threshold)}`,
-          ],
+          description: `${formatQuantity(available)} on hand against an approved reorder point of ${formatQuantity(threshold)}.`,
+          metadata: ["Inventory risk", item.label, `Reorder point ${formatQuantity(threshold)}`],
         });
       }
     }

@@ -1,4 +1,11 @@
 import type { DashboardTableColumn } from "@/src/presentation/components/dashboard/data-table.client";
+import {
+  formatDate,
+  formatMonth,
+  formatPercent,
+  formatQuantity,
+  formatUsd,
+} from "@/src/presentation/components/dashboard/format-display-value";
 
 import type { DisplayTableRow } from "./display-data";
 
@@ -15,25 +22,6 @@ const INITIALISMS = new Set(["cac", "fefo", "id", "ltv", "po", "roas", "sku", "u
 
 /** Suffixes that declare a unit; the unit moves into the formatting, not the header. */
 const UNIT_SUFFIXES = ["MinorUnits", "BasisPoints"] as const;
-
-const usdFormatter = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-  maximumFractionDigits: 2,
-});
-const percentFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-const dayFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  day: "numeric",
-  year: "numeric",
-  timeZone: "America/New_York",
-});
-const monthFormatter = new Intl.DateTimeFormat("en-US", {
-  month: "short",
-  year: "numeric",
-  timeZone: "America/New_York",
-});
 
 type CellFormat = "money" | "percent" | "date" | "plain";
 
@@ -73,11 +61,11 @@ function cellFormat(key: string): CellFormat {
   return "plain";
 }
 
-function formatDate(value: string): string {
+function formatTableDate(value: string): string {
   const month = ISO_MONTH.exec(value);
-  if (month) return monthFormatter.format(new Date(`${value}-01T12:00:00Z`));
+  if (month) return formatMonth(value);
   const day = ISO_DAY.exec(value);
-  return day ? dayFormatter.format(new Date(`${day[1]}T12:00:00Z`)) : value;
+  return day ? formatDate(day[1] ?? value) : value;
 }
 
 export function formatCell(key: string, value: DisplayTableRow[string]): string {
@@ -85,11 +73,11 @@ export function formatCell(key: string, value: DisplayTableRow[string]): string 
   if (typeof value === "boolean") return value ? "Yes" : "No";
   const format = cellFormat(key);
   if (typeof value === "number") {
-    if (format === "money") return usdFormatter.format(value / 100);
-    if (format === "percent") return `${percentFormatter.format(value / 100)}%`;
-    return numberFormatter.format(value);
+    if (format === "money") return formatUsd(value / 100);
+    if (format === "percent") return formatPercent(value / 100);
+    return formatQuantity(value);
   }
-  if (format === "date") return formatDate(value);
+  if (format === "date") return formatTableDate(value);
   if (ENUM_TOKEN.test(value)) {
     const words = value.replace(/_/g, " ").toLowerCase();
     return words.charAt(0).toUpperCase() + words.slice(1);

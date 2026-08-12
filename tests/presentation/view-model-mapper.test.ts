@@ -217,8 +217,8 @@ describe("mapDashboardPageToDisplayData", () => {
     };
     const display = mapDashboardPageToDisplayData(pageWith([withComparison]), "production");
     expect(display.comparisonValues?.["customers.returning_rate"]).toEqual({
-      label: "vs previous period",
-      value: "+20.0%",
+      label: "vs. previous period",
+      value: "+20%",
       direction: "up",
     });
   });
@@ -241,7 +241,7 @@ describe("mapDashboardPageToDisplayData", () => {
     };
     const display = mapDashboardPageToDisplayData(pageWith([withComparison]), "production");
     expect(display.comparisonValues?.["customers.returning_rate"]).toEqual({
-      label: "vs previous year",
+      label: "vs. previous year",
       value: null,
     });
   });
