@@ -36,6 +36,25 @@ for (const [slug, title] of pages) {
   });
 }
 
+test("product detail drawer remains responsive after opening", async ({ page }) => {
+  await page.goto("/products");
+  await page.waitForLoadState("networkidle");
+
+  const viewButton = page.getByRole("button", { name: /View details for/ }).first();
+  const detailDrawer = page.getByRole("dialog", { name: "Product catalog detail" });
+
+  await viewButton.click();
+  await expect(detailDrawer).toBeVisible();
+  await page.waitForTimeout(1_000);
+  await detailDrawer.getByRole("button", { name: "Close" }).click();
+  await expect(detailDrawer).toBeHidden();
+
+  await viewButton.click();
+  await expect(detailDrawer).toBeVisible();
+  await detailDrawer.getByRole("button", { name: "Close" }).click();
+  await expect(detailDrawer).toBeHidden();
+});
+
 for (const width of [760, 640]) {
   test(`dashboard remains usable without page overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 720 });
