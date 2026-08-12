@@ -66,6 +66,23 @@ export const drilldownCatalog = Object.freeze([
     exportable: true,
   }),
   definition({
+    dataset: "sku-margin",
+    section: "Product Intelligence",
+    metricKey: "products.sku_margin",
+    fields: [
+      "sku",
+      "units",
+      "revenueMinorUnits",
+      "cogsPerBarMinorUnits",
+      "targetPerBarMinorUnits",
+      "marginBasisPoints",
+      "status",
+    ],
+    sortFields: ["sku", "units", "revenueMinorUnits", "marginBasisPoints", "status"],
+    exportable: true,
+    implementationPending: true,
+  }),
+  definition({
     dataset: "klaviyo-campaigns",
     section: "Marketing Intelligence",
     metricKey: "klaviyo.campaign_performance",

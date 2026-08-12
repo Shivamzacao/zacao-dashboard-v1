@@ -400,3 +400,126 @@ export const f3CustomerPageFixtureData: F3PageFixtureData = Object.freeze({
     ],
   }),
 });
+
+export const f3ProductPageFixtureData: F3PageFixtureData = Object.freeze({
+  ...f3PageFixtureData,
+  alerts: [
+    {
+      key: "synthetic-matcha-cogs-risk",
+      severity: "danger" as const,
+      title: "Matcha 60% COGS is trending above target",
+      description:
+        "Landed cost is $1.71 a bar against a $1.45 target. Matcha input cost is up 18% quarter over quarter, holding SKU margin at 43% against 61% for Dark 70%.",
+      metadata: ["SKU cost risk", "SYNTH-MATCHA-60"],
+    },
+  ],
+  currentValues: Object.freeze({
+    ...f3PageFixtureData.currentValues,
+    "products.sku_velocity": { kind: "quantity" as const, value: 4.3 },
+    "inventory.on_hand_bars": { kind: "quantity" as const, value: 436 },
+    "inventory.value": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 78_480 },
+    },
+    "inventory.sell_through": { kind: "rate_basis_points" as const, value: 2_270 },
+    "inventory.weeks_cover": { kind: "quantity" as const, value: 7.4 },
+    "products.cogs_flags": { kind: "count" as const, value: 1 },
+    "manufacturing.cogs_per_bar": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 142 },
+    },
+    "products.sku_margin": { kind: "rate_basis_points" as const, value: 6_400 },
+    "inventory.sku_stock": { kind: "quantity" as const, value: 436 },
+    "manufacturing.cogs_trend": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 142 },
+    },
+  }),
+  chartData: Object.freeze({
+    ...f3PageFixtureData.chartData,
+    "inventory.on_hand_bars": [
+      { key: "dark", label: "Dark 70%", value: 182 },
+      { key: "smooth", label: "Smooth 42%", value: 164 },
+      { key: "matcha", label: "Matcha 60%", value: 46 },
+      { key: "gift", label: "Gift pack", value: 44 },
+    ],
+    "products.sku_velocity": [
+      { key: "dark", label: "Dark 70% · SYNTH-DARK-70", value: 1.73 },
+      { key: "smooth", label: "Smooth 42% · SYNTH-SMOOTH-42", value: 1.47 },
+      { key: "gift", label: "Gift pack · SYNTH-GIFT-01", value: 1.07 },
+    ],
+    "products.sales": [
+      { key: "dark", label: "Dark 70%", value: 5_240 },
+      { key: "smooth", label: "Smooth 42%", value: 4_180 },
+      { key: "matcha", label: "Matcha 60%", value: 2_610 },
+      { key: "gift", label: "Gift pack", value: 2_220 },
+    ],
+    "products.sku_margin": [
+      { key: "smooth", label: "Smooth 42%", value: 64 },
+      { key: "dark", label: "Dark 70%", value: 61 },
+      { key: "gift", label: "Gift pack", value: 57 },
+      { key: "matcha", label: "Matcha 60%", value: 43 },
+    ],
+    "inventory.sku_stock": [
+      { key: "dark", label: "Dark 70%", value: 182, minValue: 120, maxValue: 260 },
+      { key: "smooth", label: "Smooth 42%", value: 164, minValue: 120, maxValue: 260 },
+      { key: "matcha", label: "Matcha 60%", value: 46, minValue: 110, maxValue: 240 },
+      { key: "gift", label: "Gift pack", value: 44, minValue: 35, maxValue: 95 },
+    ],
+    "manufacturing.cogs_trend": [
+      { key: "feb", label: "Feb", value: 1.58, secondaryValue: 1.35 },
+      { key: "mar", label: "Mar", value: 1.52, secondaryValue: 1.35 },
+      { key: "apr", label: "Apr", value: 1.49, secondaryValue: 1.35 },
+      { key: "may", label: "May", value: 1.46, secondaryValue: 1.35 },
+      { key: "jun", label: "Jun", value: 1.44, secondaryValue: 1.35 },
+      { key: "jul", label: "Jul", value: 1.42, secondaryValue: 1.35 },
+    ],
+  }),
+  rowsByDataset: Object.freeze({
+    ...f3PageFixtureData.rowsByDataset,
+    "product-catalog": [
+      { product: "Dark 70%", sku: "SYNTH-DARK-70", status: "Active", price: "$12.00" },
+      { product: "Smooth 42%", sku: "SYNTH-SMOOTH-42", status: "Active", price: "$12.00" },
+      { product: "Matcha 60%", sku: "SYNTH-MATCHA-60", status: "Active", price: "$14.00" },
+      { product: "Gift pack", sku: "SYNTH-GIFT-01", status: "Active", price: "$36.00" },
+    ],
+    "sku-margin": [
+      {
+        sku: "SYNTH-DARK-70",
+        units: 52,
+        revenueMinorUnits: 524_000,
+        cogsPerBarMinorUnits: 138,
+        targetPerBarMinorUnits: 135,
+        marginBasisPoints: 6_100,
+        status: "On target",
+      },
+      {
+        sku: "SYNTH-SMOOTH-42",
+        units: 44,
+        revenueMinorUnits: 418_000,
+        cogsPerBarMinorUnits: 131,
+        targetPerBarMinorUnits: 135,
+        marginBasisPoints: 6_400,
+        status: "On target",
+      },
+      {
+        sku: "SYNTH-MATCHA-60",
+        units: 21,
+        revenueMinorUnits: 261_000,
+        cogsPerBarMinorUnits: 171,
+        targetPerBarMinorUnits: 145,
+        marginBasisPoints: 4_300,
+        status: "Above target",
+      },
+      {
+        sku: "SYNTH-GIFT-01",
+        units: 11,
+        revenueMinorUnits: 222_000,
+        cogsPerBarMinorUnits: 410,
+        targetPerBarMinorUnits: 420,
+        marginBasisPoints: 5_700,
+        status: "On target",
+      },
+    ],
+  }),
+});

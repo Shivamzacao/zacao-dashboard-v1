@@ -10,6 +10,7 @@ import {
   HeatmapChartView,
   HorizontalBarChartView,
   LineChartView,
+  StockBandChartView,
   StackedBarChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
@@ -146,6 +147,7 @@ function Chart({
     donut: <DonutChartView {...props} />,
     funnel: <FunnelChartView {...props} />,
     heatmap: <HeatmapChartView {...props} />,
+    band: <StockBandChartView {...props} />,
   }[spec.kind];
   return (
     <ChartCard
@@ -200,13 +202,16 @@ function TableCard({
 
   return (
     <ChartCard
+      {...(spec.span === 2 ? { className: "table-card-span-2" } : {})}
       title={spec.title}
       description={spec.description}
       eyebrow={metricDisplayLabel(metric)}
       actions={
         <>
           <SourceBadge label={metricSourceLabel(metric, spec.sourceLabel)} />
-          {spec.dataset ? <ExportStatus state={exportState} onRequest={exportRows} /> : null}
+          {spec.dataset && !spec.hideExport ? (
+            <ExportStatus state={exportState} onRequest={exportRows} />
+          ) : null}
         </>
       }
     >
@@ -266,6 +271,7 @@ export function DashboardPageView({
               title={alert.title}
               severity={alert.severity}
               metadata={alert.metadata}
+              headingLevel={2}
             >
               {alert.description}
             </WarningCard>

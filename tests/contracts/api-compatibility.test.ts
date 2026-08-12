@@ -39,6 +39,7 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       "customer-ltv-cohorts",
       "product-catalog",
       "product-velocity",
+      "sku-margin",
       "klaviyo-campaigns",
       "klaviyo-flows",
       "inventory-lots",

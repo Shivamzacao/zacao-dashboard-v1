@@ -404,6 +404,7 @@ select {
 .message-danger .message-icon {
   background: var(--danger);
 }
+.message-card h2,
 .message-card h3 {
   margin: 0;
   color: var(--forest-deep);
@@ -429,7 +430,7 @@ select {
   text-transform: uppercase;
 }
 .severity-warning {
-  background: var(--warning);
+  background: #80500d;
 }
 .severity-danger {
   background: var(--danger);
@@ -1478,6 +1479,84 @@ table.sr-only {
   gap: 13px;
 }
 
+.table-card-span-2 {
+  grid-column: span 2;
+}
+
+.stock-band-chart {
+  display: grid;
+  gap: 22px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stock-band-row {
+  display: grid;
+  grid-template-columns: minmax(0, 8.5rem) minmax(8rem, 1fr) 4.75rem;
+  align-items: center;
+  gap: 12px;
+}
+
+.stock-band-label {
+  color: var(--forest-dark);
+  font-size: 11px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-band-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: #edf0e9;
+  overflow: hidden;
+}
+
+.stock-band-ideal,
+.stock-band-current {
+  position: absolute;
+  left: 0;
+  border-radius: 999px;
+}
+
+.stock-band-ideal {
+  top: 0;
+  height: 100%;
+  background: rgb(200 168 107 / 42%);
+}
+
+.stock-band-current {
+  top: 4px;
+  height: 6px;
+  background: var(--forest);
+}
+
+.stock-band-status {
+  display: grid;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.stock-band-status strong {
+  color: var(--forest-dark);
+  font-size: 11px;
+}
+
+.stock-band-status-below-band {
+  color: var(--danger);
+}
+
+.stock-band-note {
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+}
+
 /* Retained for the component fixture page and for restoring the per-source
    panel later; no dashboard page renders it today. */
 .source-readiness-panel {
@@ -1556,12 +1635,26 @@ table.sr-only {
   .intelligence-table-grid {
     grid-template-columns: 1fr;
   }
+
+  .table-card-span-2 {
+    grid-column: auto;
+  }
 }
 
 @media (max-width: 620px) {
   .intelligence-kpi-grid,
   .intelligence-kpi-grid:has(> :nth-child(5)) {
     grid-template-columns: 1fr;
+  }
+
+  .stock-band-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px 10px;
+  }
+
+  .stock-band-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
   }
 }
 

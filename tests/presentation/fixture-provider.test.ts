@@ -27,6 +27,9 @@ describe("F1 Phase 2 fixture provider", () => {
     expect(phase2FixtureProvider.getF3PageData("marketing").currentValues).not.toHaveProperty(
       "klaviyo.email_open_rate",
     );
+    expect(phase2FixtureProvider.getF3PageData("products").currentValues).toHaveProperty(
+      "inventory.weeks_cover",
+    );
   });
 
   it("rejects unlabelled or structurally invalid fixtures", () => {

@@ -9,8 +9,11 @@ import { drilldownCatalog } from "@/src/application/api";
 import { metricCatalog } from "@/src/domain/metrics/catalog";
 import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/dashboard-page.client";
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
-import { f3PageFixtureData } from "@/src/presentation/fixtures/f3-page-data";
-import { f3CustomerPageFixtureData } from "@/src/presentation/fixtures/f3-page-data";
+import {
+  f3CustomerPageFixtureData,
+  f3PageFixtureData,
+  f3ProductPageFixtureData,
+} from "@/src/presentation/fixtures/f3-page-data";
 import { dashboardRoutes } from "@/src/presentation/shell/routes";
 
 afterEach(cleanup);
@@ -177,17 +180,53 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByText("Welcome flow")).toBeTruthy();
   });
 
-  it("uses the approved F2 table, drill-down, and export path for Product Intelligence", async () => {
-    render(<DashboardPageView spec={dashboardPageSpecs.products} fixture={f3PageFixtureData} />);
+  it("matches the HTML Product Intelligence composition and table presentation", async () => {
+    const products = dashboardPageSpecs.products;
+    expect(products.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "products.units_sold",
+      "products.sku_velocity",
+      "inventory.on_hand_bars",
+      "inventory.value",
+      "quality.missing_sku_cost",
+      "inventory.sell_through",
+      "inventory.weeks_cover",
+      "products.cogs_flags",
+      "manufacturing.cogs_per_bar",
+    ]);
+    expect(products.charts.map(({ title }) => title)).toEqual([
+      "Product demand",
+      "Product mix",
+      "Inventory position",
+      "SKU velocity",
+      "Sales by SKU",
+      "Margin by SKU",
+      "Stock versus ideal band",
+      "Per-bar COGS versus target",
+    ]);
+    expect(products.tables.map(({ title }) => title)).toEqual([
+      "Product catalog",
+      "SKU margin & cost",
+    ]);
+    expect(products.charts.at(-1)?.series?.[1]).toMatchObject({ pattern: "dashed" });
+
+    render(<DashboardPageView spec={products} fixture={f3ProductPageFixtureData} />);
+    expect(
+      screen
+        .getByRole("region", { name: "Key performance indicators" })
+        .querySelectorAll("article"),
+    ).toHaveLength(9);
     expect(screen.getByRole("table", { name: "Product catalog" })).toBeTruthy();
-    expect(screen.getAllByRole("button", { name: "Export CSV" })).toHaveLength(2);
+    expect(screen.getByRole("table", { name: "SKU margin & cost" })).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: "Export CSV" })).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Inventory runway & reorder" })).toBeNull();
+    expect(screen.getByText("Matcha 60% COGS is trending above target")).toBeTruthy();
+    expect(screen.getByText("Below band")).toBeTruthy();
     const viewButtons = screen.getAllByRole("button", { name: /View details for/ });
-    expect(viewButtons).toHaveLength(6);
+    expect(viewButtons).toHaveLength(8);
 
     await userEvent.click(viewButtons[0]!);
     expect(screen.getByRole("dialog", { name: "Product catalog detail" })).toBeTruthy();
-    expect(screen.getAllByText("Synthetic Dark Bar").length).toBeGreaterThan(1);
-    expect(screen.getByText("Inventory runway and reorder alert")).toBeTruthy();
+    expect(screen.getAllByText("Dark 70%").length).toBeGreaterThan(1);
   });
 
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {

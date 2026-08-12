@@ -6,6 +6,7 @@ import {
   buildCustomerCityBreakdown,
   buildInventoryBreakdown,
   buildProductUnitsBreakdown,
+  buildProductSkuVelocityBreakdown,
   buildProductVelocityTable,
   buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
@@ -116,10 +117,19 @@ describe("B5 Shopify metric services", () => {
     ] as const;
     const breakdown = buildProductUnitsBreakdown(context(), facts);
     const velocity = buildProductVelocityTable(context(), facts);
+    const skuVelocity = buildProductSkuVelocityBreakdown(context(), facts, 30);
     expect(breakdown.metric.value).toEqual({ kind: "count", value: 14 });
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items.some(({ warnings }) => warnings.includes("MISSING_SKU"))).toBe(true);
     expect(velocity.rows).toHaveLength(2);
+    expect(skuVelocity.metric.value).toEqual({ kind: "quantity", value: 0.4 });
+    expect(skuVelocity.items).toEqual([
+      expect.objectContaining({
+        key: "SKU-A",
+        label: "Bar · SKU-A",
+        values: [{ kind: "quantity", value: 0.4 }],
+      }),
+    ]);
   });
 
   it("returns sanitized catalog/current inventory without treating Shopify cost as sheet authority", () => {

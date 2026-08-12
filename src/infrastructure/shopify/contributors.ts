@@ -10,6 +10,7 @@ import {
   buildInventoryBreakdown,
   buildProductSalesBreakdown,
   buildProductUnitsBreakdown,
+  buildProductSkuVelocityBreakdown,
   buildProductVelocityTable,
   buildPurchaseHeatmapBreakdown,
   buildSalesTotalsMetrics,
@@ -179,18 +180,33 @@ export function createShopifyContributors(input: {
     SHOPIFYQL_CACHE,
     async (context) => {
       const { shopifyql } = await adapters();
-      const result = await shopifyql.read({
-        dataset: "product_line_classification",
-        dateRange: context.dataPeriod,
-      });
+      const trailingEnd = new Date(`${context.dataPeriod.endDate}T00:00:00.000Z`);
+      const trailingStart = new Date(trailingEnd);
+      trailingStart.setUTCDate(trailingStart.getUTCDate() - 29);
+      const trailingRange = {
+        startDate: trailingStart.toISOString().slice(0, 10),
+        endDate: context.dataPeriod.endDate,
+      };
+      const [result, trailingResult] = await Promise.all([
+        shopifyql.read({
+          dataset: "product_line_classification",
+          dateRange: context.dataPeriod,
+        }),
+        shopifyql.read({
+          dataset: "product_line_classification",
+          dateRange: trailingRange,
+        }),
+      ]);
       const status = currentStatus(now().toISOString(), result.history);
       const serviceContext = metricContext(context, [status]);
       const periodLabel = `${context.dataPeriod.startDate}..${context.dataPeriod.endDate}`;
       const facts = mapProductUnitsFacts(result.rows, periodLabel);
       const salesFacts = mapProductSalesFacts(result.rows);
+      const trailingFacts = mapProductUnitsFacts(trailingResult.rows, "trailing-30-days");
       return {
         breakdowns: [
           buildProductUnitsBreakdown(serviceContext, facts),
+          buildProductSkuVelocityBreakdown(serviceContext, trailingFacts),
           buildProductSalesBreakdown(serviceContext, salesFacts),
           buildProductMixBreakdown(serviceContext, salesFacts),
         ],
