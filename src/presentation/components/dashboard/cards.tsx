@@ -105,6 +105,7 @@ interface MessageCardProps {
   readonly tone?: "insight" | "warning" | "danger";
   readonly metadata?: readonly string[];
   readonly headingLevel?: 2 | 3;
+  readonly showSeverity?: boolean;
 }
 
 export function InsightCard({
@@ -113,6 +114,7 @@ export function InsightCard({
   tone = "insight",
   metadata = [],
   headingLevel = 3,
+  showSeverity = false,
 }: MessageCardProps) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
@@ -123,9 +125,9 @@ export function InsightCard({
       <div>
         <div className="message-heading-row">
           <Heading>{title}</Heading>
-          {tone === "danger" || tone === "warning" ? (
+          {showSeverity ? (
             <span className={`severity-badge severity-${tone}`}>
-              {tone === "danger" ? "High" : "Medium"}
+              {tone === "danger" ? "High" : tone === "warning" ? "Medium" : "Low"}
             </span>
           ) : null}
         </div>
@@ -143,9 +145,11 @@ export function InsightCard({
 }
 
 export function WarningCard(
-  props: Omit<MessageCardProps, "tone"> & { readonly severity?: "warning" | "danger" },
+  props: Omit<MessageCardProps, "tone"> & {
+    readonly severity?: "insight" | "warning" | "danger";
+  },
 ) {
-  return <InsightCard {...props} tone={props.severity ?? "warning"} />;
+  return <InsightCard {...props} tone={props.severity ?? "warning"} showSeverity />;
 }
 
 export function SourceIndicator({ model }: { readonly model: SourceIndicatorModel }) {

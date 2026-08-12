@@ -11,7 +11,7 @@ export type DisplayTableRow = Record<string, string | number | boolean | null>;
 
 export interface DashboardAlertDisplayModel {
   readonly key: string;
-  readonly severity: "warning" | "danger";
+  readonly severity: "insight" | "warning" | "danger";
   readonly title: string;
   readonly description: string;
   readonly metadata: readonly string[];

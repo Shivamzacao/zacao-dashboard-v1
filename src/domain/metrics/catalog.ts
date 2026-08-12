@@ -357,7 +357,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "revenue.channel_margin",
     label: "Contribution margin by channel",
-    sections: ["Revenue Intelligence"],
+    sections: ["Revenue Intelligence", "Financial Intelligence"],
     v1Class: "conditional",
     valueKind: "rate_basis_points",
     sourceKeys: ["shopify", "google_sheets"],
@@ -2113,6 +2113,50 @@ export const metricCatalog = Object.freeze([
     calculation: "Apply only a signed/effective approved rebate rule.",
     status: "BUSINESS_RULE_REQUIRED",
     blockingReason: "No approved rebate rule registry exists.",
+  }),
+  entry({
+    key: "finance.effective_cogs",
+    label: "Effective COGS per bar",
+    sections: ["Financial Intelligence"],
+    v1Class: "conditional",
+    valueKind: "money",
+    sourceKeys: ["google_sheets", "google_drive"],
+    sources: "Fairafric invoices and approved effective-dated rebate rules",
+    sourceFields: "base per-bar COGS, qualifying volume, effective rebate tier and rate",
+    calculation:
+      "Apply only an approved effective-dated Fairafric rebate rate to certified base per-bar COGS.",
+    status: "BUSINESS_RULE_REQUIRED",
+    blockingReason:
+      "No approved Fairafric volume-rebate agreement and effective landed-cost policy are available.",
+  }),
+  entry({
+    key: "finance.rebate_tier",
+    label: "Fairafric rebate tier",
+    sections: ["Financial Intelligence"],
+    v1Class: "conditional",
+    valueKind: "status",
+    sourceKeys: ["google_sheets", "google_drive"],
+    sources: "Fairafric invoices and approved effective-dated rebate rules",
+    sourceFields: "qualifying volume, tier thresholds, rebate rate and effective dates",
+    calculation:
+      "Select the effective approved rebate tier containing certified qualifying Fairafric volume.",
+    status: "BUSINESS_RULE_REQUIRED",
+    blockingReason: "No approved Fairafric volume-rebate agreement is available.",
+  }),
+  entry({
+    key: "finance.rebate_tiers",
+    label: "Fairafric volume rebate tiers",
+    sections: ["Financial Intelligence"],
+    v1Class: "conditional",
+    valueKind: "status",
+    sourceKeys: ["google_sheets", "google_drive"],
+    sources: "Fairafric invoices and approved effective-dated rebate rules",
+    sourceFields:
+      "tier names, minimum and maximum qualifying units, rebate rate, certified progress and effective COGS",
+    calculation:
+      "Present approved effective-dated tiers and certified progress without inferring missing thresholds or rates.",
+    status: "BUSINESS_RULE_REQUIRED",
+    blockingReason: "No approved Fairafric volume-rebate agreement is available.",
   }),
   entry({
     key: "finance.predictive_cashflow",

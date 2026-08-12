@@ -429,6 +429,9 @@ select {
   line-height: 12px;
   text-transform: uppercase;
 }
+.severity-insight {
+  background: var(--forest);
+}
 .severity-warning {
   background: #80500d;
 }
@@ -1557,6 +1560,107 @@ table.sr-only {
   font-size: 9px;
 }
 
+.rebate-tier-chart {
+  display: grid;
+  gap: 15px;
+}
+
+.rebate-tier-progress-copy {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 12px;
+  color: var(--forest-dark);
+  font-size: 11px;
+}
+
+.rebate-tier-progress-copy > span:not(.rebate-tier-progress) {
+  color: var(--muted);
+  text-align: right;
+}
+
+.rebate-tier-progress {
+  grid-column: 1 / -1;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--cream-dark);
+}
+
+.rebate-tier-progress-value {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--forest);
+}
+
+.rebate-tier-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rebate-tier-row {
+  position: relative;
+  display: grid;
+  min-height: 92px;
+  align-content: space-between;
+  gap: 8px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.rebate-tier-row.is-current {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold);
+  background: var(--cream);
+}
+
+.rebate-tier-label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  color: var(--forest-dark);
+  font-size: 10px;
+}
+
+.rebate-tier-label small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 12px;
+}
+
+.rebate-tier-rate {
+  color: var(--forest);
+  font: 500 23px/1 var(--font-display);
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+.rebate-tier-current {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  color: var(--paper);
+  background: var(--forest);
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+}
+
+.rebate-tier-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 14px;
+}
+
 .delivery-timeline-scroll {
   height: 100%;
   overflow-y: auto;
@@ -1711,6 +1815,18 @@ table.sr-only {
   .stock-band-track {
     grid-column: 1 / -1;
     grid-row: 2;
+  }
+
+  .rebate-tier-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rebate-tier-progress-copy {
+    grid-template-columns: 1fr;
+  }
+
+  .rebate-tier-progress-copy > span:not(.rebate-tier-progress) {
+    text-align: left;
   }
 }
 

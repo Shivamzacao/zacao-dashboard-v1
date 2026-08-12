@@ -7,7 +7,10 @@ import {
   type MetricViewModel,
 } from "@/src/application/view-models";
 import type { SourceStatus } from "@/src/domain/contracts";
-import { mapDashboardPageToDisplayData } from "@/src/presentation/features/dashboard-pages/view-model-mapper";
+import {
+  mapDashboardPageToDisplayData,
+  rebateProgressAlert,
+} from "@/src/presentation/features/dashboard-pages/view-model-mapper";
 
 const dataPeriod = { startDate: "2025-08-08", endDate: "2026-08-07" };
 
@@ -31,6 +34,16 @@ const klaviyoNoActivity: SourceStatus = {
   warningCodes: ["KLAVIYO_NO_ACTIVITY"],
 };
 
+const googleSheetsCurrent: SourceStatus = {
+  source: "google_sheets",
+  state: "current",
+  checkedAt: "2026-08-08T00:00:00Z",
+  lastSuccessfulAt: "2026-08-08T00:00:00Z",
+  dataAsOf: "2026-08-08T00:00:00Z",
+  completeness: "complete",
+  warningCodes: [],
+};
+
 function pageWith(
   metrics: readonly MetricViewModel[],
   sourceStatuses: readonly SourceStatus[] = [shopifyCurrent, klaviyoNoActivity],
@@ -41,6 +54,18 @@ function pageWith(
       environment: "production",
       dataPeriod,
       sourceStatuses,
+    },
+    metrics,
+  });
+}
+
+function financialPageWith(metrics: readonly MetricViewModel[]) {
+  return composeDashboardPage({
+    section: "Financial Intelligence",
+    context: {
+      environment: "production",
+      dataPeriod,
+      sourceStatuses: [shopifyCurrent, googleSheetsCurrent],
     },
     metrics,
   });
@@ -118,6 +143,83 @@ describe("mapDashboardPageToDisplayData", () => {
     expect(JSON.stringify(display.rowsByDataset["customer-ltv-cohorts"])).not.toContain(
       "customerId",
     );
+  });
+
+  it("maps only matched Budget actual and plan periods in their declared series order", () => {
+    const metric = createMetricViewModel({
+      metricKey: "finance.budget_vs_actual",
+      environment: "production",
+      dataPeriod,
+      sources: [googleSheetsCurrent],
+      value: { kind: "money", value: { currency: "USD", minorUnits: -20_000 } },
+    });
+    const breakdown = metricBreakdownViewModelSchema.parse({
+      metric,
+      dimension: "mapped_scope",
+      items: [
+        {
+          key: "2026-07",
+          label: "2026-07",
+          values: [
+            { kind: "money", value: { currency: "USD", minorUnits: 120_000 } },
+            { kind: "money", value: { currency: "USD", minorUnits: 100_000 } },
+            { kind: "money", value: { currency: "USD", minorUnits: -20_000 } },
+          ],
+          warnings: ["PLAN", "ACTUAL", "VARIANCE"],
+        },
+      ],
+    });
+    const display = mapDashboardPageToDisplayData(
+      { ...financialPageWith([metric]), breakdowns: [breakdown] },
+      "production",
+    );
+
+    expect(display.chartData["finance.budget_vs_actual"]).toEqual([
+      { key: "2026-07", label: "2026-07", value: 1_000, secondaryValue: 1_200 },
+    ]);
+  });
+
+  it("creates a LOW rebate insight only before a certified next tier", () => {
+    const rows = [
+      {
+        key: "tier-2",
+        label: "Tier 2",
+        value: 3,
+        minValue: 10_000,
+        maxValue: 24_999,
+        status: "current",
+        seriesValues: {
+          qualifyingUnits: 18_400,
+          baseCogs: 1.42,
+          effectiveCogs: 1.38,
+          nextCogs: 1.34,
+        },
+      },
+      { key: "tier-3", label: "Tier 3", value: 6, minValue: 25_000, maxValue: 49_999 },
+    ];
+
+    expect(rebateProgressAlert(rows, "current")).toMatchObject({
+      severity: "insight",
+      title: "6,600 bars to the Tier 3 rebate",
+      metadata: ["Fairafric", "Tier 2 · 3%"],
+    });
+    expect(rebateProgressAlert(rows, "business_rule_required")).toBeNull();
+    expect(
+      rebateProgressAlert(
+        [
+          {
+            key: "tier-4",
+            label: "Tier 4",
+            value: 9,
+            minValue: 50_000,
+            maxValue: null,
+            status: "current",
+            seriesValues: { qualifyingUnits: 52_000 },
+          },
+        ],
+        "current",
+      ),
+    ).toBeNull();
   });
 
   it("maps real values into currentValues and never fabricates blocked entries", () => {

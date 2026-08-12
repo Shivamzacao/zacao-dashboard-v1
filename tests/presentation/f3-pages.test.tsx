@@ -11,6 +11,7 @@ import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/d
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
 import {
   f3CustomerPageFixtureData,
+  f3FinancialPageFixtureData,
   f3GrowthPageFixtureData,
   f3MarketingPageFixtureData,
   f3OperationsPageFixtureData,
@@ -370,9 +371,47 @@ describe("F3 dashboard pages", () => {
     ).toEqual(["Investor", "Stage", "Interest level", "Check size", "Next step", "Details"]);
   });
 
-  it("keeps the conditional Financial page structurally complete without fake values", () => {
-    render(<DashboardPageView spec={dashboardPageSpecs.financial} fixture={f3PageFixtureData} />);
-    expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
+  it("renders the complete Financial Intelligence HTML composition truthfully", () => {
+    const financial = dashboardPageSpecs.financial;
+    expect(financial.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "commerce.total_sales",
+      "finance.actual_expenses",
+      "finance.actual_margin",
+      "finance.cash_position",
+      "inventory.value",
+      "finance.monthly_burn",
+      "finance.cash_runway",
+      "finance.effective_cogs",
+      "finance.rebate_tier",
+    ]);
+    expect(financial.charts.map(({ title }) => title)).toEqual([
+      "Expense composition",
+      "Cash position",
+      "Production cost & payment",
+      "Budget versus actual",
+      "Margin by channel",
+      "Fairafric volume rebate tiers",
+    ]);
+    expect(financial.tables).toEqual([]);
+    expect(financial.charts[3]?.series?.[1]).toMatchObject({
+      label: "Plan",
+      pattern: "dashed",
+    });
+
+    render(<DashboardPageView spec={financial} fixture={f3FinancialPageFixtureData} />);
+    expect(
+      screen
+        .getByRole("region", { name: "Key performance indicators" })
+        .querySelectorAll("article"),
+    ).toHaveLength(9);
+    expect(screen.getByLabelText("Actual operating expenses: $35,700.00")).toBeTruthy();
+    expect(screen.getByLabelText("Cash position: $248,000.00")).toBeTruthy();
+    expect(screen.getAllByText("Business rule required")).toHaveLength(4);
+    expect(screen.getAllByText("Data pending")).toHaveLength(3);
+    expect(screen.getAllByText("Actual").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Plan").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText("Source: Fairafric")).toHaveLength(3);
+    expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
   });
 
   it("renders live catalog rows as readable columns without provider URIs", () => {

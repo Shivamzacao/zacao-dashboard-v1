@@ -14,7 +14,8 @@ export type ChartKind =
   | "funnel"
   | "heatmap"
   | "band"
-  | "timeline";
+  | "timeline"
+  | "tiers";
 
 export interface PageKpiSpec {
   readonly metricKey: string;
@@ -1085,38 +1086,79 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
     financial: spec({
       slug: "financial",
       kpis: [
-        "commerce.total_sales",
-        "finance.actual_expenses",
-        "finance.actual_margin",
-        "finance.cash_position",
-        "inventory.value",
-        "finance.monthly_burn",
-        "finance.cash_runway",
+        { metricKey: "commerce.total_sales", sourceLabel: "Shopify" },
+        { metricKey: "finance.actual_expenses", sourceLabel: "Google Sheets" },
+        {
+          metricKey: "finance.actual_margin",
+          label: "Actual gross margin",
+          sourceLabel: "Shopify + Google Sheets",
+        },
+        { metricKey: "finance.cash_position", sourceLabel: "Google Sheets" },
+        { metricKey: "inventory.value", sourceLabel: "Shopify + Google Sheets" },
+        { metricKey: "finance.monthly_burn", sourceLabel: "Google Sheets" },
+        { metricKey: "finance.cash_runway", sourceLabel: "Google Sheets" },
+        {
+          metricKey: "finance.effective_cogs",
+          label: "Effective COGS per bar",
+          sourceLabel: "Fairafric",
+        },
+        {
+          metricKey: "finance.rebate_tier",
+          label: "Fairafric rebate tier",
+          sourceLabel: "Fairafric",
+        },
       ],
       charts: [
-        {
-          title: "Budget versus actual",
-          description: "Approved plan and actual values for matching periods and definitions.",
-          metricKey: "finance.budget_vs_actual",
-          kind: "bar",
-        },
         {
           title: "Expense composition",
           description: "Actual expense categories from validated finance records.",
           metricKey: "finance.expense_composition",
           kind: "donut",
+          sourceLabel: "Google Sheets",
         },
         {
           title: "Cash position",
           description: "Approved cash snapshots without inferred future cash flow.",
           metricKey: "finance.cash_position",
           kind: "line",
+          sourceLabel: "Google Sheets",
         },
         {
-          title: "Production cost and payment",
+          title: "Production cost & payment",
           description: "Approved production cost and payment-date records.",
           metricKey: "production.cost_payment",
           kind: "area",
+          sourceLabel: "Google Sheets",
+        },
+        {
+          title: "Budget versus actual",
+          description: "Approved plan and actual values for matching periods and definitions.",
+          metricKey: "finance.budget_vs_actual",
+          kind: "line",
+          sourceLabel: "Google Sheets",
+          series: [
+            { key: "value", label: "Actual", tone: "forest" },
+            {
+              key: "secondaryValue",
+              label: "Plan",
+              tone: "gold",
+              pattern: "dashed",
+            },
+          ],
+        },
+        {
+          title: "Margin by channel",
+          description: "Contribution margin after landed COGS, channel fees, and commission.",
+          metricKey: "revenue.channel_margin",
+          kind: "horizontal",
+          sourceLabel: "Shopify + Google Sheets",
+        },
+        {
+          title: "Fairafric volume rebate tiers",
+          description: "Approved qualifying-volume tiers and progress toward the next rebate.",
+          metricKey: "finance.rebate_tiers",
+          kind: "tiers",
+          sourceLabel: "Fairafric",
         },
       ],
       tables: [],
