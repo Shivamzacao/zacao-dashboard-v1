@@ -16,7 +16,6 @@ export class MutableClock implements ClockPort {
 export const FILTERS: DashboardFilters = {
   startDate: "2026-07-01",
   endDate: "2026-07-31",
-  comparison: "none",
   channels: [],
   productSkus: [],
   locations: [],

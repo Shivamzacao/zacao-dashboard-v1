@@ -85,12 +85,10 @@ export function DashboardShellClient({
         <TopBar
           state={state}
           onPresetChange={selectPreset}
-          onFilterChange={push}
           onOpenNavigation={() => setNavigationOpen(true)}
           navigationOpen={navigationOpen}
           menuButtonRef={menuButtonRef}
           exportHref={exportHref}
-          supportedComparisons={supportedFilters.comparisons}
           pending={pending}
         />
         <GlobalFilterBar

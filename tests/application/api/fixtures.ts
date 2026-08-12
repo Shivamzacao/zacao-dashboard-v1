@@ -24,7 +24,6 @@ export function apiSource(state: SourceStatus["state"] = "current"): SourceStatu
 export class FixtureApiRuntime implements BackendApiRuntime {
   readonly environment = "test" as const;
   readonly supportedFilters: FilterOptions = {
-    comparisons: ["none", "previous_period", "previous_year"],
     channels: ["Website/DTC"],
     productSkus: ["SYNTH-1", "SYNTH-2", "SYNTH-3"],
     locations: ["SYNTH-WAREHOUSE"],

@@ -53,7 +53,7 @@ export function parseDashboardFilters(
   search: URLSearchParams,
   supported: FilterOptions,
 ): DashboardFilters {
-  assertOnly(search, ["start", "end", "comparison", "channels", "skus", "locations"]);
+  assertOnly(search, ["start", "end", "channels", "skus", "locations"]);
   const startDate = search.get("start");
   const endDate = search.get("end");
   if (!startDate || !endDate) throw new ApiQueryError("start and end are required", ["start"]);
@@ -61,7 +61,6 @@ export function parseDashboardFilters(
     dashboardFiltersSchema.parse({
       startDate,
       endDate,
-      comparison: search.get("comparison") ?? "none",
       channels: list(search, "channels"),
       productSkus: list(search, "skus"),
       locations: list(search, "locations"),
@@ -69,8 +68,6 @@ export function parseDashboardFilters(
   );
   if (daySpan(filters.startDate, filters.endDate) > 366)
     throw new ApiQueryError("Date range cannot exceed 366 days", ["end"]);
-  if (!supported.comparisons.includes(filters.comparison))
-    throw new ApiQueryError("Unsupported comparison", ["comparison"]);
   assertKnown(filters.channels, supported.channels, "channels");
   assertKnown(filters.productSkus, supported.productSkus, "skus");
   assertKnown(filters.locations, supported.locations, "locations");
@@ -94,7 +91,6 @@ export function parseDrilldownQuery(
   assertOnly(search, [
     "start",
     "end",
-    "comparison",
     "channels",
     "skus",
     "locations",

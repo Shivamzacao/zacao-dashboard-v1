@@ -8,7 +8,6 @@ import {
 const filters = {
   startDate: "2025-08-08",
   endDate: "2026-08-07",
-  comparison: "none" as const,
   channels: [] as string[],
   productSkus: [] as string[],
   locations: [] as string[],

@@ -22,12 +22,7 @@ afterEach(cleanup);
 
 describe("F1 shell components", () => {
   it("renders all and only approved V1 destinations with active-route semantics", () => {
-    render(
-      <SidebarNavigation
-        pathname="/products"
-        query="start=2025-08-08&end=2026-08-07&comparison=none"
-      />,
-    );
+    render(<SidebarNavigation pathname="/products" query="start=2025-08-08&end=2026-08-07" />);
     expect(screen.getAllByRole("link")).toHaveLength(9);
     expect(
       screen.getByRole("link", { name: /Product intelligence/ }).getAttribute("aria-current"),

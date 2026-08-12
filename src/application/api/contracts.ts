@@ -11,7 +11,6 @@ import {
 
 const filterOptionsSchema = z
   .object({
-    comparisons: z.array(z.enum(["none", "previous_period", "previous_year"])),
     channels: z.array(z.string().min(1)),
     productSkus: z.array(z.string().min(1)),
     locations: z.array(z.string().min(1)),

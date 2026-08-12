@@ -12,9 +12,7 @@ const supported = new FixtureApiRuntime().supportedFilters;
 describe("B7 query allowlists", () => {
   it("parses and normalizes the approved filter contract", () => {
     const parsed = parseDashboardFilters(
-      new URLSearchParams(
-        "start=2026-07-01&end=2026-07-31&comparison=previous_period&skus=SYNTH-2,SYNTH-1,SYNTH-1",
-      ),
+      new URLSearchParams("start=2026-07-01&end=2026-07-31&skus=SYNTH-2,SYNTH-1,SYNTH-1"),
       supported,
     );
     expect(parsed.productSkus).toEqual(["SYNTH-1", "SYNTH-2"]);
@@ -23,6 +21,7 @@ describe("B7 query allowlists", () => {
   it.each([
     "start=2025-01-01&end=2026-07-31",
     "start=2026-07-01&end=2026-07-31&providerQuery=unsafe",
+    "start=2026-07-01&end=2026-07-31&comparison=previous_period",
     "start=2026-07-01&end=2026-07-31&channels=Unknown",
   ])("rejects oversized or unsupported input: %s", (query) => {
     expect(() => parseDashboardFilters(new URLSearchParams(query), supported)).toThrow();

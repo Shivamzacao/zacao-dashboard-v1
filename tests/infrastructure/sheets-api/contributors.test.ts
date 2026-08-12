@@ -24,7 +24,6 @@ const context = {
   filters: {
     startDate: "2026-07-01",
     endDate: "2026-08-31",
-    comparison: "none" as const,
     channels: [],
     productSkus: [],
     locations: [],

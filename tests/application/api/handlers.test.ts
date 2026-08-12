@@ -47,6 +47,22 @@ describe("B7 JSON route contracts", () => {
     expect(JSON.stringify(problem)).not.toMatch(/token|private.?key|secret/i);
   });
 
+  it("rejects the retired comparison query parameter", async () => {
+    const response = await setup().dashboard(
+      new Request(
+        `https://example.test/api/v1/dashboards/products?${API_QUERY}&comparison=previous_year`,
+      ),
+      "products",
+    );
+
+    expect(response.status).toBe(400);
+    const problem = apiProblemSchema.parse(await response.json());
+    expect(problem).toMatchObject({ code: "INVALID_REQUEST" });
+    expect(problem.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ path: ["comparison"] })]),
+    );
+  });
+
   it("preserves partial and empty-data states without failing their pages", async () => {
     const handlers = setup();
     const customers = dashboardApiResponseSchema.parse(

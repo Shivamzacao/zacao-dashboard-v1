@@ -30,9 +30,9 @@ Dashboard slugs are `executive`, `revenue`, `customers`, `products`, `operations
 ## Query contract
 
 Dashboard requests require `start=YYYY-MM-DD` and `end=YYYY-MM-DD`. The inclusive range is capped
-at 366 days. Optional parameters are `comparison`, `channels`, `skus`, and `locations`. Comparison
-values are `none`, `previous_period`, or `previous_year`; source dimensions must be selected from
-the response's `supportedFilters`. Unknown parameters and client-selected environments are rejected.
+at 366 days. Optional parameters are `channels`, `skus`, and `locations`; source dimensions must be
+selected from the response's `supportedFilters`. Unknown parameters, including the retired
+`comparison` parameter, and client-selected environments are rejected.
 
 Drill-down and export requests additionally accept `limit` (1–100), an opaque `cursor`,
 `sort=field:asc|desc`, and comma-separated `fields`. Every dataset has fixed field and sort

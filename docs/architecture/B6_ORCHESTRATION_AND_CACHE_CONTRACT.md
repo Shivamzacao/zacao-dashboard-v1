@@ -24,7 +24,7 @@ B6 composes approved normalized B5 contributions. It does not expose HTTP routes
 - No Redis, database, external cache, queue, background job, or new package was added.
 - Policies are supplied per contributor; B6 does not lock an assumed business update cadence.
 - Process memory is bounded by a configurable entry limit with oldest-entry eviction.
-- Keys isolate schema version, metric definition version, environment, source, hashed fixed source identity, dataset, date range, comparison, channels, SKUs, and locations.
+- Keys isolate schema version, metric definition version, environment, source, hashed fixed source identity, dataset, date range, channels, SKUs, and locations.
 - TEST and PRODUCTION cannot collide. A real Google workbook ID is hashed and is not exposed in the key.
 - Only contributions whose source states are usable are cached. Invalid, unavailable, not-configured, and error results cannot replace a valid entry.
 - Identical concurrent misses are coalesced.

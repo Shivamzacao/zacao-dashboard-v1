@@ -50,4 +50,16 @@ describe("B7 bounded CSV exports", () => {
       ).status,
     ).toBe(400);
   });
+
+  it("rejects the retired comparison query parameter", async () => {
+    const response = await handlers().exportCsv(
+      new Request(
+        `https://example.test/api/v1/exports/product-catalog?${API_QUERY}&comparison=previous_period`,
+      ),
+      "product-catalog",
+    );
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("content-type")).toContain("application/problem+json");
+  });
 });

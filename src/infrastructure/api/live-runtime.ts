@@ -150,7 +150,6 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
 export class LiveBackendApiRuntime implements BackendApiRuntime {
   readonly environment = "production" as const;
   readonly supportedFilters: FilterOptions = {
-    comparisons: ["none", "previous_period", "previous_year"],
     channels: [],
     productSkus: [],
     locations: [],
