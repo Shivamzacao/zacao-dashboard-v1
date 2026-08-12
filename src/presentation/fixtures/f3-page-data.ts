@@ -846,6 +846,62 @@ export const f3GrowthPageFixtureData: F3PageFixtureData = Object.freeze({
   }),
 });
 
+export const f3FinancialPageFixtureData: F3PageFixtureData = Object.freeze({
+  ...f3PageFixtureData,
+  currentValues: Object.freeze({
+    ...f3PageFixtureData.currentValues,
+    "finance.actual_expenses": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 3_570_000 },
+    },
+    "finance.expense_composition": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 3_570_000 },
+    },
+    "finance.cash_position": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 24_800_000 },
+    },
+    "inventory.value": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 4_860_000 },
+    },
+    "finance.budget_vs_actual": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: -175_000 },
+    },
+    "production.cost_payment": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 890_000 },
+    },
+  }),
+  chartData: Object.freeze({
+    ...f3PageFixtureData.chartData,
+    "finance.expense_composition": [
+      { key: "production", label: "Production", value: 16_200 },
+      { key: "marketing", label: "Marketing", value: 8_500 },
+      { key: "fulfillment", label: "Fulfillment", value: 6_100 },
+      { key: "operations", label: "Operations", value: 4_900 },
+    ],
+    "finance.cash_position": [
+      { key: "may", label: "May", value: 268_000 },
+      { key: "jun", label: "Jun", value: 259_000 },
+      { key: "jul", label: "Jul", value: 248_000 },
+    ],
+    "production.cost_payment": [
+      { key: "may", label: "May", value: 6_200 },
+      { key: "jun", label: "Jun", value: 7_600 },
+      { key: "jul", label: "Jul", value: 8_900 },
+    ],
+    "finance.budget_vs_actual": [
+      { key: "may", label: "May", value: 13_800, secondaryValue: 15_000 },
+      { key: "jun", label: "Jun", value: 14_600, secondaryValue: 15_500 },
+      { key: "jul", label: "Jul", value: 14_250, secondaryValue: 16_000 },
+    ],
+  }),
+  alerts: Object.freeze([]),
+});
+
 export const f3ProductPageFixtureData: F3PageFixtureData = Object.freeze({
   ...f3PageFixtureData,
   alerts: [

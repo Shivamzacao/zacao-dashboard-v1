@@ -25,7 +25,7 @@ import type {
   DisplayState,
   LegendItem,
 } from "./display-contracts";
-import { formatChartValue, formatPercent } from "./format-display-value";
+import { formatChartValue, formatPercent, formatQuantity, formatUsd } from "./format-display-value";
 import { ChartLegend } from "./tooltip-legend";
 import { StateSurface } from "./state-surface";
 
@@ -53,7 +53,7 @@ const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
   ratio: (value) => `${formatChartValue(value, "quantity", "full")}×`,
 };
 
-interface BaseChartProps {
+export interface BaseChartProps {
   readonly title: string;
   /**
    * Optional in-frame description. Omit it when the surrounding card already
@@ -538,6 +538,91 @@ export function TimelineChartView(props: BaseChartProps) {
           })}
         </ol>
         <p className="stock-band-note">Bars span production start through expected arrival.</p>
+      </div>
+    </ChartFrame>
+  );
+}
+
+export function RebateTierChartView(props: BaseChartProps) {
+  const rows = [...(props.data ?? [])]
+    .filter((item) => item.value !== null && item.minValue !== null && item.minValue !== undefined)
+    .sort((left, right) => (left.minValue ?? 0) - (right.minValue ?? 0));
+  const current = rows.find((item) => item.status === "current");
+  const qualifyingUnits = current?.seriesValues?.["qualifyingUnits"] ?? null;
+  const next =
+    qualifyingUnits === null
+      ? undefined
+      : rows.find((item) => (item.minValue ?? 0) > qualifyingUnits);
+  const unitsToNext =
+    qualifyingUnits !== null && next?.minValue !== null && next?.minValue !== undefined
+      ? Math.max(next.minValue - qualifyingUnits, 0)
+      : null;
+  const progress =
+    qualifyingUnits !== null && next?.minValue
+      ? Math.min(Math.max((qualifyingUnits / next.minValue) * 100, 0), 100)
+      : next
+        ? 0
+        : 100;
+  const baseCogs = current?.seriesValues?.["baseCogs"] ?? null;
+  const effectiveCogs = current?.seriesValues?.["effectiveCogs"] ?? null;
+  const nextCogs = current?.seriesValues?.["nextCogs"] ?? null;
+  const accessibleRows = rows.map((item) => ({
+    ...item,
+    label: `${item.label} · ${formatQuantity(item.minValue ?? 0)}${item.maxValue === null || item.maxValue === undefined ? "+" : `–${formatQuantity(item.maxValue)}`} bars${item.status === "current" ? " · Current" : ""}`,
+  }));
+
+  return (
+    <ChartFrame {...props} data={accessibleRows} valueFormat="percent">
+      <div className="rebate-tier-chart">
+        {current && qualifyingUnits !== null ? (
+          <div className="rebate-tier-progress-copy">
+            <strong>{formatQuantity(qualifyingUnits)} bars year to date</strong>
+            <span>
+              {next && unitsToNext !== null
+                ? `${formatQuantity(unitsToNext)} bars to ${next.label}`
+                : "Highest rebate tier reached"}
+            </span>
+            <span
+              className="rebate-tier-progress"
+              role="progressbar"
+              aria-label={next ? `Progress toward ${next.label}` : "Highest rebate tier reached"}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progress)}
+            >
+              <span className="rebate-tier-progress-value" style={{ width: `${progress}%` }} />
+            </span>
+          </div>
+        ) : null}
+        <ol className="rebate-tier-list">
+          {rows.map((item) => (
+            <li
+              key={item.key}
+              className={`rebate-tier-row${item.status === "current" ? " is-current" : ""}`}
+            >
+              <span className="rebate-tier-label">
+                <strong>{item.label}</strong>
+                <small>
+                  {formatQuantity(item.minValue ?? 0)}
+                  {item.maxValue === null || item.maxValue === undefined
+                    ? "+"
+                    : `–${formatQuantity(item.maxValue)}`}{" "}
+                  bars
+                </small>
+              </span>
+              <strong className="rebate-tier-rate">{formatPercent(item.value ?? 0)}</strong>
+              {item.status === "current" ? (
+                <span className="rebate-tier-current">Current tier</span>
+              ) : null}
+            </li>
+          ))}
+        </ol>
+        {baseCogs !== null && effectiveCogs !== null && nextCogs !== null && next ? (
+          <p className="rebate-tier-note">
+            Base COGS {formatUsd(baseCogs)} becomes {formatUsd(effectiveCogs)} at the current tier
+            and {formatUsd(nextCogs)} at {next.label}.
+          </p>
+        ) : null}
       </div>
     </ChartFrame>
   );

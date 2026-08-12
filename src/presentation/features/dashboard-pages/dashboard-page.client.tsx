@@ -10,6 +10,7 @@ import {
   HeatmapChartView,
   HorizontalBarChartView,
   LineChartView,
+  RebateTierChartView,
   StockBandChartView,
   StackedBarChartView,
   TimelineChartView,
@@ -153,6 +154,7 @@ function Chart({
     heatmap: <HeatmapChartView {...props} />,
     band: <StockBandChartView {...props} />,
     timeline: <TimelineChartView {...props} />,
+    tiers: <RebateTierChartView {...props} />,
   }[spec.kind];
   return (
     <ChartCard

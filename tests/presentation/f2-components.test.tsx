@@ -10,12 +10,14 @@ import {
   KpiCard,
   ReadinessCard,
   SourceIndicator,
+  WarningCard,
 } from "@/src/presentation/components/dashboard/cards";
 import {
   AreaChartView,
   FunnelChartView,
   HorizontalBarChartView,
   LineChartView,
+  RebateTierChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
 import {
   DataTable,
@@ -156,6 +158,71 @@ describe("F2 reusable dashboard components", () => {
     );
     expect(container.querySelector(".pattern-dashed")).toBeTruthy();
     expect(screen.getByRole("table", { name: "Per-bar COGS versus target data" })).toBeTruthy();
+  });
+
+  it("renders approved rebate tiers, current progress, and effective COGS copy", () => {
+    render(
+      <RebateTierChartView
+        title="Fairafric volume rebate tiers"
+        data={[
+          { key: "tier-1", label: "Tier 1", value: 0, minValue: 0, maxValue: 9_999 },
+          {
+            key: "tier-2",
+            label: "Tier 2",
+            value: 3,
+            minValue: 10_000,
+            maxValue: 24_999,
+            status: "current",
+            seriesValues: {
+              qualifyingUnits: 18_400,
+              baseCogs: 1.42,
+              effectiveCogs: 1.38,
+              nextCogs: 1.34,
+            },
+          },
+          { key: "tier-3", label: "Tier 3", value: 6, minValue: 25_000, maxValue: 49_999 },
+          { key: "tier-4", label: "Tier 4", value: 9, minValue: 50_000, maxValue: null },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("18,400 bars year to date")).toBeTruthy();
+    expect(screen.getByText("6,600 bars to Tier 3")).toBeTruthy();
+    expect(screen.getByText("Current tier")).toBeTruthy();
+    expect(screen.getByText(/Base COGS \$1.42 becomes \$1.38/)).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Fairafric volume rebate tiers data" })).toBeTruthy();
+  });
+
+  it("shows highest-tier completion and the HTML LOW insight treatment", () => {
+    render(
+      <>
+        <RebateTierChartView
+          title="Highest tier"
+          data={[
+            {
+              key: "tier-4",
+              label: "Tier 4",
+              value: 9,
+              minValue: 50_000,
+              maxValue: null,
+              status: "current",
+              seriesValues: { qualifyingUnits: 52_000 },
+            },
+          ]}
+        />
+        <WarningCard
+          title="6,600 bars to the Tier 3 rebate"
+          severity="insight"
+          metadata={["Fairafric"]}
+        >
+          Certified tier progress.
+        </WarningCard>
+      </>,
+    );
+
+    expect(screen.getByText("Highest rebate tier reached")).toBeTruthy();
+    expect(screen.getByText("Low")).toBeTruthy();
+    expect(document.querySelector(".message-insight .severity-insight")).toBeTruthy();
   });
 
   it("exposes every declared LTV series and unavailable immature cells accessibly", () => {

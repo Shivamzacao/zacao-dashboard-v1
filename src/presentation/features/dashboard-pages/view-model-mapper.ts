@@ -16,6 +16,7 @@ import {
   formatDate,
   formatPercent,
   formatQuantity,
+  formatUsd,
 } from "@/src/presentation/components/dashboard/format-display-value";
 
 import type {
@@ -166,6 +167,38 @@ function sourceIndicator(status: SourceStatus): SourceIndicatorModel {
   };
 }
 
+export function rebateProgressAlert(
+  data: readonly ChartDatum[],
+  state: DisplayState | undefined,
+): DashboardAlertDisplayModel | null {
+  if (state !== "current") return null;
+  const current = data.find((item) => item.status === "current");
+  const qualifyingUnits = current?.seriesValues?.["qualifyingUnits"] ?? null;
+  if (!current || current.value === null || qualifyingUnits === null) return null;
+  const next = [...data]
+    .filter(
+      (item) =>
+        item.minValue !== null && item.minValue !== undefined && item.minValue > qualifyingUnits,
+    )
+    .sort((left, right) => (left.minValue ?? 0) - (right.minValue ?? 0))[0];
+  if (!next?.minValue) return null;
+  const baseCogs = current.seriesValues?.["baseCogs"] ?? null;
+  const effectiveCogs = current.seriesValues?.["effectiveCogs"] ?? null;
+  const nextCogs = current.seriesValues?.["nextCogs"] ?? null;
+  const unitsToNext = next.minValue - qualifyingUnits;
+  const costCopy =
+    baseCogs !== null && effectiveCogs !== null && nextCogs !== null
+      ? ` Base COGS of ${formatUsd(baseCogs)} is ${formatUsd(effectiveCogs)} after the current rebate and would become ${formatUsd(nextCogs)} at ${next.label}.`
+      : "";
+  return {
+    key: "finance.rebate-tier-progress",
+    severity: "insight",
+    title: `${formatQuantity(unitsToNext)} bars to the ${next.label} rebate`,
+    description: `${formatQuantity(qualifyingUnits)} certified qualifying bars place Fairafric volume in ${current.label} at ${formatPercent(current.value)}.${costCopy}`,
+    metadata: ["Fairafric", `${current.label} · ${formatPercent(current.value)}`],
+  };
+}
+
 /**
  * Pure projection of a certified backend page view model onto the display
  * contract the F3 components render. Blocked metrics arrive with null values
@@ -305,60 +338,88 @@ export function mapDashboardPageToDisplayData(
     // The day/hour heatmap key is "<day>:<hour>" (see buildPurchaseHeatmapBreakdown);
     // splitting it into a group/label pair lets HeatmapChartView lay the data
     // out as a day-by-hour grid instead of 168 flat category-axis ticks.
-    chartData[breakdown.metric.key] = ["packaging_material_band", "sku_stock_band"].includes(
-      breakdown.dimension,
-    )
-      ? breakdown.items.map((item) => {
-          const warningNumber = (prefix: string) => {
-            const warning = item.warnings.find((value) => value.startsWith(prefix));
-            return warning ? Number(warning.slice(prefix.length)) : null;
-          };
-          return {
+    chartData[breakdown.metric.key] =
+      breakdown.metric.key === "finance.budget_vs_actual" && breakdown.dimension === "mapped_scope"
+        ? breakdown.items.map((item) => ({
             key: item.key,
-            label: item.label,
-            value: numericValue(item.values[0] ?? null),
-            minValue: warningNumber("IDEAL_MIN:"),
-            maxValue: warningNumber("IDEAL_MAX:"),
-          };
-        })
-      : breakdown.dimension === "packaging_month_series"
-        ? breakdown.items.map((item) => {
-            const seriesValues: Record<string, number | null> = {};
-            item.warnings.forEach((warning, index) => {
-              if (!warning.startsWith("SERIES:")) return;
-              const [, , label = ""] = warning.split(":");
-              const normalized = label.toLowerCase();
-              const key = normalized.includes("wrapper")
-                ? "barWrappers"
-                : normalized.includes("shipper")
-                  ? "shipperBoxes"
-                  : normalized.includes("carton")
-                    ? "cartons"
-                    : null;
-              if (key) seriesValues[key] = numericValue(item.values[index] ?? null);
-            });
-            return {
-              key: item.key,
-              label: compactPeriodLabel(item.label),
-              value: numericValue(item.values[0] ?? null),
-              seriesValues,
-            };
-          })
-        : breakdown.dimension === "day_hour"
+            label: compactPeriodLabel(item.label),
+            value: numericValue(item.values[1] ?? null),
+            secondaryValue: numericValue(item.values[0] ?? null),
+          }))
+        : breakdown.metric.key === "finance.rebate_tiers" && breakdown.dimension === "rebate_tiers"
           ? breakdown.items.map((item) => {
-              const [day, hour] = item.key.split(":");
+              const warningNumber = (prefix: string) => {
+                const warning = item.warnings.find((value) => value.startsWith(prefix));
+                return warning ? Number(warning.slice(prefix.length)) : null;
+              };
+              const seriesValues = {
+                qualifyingUnits: warningNumber("QUALIFYING_UNITS:"),
+                baseCogs: warningNumber("BASE_COGS:"),
+                effectiveCogs: warningNumber("EFFECTIVE_COGS:"),
+                nextCogs: warningNumber("NEXT_COGS:"),
+              };
               return {
                 key: item.key,
-                label: hour ?? item.label,
+                label: item.label,
                 value: numericValue(item.values[0] ?? null),
-                group: day ?? "",
+                minValue: warningNumber("MIN_UNITS:"),
+                maxValue: warningNumber("MAX_UNITS:"),
+                status: item.warnings.includes("CURRENT") ? "current" : undefined,
+                seriesValues,
               };
             })
-          : breakdown.items.map((item) => ({
-              key: item.key,
-              label: item.label,
-              value: numericValue(item.values[0] ?? null),
-            }));
+          : ["packaging_material_band", "sku_stock_band"].includes(breakdown.dimension)
+            ? breakdown.items.map((item) => {
+                const warningNumber = (prefix: string) => {
+                  const warning = item.warnings.find((value) => value.startsWith(prefix));
+                  return warning ? Number(warning.slice(prefix.length)) : null;
+                };
+                return {
+                  key: item.key,
+                  label: item.label,
+                  value: numericValue(item.values[0] ?? null),
+                  minValue: warningNumber("IDEAL_MIN:"),
+                  maxValue: warningNumber("IDEAL_MAX:"),
+                };
+              })
+            : breakdown.dimension === "packaging_month_series"
+              ? breakdown.items.map((item) => {
+                  const seriesValues: Record<string, number | null> = {};
+                  item.warnings.forEach((warning, index) => {
+                    if (!warning.startsWith("SERIES:")) return;
+                    const [, , label = ""] = warning.split(":");
+                    const normalized = label.toLowerCase();
+                    const key = normalized.includes("wrapper")
+                      ? "barWrappers"
+                      : normalized.includes("shipper")
+                        ? "shipperBoxes"
+                        : normalized.includes("carton")
+                          ? "cartons"
+                          : null;
+                    if (key) seriesValues[key] = numericValue(item.values[index] ?? null);
+                  });
+                  return {
+                    key: item.key,
+                    label: compactPeriodLabel(item.label),
+                    value: numericValue(item.values[0] ?? null),
+                    seriesValues,
+                  };
+                })
+              : breakdown.dimension === "day_hour"
+                ? breakdown.items.map((item) => {
+                    const [day, hour] = item.key.split(":");
+                    return {
+                      key: item.key,
+                      label: hour ?? item.label,
+                      value: numericValue(item.values[0] ?? null),
+                      group: day ?? "",
+                    };
+                  })
+                : breakdown.items.map((item) => ({
+                    key: item.key,
+                    label: item.label,
+                    value: numericValue(item.values[0] ?? null),
+                  }));
   }
 
   const rowsByDataset: Record<string, readonly DisplayTableRow[]> = {};
@@ -456,6 +517,11 @@ export function mapDashboardPageToDisplayData(
   }
 
   alerts.push(...packagingAlerts.sort((left, right) => right.shortfall - left.shortfall));
+  const rebateAlert = rebateProgressAlert(
+    chartData["finance.rebate_tiers"] ?? [],
+    states["finance.rebate_tiers"],
+  );
+  if (rebateAlert) alerts.push(rebateAlert);
 
   return {
     environment,
