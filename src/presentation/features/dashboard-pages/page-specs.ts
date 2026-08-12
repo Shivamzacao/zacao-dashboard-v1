@@ -4,11 +4,21 @@ import type { ChartSeriesDefinition } from "@/src/presentation/components/dashbo
 export type ChartKind =
   "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap";
 
+export interface PageKpiSpec {
+  readonly metricKey: string;
+  readonly label?: string;
+  readonly sourceLabel?: string;
+  readonly valuePresentation?: "default" | "full" | "ratio";
+  readonly unitSuffix?: string;
+}
+
 export interface PageChartSpec {
   readonly title: string;
   readonly description: string;
   readonly metricKey: string;
   readonly kind: ChartKind;
+  readonly eyebrow?: string;
+  readonly sourceLabel?: string;
   readonly secondaryMetricKey?: string;
   readonly series?: readonly ChartSeriesDefinition[];
 }
@@ -17,33 +27,65 @@ export interface PageTableSpec {
   readonly title: string;
   readonly description: string;
   readonly metricKey: string;
+  readonly sourceLabel?: string;
   readonly dataset?: string;
   readonly hiddenColumns?: readonly string[];
 }
 
 export interface DashboardPageSpec {
   readonly slug: DashboardSlug;
-  readonly kpis: readonly string[];
+  readonly kpis: readonly PageKpiSpec[];
   readonly charts: readonly PageChartSpec[];
   readonly tables: readonly PageTableSpec[];
 }
 
-const spec = (value: DashboardPageSpec): DashboardPageSpec => Object.freeze(value);
+type DashboardPageSpecInput = Omit<DashboardPageSpec, "kpis"> & {
+  readonly kpis: readonly (string | PageKpiSpec)[];
+};
+
+const spec = (value: DashboardPageSpecInput): DashboardPageSpec =>
+  Object.freeze({
+    ...value,
+    kpis: Object.freeze(
+      value.kpis.map((item) => (typeof item === "string" ? { metricKey: item } : item)),
+    ),
+  });
 
 export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpec>> = Object.freeze(
   {
     executive: spec({
       slug: "executive",
       kpis: [
-        "commerce.net_sales",
-        "commerce.orders",
-        "commerce.average_order_value",
-        "customers.returning_rate",
-        "finance.cash_runway",
-        "inventory.shopify_current",
-        "operations.shipped_delivered",
-        "inventory.value",
-        "finance.actual_margin",
+        { metricKey: "commerce.net_sales", valuePresentation: "full" },
+        { metricKey: "commerce.orders", valuePresentation: "full" },
+        { metricKey: "commerce.average_order_value", valuePresentation: "full" },
+        { metricKey: "customers.returning_rate", valuePresentation: "full" },
+        {
+          metricKey: "marketing.ltv_cac",
+          label: "LTV:CAC",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "ratio",
+        },
+        { metricKey: "commerce.website_sessions", valuePresentation: "full" },
+        {
+          metricKey: "inventory.combined",
+          label: "Inventory on hand",
+          sourceLabel: "Shopify + 3PL",
+          valuePresentation: "full",
+          unitSuffix: "bars",
+        },
+        {
+          metricKey: "operations.manufacturer_otif",
+          label: "On-time & complete (manufacturer)",
+          sourceLabel: "Google Sheets",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "manufacturing.cogs_per_bar",
+          label: "COGS per bar",
+          sourceLabel: "Fairafric",
+          valuePresentation: "full",
+        },
       ],
       charts: [
         {
@@ -59,33 +101,68 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "horizontal",
         },
         {
-          title: "Revenue mix by channel",
-          description: "Approved native channel mix; unmapped sales remain unclassified.",
-          metricKey: "commerce.native_channel_mix",
-          kind: "horizontal",
-        },
-        {
-          title: "Inventory on hand",
-          description: "Current inventory available from verified Shopify locations.",
-          metricKey: "inventory.shopify_current",
+          title: "Units sold",
+          description: "Net merchandise items sold by approved product.",
+          metricKey: "products.units_sold",
+          eyebrow: "Units sold",
           kind: "horizontal",
         },
         {
           title: "Product revenue",
           description: "Approved merchandise revenue by product.",
           metricKey: "products.sales",
-          kind: "horizontal",
-        },
-        {
-          title: "Units sold",
-          description: "Net merchandise items sold by approved product.",
-          metricKey: "products.units_sold",
+          eyebrow: "Product/SKU sales",
           kind: "horizontal",
         },
         {
           title: "Source readiness",
           description: "Freshness evidence for each connected source.",
           metricKey: "sources.freshness",
+          eyebrow: "Source freshness",
+          sourceLabel: "Shopify + Klaviyo + Google Sheets",
+          kind: "bar",
+        },
+        {
+          title: "Revenue mix by channel",
+          description: "Net sales across the approved ZACAO channel taxonomy.",
+          metricKey: "commerce.native_channel_mix",
+          eyebrow: "Revenue by channel",
+          kind: "horizontal",
+        },
+        {
+          title: "Per-bar COGS versus target",
+          description: "Landed manufacturing cost per bar against the approved target.",
+          metricKey: "manufacturing.cogs_per_bar",
+          eyebrow: "Per-bar COGS trend",
+          sourceLabel: "Fairafric",
+          kind: "line",
+          series: [
+            { key: "value", label: "Actual COGS", tone: "forest" },
+            { key: "secondaryValue", label: "Target", tone: "gold", pattern: "dashed" },
+          ],
+        },
+        {
+          title: "Input cost movement",
+          description: "Quarter-over-quarter movement in each major input cost.",
+          metricKey: "manufacturing.input_cost_movement",
+          eyebrow: "Input cost movement",
+          sourceLabel: "Fairafric",
+          kind: "horizontal",
+        },
+        {
+          title: "Manufacturer delivery performance",
+          description: "On-time, complete, and damage-free rates for received purchase orders.",
+          metricKey: "operations.manufacturer_otif",
+          eyebrow: "Manufacturer delivery performance",
+          sourceLabel: "Google Sheets",
+          kind: "horizontal",
+        },
+        {
+          title: "Inventory on hand by channel",
+          description: "Sellable units grouped by the channel each location serves.",
+          metricKey: "inventory.combined",
+          eyebrow: "Inventory on hand by channel",
+          sourceLabel: "Shopify + 3PL",
           kind: "horizontal",
         },
       ],

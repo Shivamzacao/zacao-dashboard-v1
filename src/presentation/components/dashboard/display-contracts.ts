@@ -40,6 +40,7 @@ export interface ChartSeriesDefinition {
   readonly key: string;
   readonly label: string;
   readonly tone: "forest" | "gold" | "terracotta" | "sage" | "plum";
+  readonly pattern?: "solid" | "dashed" | "dotted";
 }
 
 export interface LegendItem {
@@ -60,6 +61,9 @@ export interface KpiDisplayModel {
   readonly label: string;
   readonly value: MetricDisplayValue | null;
   readonly state: DisplayState;
+  readonly sourceLabel?: string;
+  readonly valuePresentation?: "default" | "full" | "ratio";
+  readonly unitSuffix?: string;
   readonly comparison?: DisplayComparison;
   readonly helpText?: string;
   readonly unavailableReason?: string;

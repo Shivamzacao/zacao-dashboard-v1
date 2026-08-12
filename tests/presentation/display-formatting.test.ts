@@ -6,6 +6,7 @@ import {
   formatDate,
   formatDateTime,
   formatDisplayValue,
+  formatKpiDisplayValue,
   formatMonth,
   formatPercent,
   formatQuantity,
@@ -45,6 +46,15 @@ describe("dashboard display formatting", () => {
     expect(formatDisplayValue({ kind: "count", value: 0 })).toBe("0");
     expect(formatDisplayValue(null)).toBe("Unavailable");
     expect(fullDisplayValue(null)).toBe("Data unavailable");
+  });
+
+  it("supports reference-specific KPI ratios and units without changing value contracts", () => {
+    expect(
+      formatKpiDisplayValue({ kind: "rate_basis_points", value: 360 }, { presentation: "ratio" }),
+    ).toBe("3.6 : 1");
+    expect(formatKpiDisplayValue({ kind: "quantity", value: 436 }, { unitSuffix: "bars" })).toBe(
+      "436 bars",
+    );
   });
 
   it("uses full values for tooltips and compact values for chart axes", () => {

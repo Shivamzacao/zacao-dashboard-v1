@@ -80,12 +80,21 @@ export function buildShopifyFunnelMetrics(
   context: MetricServiceContext,
   fact: ShopifyFunnelFact | null,
 ): readonly MetricViewModel[] {
-  if (!fact) return [metric(context, "commerce.web_funnel", null)];
+  if (!fact) {
+    return [
+      metric(context, "commerce.web_funnel", null),
+      metric(context, "commerce.website_sessions", null),
+    ];
+  }
   const funnelMetric = metric(context, "commerce.web_funnel", {
     kind: "rate_basis_points",
     value: fact.conversionRateBasisPoints,
   });
-  return [funnelMetric];
+  const sessionsMetric = metric(context, "commerce.website_sessions", {
+    kind: "count",
+    value: fact.sessions,
+  });
+  return [funnelMetric, sessionsMetric];
 }
 
 export function buildShopifyFunnelTable(

@@ -125,3 +125,18 @@ export function fullDisplayValue(value: MetricDisplayValue | null): string {
   if (value === null) return "Data unavailable";
   return formatDisplayValue(value, "full");
 }
+
+export function formatKpiDisplayValue(
+  value: MetricDisplayValue | null,
+  options: {
+    readonly presentation?: "default" | "full" | "ratio";
+    readonly unitSuffix?: string;
+  } = {},
+): string {
+  if (value === null) return "Unavailable";
+  const formatted =
+    options.presentation === "ratio" && value.kind === "rate_basis_points"
+      ? `${formatQuantity(value.value / 100, "full")} : 1`
+      : formatDisplayValue(value, options.presentation === "full" ? "full" : "compact");
+  return options.unitSuffix ? `${formatted} ${options.unitSuffix}` : formatted;
+}

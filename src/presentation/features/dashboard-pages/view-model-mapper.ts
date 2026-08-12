@@ -301,9 +301,9 @@ export function mapDashboardPageToDisplayData(
       chartData[table.metric.key] = table.rows.map((row, index) => ({
         key: String(row["source"] ?? index),
         label: String(row["source"] ?? index),
-        value: row["state"] === "current" ? 1 : row["state"] === "stale" ? 0.5 : 0,
+        value: row["state"] === "current" ? 100 : row["state"] === "stale" ? 50 : 0,
       }));
-      chartValueFormats[table.metric.key] = "count";
+      chartValueFormats[table.metric.key] = "percent";
     }
     if (table.metric.key === "social.performance") {
       chartData[table.metric.key] = table.rows.map((row, index) => ({

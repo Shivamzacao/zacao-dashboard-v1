@@ -140,6 +140,52 @@ export const metricCatalog = Object.freeze([
     blockingReason: null,
   }),
   entry({
+    key: "operations.manufacturer_otif",
+    label: "On-time and complete (manufacturer)",
+    sections: ["Executive Health", "Operations Intelligence"],
+    v1Class: "conditional",
+    valueKind: "rate_basis_points",
+    sourceKeys: ["google_sheets"],
+    sources: "Google Sheets production and receiving records",
+    sourceFields:
+      "purchase order, promised date, received date, ordered units, received units, accepted units",
+    calculation:
+      "Calculate on-time, complete, and damage-free manufacturer delivery rates only from validated received purchase orders under an approved OTIF policy.",
+    status: "DATA_PENDING",
+    blockingReason:
+      "Validated received purchase-order history and the approved manufacturer OTIF policy are not available to the runtime.",
+  }),
+  entry({
+    key: "manufacturing.cogs_per_bar",
+    label: "COGS per bar",
+    sections: ["Executive Health", "Operations Intelligence", "Financial Intelligence"],
+    v1Class: "conditional",
+    valueKind: "money",
+    sourceKeys: ["google_sheets"],
+    sources: "Fairafric cost records",
+    sourceFields:
+      "effective SKU cost, manufactured units, packaging, freight, landed-cost policy, target cost",
+    calculation:
+      "Calculate landed manufacturing cost per sellable bar only from effective approved cost rows and a reconciled freight and packaging policy.",
+    status: "BUSINESS_RULE_REQUIRED",
+    blockingReason:
+      "The effective per-bar cost policy, freight treatment, and target cost are not approved.",
+  }),
+  entry({
+    key: "manufacturing.input_cost_movement",
+    label: "Input cost movement",
+    sections: ["Executive Health", "Operations Intelligence", "Financial Intelligence"],
+    v1Class: "conditional",
+    valueKind: "rate_basis_points",
+    sourceKeys: ["google_sheets"],
+    sources: "Fairafric cost records",
+    sourceFields: "effective input, packaging, and freight unit costs by comparable period",
+    calculation:
+      "Compare effective input costs quarter over quarter only for consistently scoped and validated cost components.",
+    status: "DATA_PENDING",
+    blockingReason: "Comparable effective input-cost history is not available to the runtime.",
+  }),
+  entry({
     key: "plan.revenue_variance",
     label: "Revenue versus plan",
     sections: ["Executive Health", "Revenue Intelligence", "Financial Intelligence"],
@@ -379,6 +425,20 @@ export const metricCatalog = Object.freeze([
       "sessions, online_store_visitors, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate",
     calculation:
       "Expose Shopify provider funnel counts and conversion rate for the requested period.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
+    key: "commerce.website_sessions",
+    label: "Website sessions",
+    sections: ["Executive Health", "Customer Intelligence", "Marketing Intelligence"],
+    v1Class: "core",
+    valueKind: "count",
+    sourceKeys: ["shopify"],
+    sources: "ShopifyQL sessions",
+    sourceFields: "sessions",
+    calculation:
+      "Pass through the ShopifyQL sessions count for the requested period from the certified acquisition-funnel dataset.",
     status: "CERTIFIABLE",
     blockingReason: null,
   }),

@@ -6,6 +6,7 @@ import {
   buildInventoryBreakdown,
   buildProductUnitsBreakdown,
   buildProductVelocityTable,
+  buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
 } from "@/src/application/metrics";
 
@@ -50,6 +51,21 @@ describe("B5 Shopify metric services", () => {
     expect(zero.rows[0]).toEqual({ stage: "Sessions", count: 0 });
     expect(unavailable.metric.value).toBeNull();
     expect(unavailable.metric.readiness.state).toBe("unavailable");
+  });
+
+  it("publishes website sessions from the certified funnel fact", () => {
+    const metrics = buildShopifyFunnelMetrics(context(), {
+      sessions: 1280,
+      visitors: 1100,
+      cartAdditions: 174,
+      reachedCheckout: 86,
+      completedCheckout: 18,
+      conversionRateBasisPoints: 141,
+    });
+    expect(metrics.map(({ key, value }) => [key, value])).toEqual([
+      ["commerce.web_funnel", { kind: "rate_basis_points", value: 141 }],
+      ["commerce.website_sessions", { kind: "count", value: 1280 }],
+    ]);
   });
 
   it("excludes non-merchandise rows and discloses missing SKU mappings", () => {

@@ -55,6 +55,7 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
     "inventory.shopify_current": { kind: "quantity", value: 436 },
     "quality.missing_sku_cost": { kind: "count", value: 1 },
     "commerce.web_funnel": { kind: "count", value: 18 },
+    "commerce.website_sessions": { kind: "count", value: 1280 },
     "sources.freshness": { kind: "status", value: "3 sources checked" },
     "sources.historical_completeness": { kind: "status", value: "Partial history disclosed" },
     "quality.klaviyo_no_activity": { kind: "status", value: "No activity" },
@@ -134,7 +135,10 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
   }),
   // The funnel plots stage counts while its metric's own value is a conversion
   // rate; without this the counts would render as percentages.
-  chartValueFormats: Object.freeze({ "commerce.web_funnel": "count" as const }),
+  chartValueFormats: Object.freeze({
+    "commerce.web_funnel": "count" as const,
+    "sources.freshness": "percent" as const,
+  }),
   rowsByDataset: Object.freeze({
     "product-catalog": [
       { product: "Synthetic Dark Bar", sku: "SYNTH-DARK-70", status: "Active", price: "$12.00" },
