@@ -386,6 +386,9 @@ describe("LiveBackendApiRuntime", () => {
   it("loads the Sheets contributors required by Executive and Revenue", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-operations");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-metrics");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
+      "product-sheet-example-metrics",
+    );
   });
 
   it("serves certifiable Shopify values while blocked metrics stay null", async () => {

@@ -174,7 +174,10 @@ export function createSheetsApiContributors(
       "COGS_By_SKU",
       "SKU_Master",
     ]);
-    const metricContext = context(value, result.sourceStatus);
+    const skuMaster = selectExampleFallback(result, "SKU_Master");
+    const status = syntheticSourceStatus(result.sourceStatus, skuMaster.usedExample);
+    const warnings = syntheticWarnings(result.warnings, skuMaster.usedExample);
+    const metricContext = context(value, status);
     return {
       metrics: [
         buildInventoryValueMetric(
@@ -182,14 +185,10 @@ export function createSheetsApiContributors(
           result.tabs["Inventory_Snapshots"] ?? [],
           result.tabs["COGS_By_SKU"] ?? [],
         ),
-        buildMissingSkuCostMetric(
-          metricContext,
-          result.tabs["SKU_Master"] ?? [],
-          result.tabs["COGS_By_SKU"] ?? [],
-        ),
+        buildMissingSkuCostMetric(metricContext, skuMaster.rows, result.tabs["COGS_By_SKU"] ?? []),
       ],
-      sourceStatuses: [result.sourceStatus],
-      warnings: result.warnings,
+      sourceStatuses: [status],
+      warnings,
     };
   });
 

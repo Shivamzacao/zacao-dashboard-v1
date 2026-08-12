@@ -35,6 +35,7 @@ import { createSheetsApiContributors } from "@/src/infrastructure/sheets-api/con
 import { SheetsApiClient } from "@/src/infrastructure/sheets-api/client";
 import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/config";
 import { createV1CompositeContributor } from "@/src/infrastructure/composite/v1-metrics";
+import { createProductSheetMetricsContributor } from "@/src/infrastructure/composite/product-metrics";
 import { GoogleReadClient } from "@/src/infrastructure/google/client";
 import {
   APPROVED_GOOGLE_FILE_IDS,
@@ -125,6 +126,7 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-catalog-inventory",
     "sheets-product",
     "v1-composite-metrics",
+    "product-sheet-example-metrics",
   ],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
@@ -274,6 +276,12 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
           }),
+          createProductSheetMetricsContributor({
+            sheets: this.sheetsSource,
+            shopify: this.shopifyAdapters,
+            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+            now,
+          }),
         );
       }
     } else {
@@ -297,6 +305,11 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       contributors.push(
         new DeferredSourceContributor(
           "v1-composite-metrics",
+          this.sheetsSource ? "shopify" : "google_sheets",
+          now,
+        ),
+        new DeferredSourceContributor(
+          "product-sheet-example-metrics",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),
