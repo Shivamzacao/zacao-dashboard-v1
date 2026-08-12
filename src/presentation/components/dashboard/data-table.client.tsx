@@ -63,10 +63,11 @@ export function DataTable<Row extends object>({
       })),
     [columns],
   );
+  const tableData = useMemo<Row[]>(() => [...rows], [rows]);
   // TanStack Table intentionally exposes non-memoizable helpers; component state remains local.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data: [...rows],
+    data: tableData,
     columns: defs,
     state: { sorting },
     onSortingChange: setSorting,
