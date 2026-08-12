@@ -91,7 +91,7 @@ function lazy<T>(factory: () => Promise<T>): () => Promise<T> {
   };
 }
 
-const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
+export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
   "Executive Health": [
     "shopify-customers",
     "shopify-funnel",
@@ -100,6 +100,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-sales",
     "shopify-channels",
     "shopify-fulfillment",
+    "sheets-operations",
     "insights-freshness",
     "v1-composite-metrics",
   ],
@@ -108,6 +109,7 @@ const SECTION_PLAN: Readonly<Record<DashboardSection, readonly string[]>> = {
     "shopify-sales",
     "shopify-purchase-timing",
     "shopify-channels",
+    "v1-composite-metrics",
   ],
   "Customer Intelligence": [
     "shopify-customers",
@@ -316,7 +318,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
 
     this.orchestrator = new DashboardOrchestrator(
       contributors,
-      SECTION_PLAN as DashboardSectionPlan,
+      LIVE_DASHBOARD_SECTION_PLAN as DashboardSectionPlan,
       new CacheCoordinator(new InMemoryCache(this.clock, 200), this.clock),
       this.clock,
       4,
