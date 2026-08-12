@@ -101,6 +101,25 @@ export function createMetricViewModel(input: {
     };
   }
 
+  if (input.value === null && warnings.includes("SOURCE_LIMITED")) {
+    return {
+      key: definition.key,
+      label: definition.label,
+      definitionVersion: "1.0",
+      implementationStatus: definition.status,
+      value: null,
+      readiness: readiness(
+        "partial",
+        "The verified source cannot provide sufficiently complete data.",
+        warnings,
+      ),
+      dataPeriod: input.dataPeriod,
+      sources: [...input.sources],
+      warnings,
+      unavailableReason: input.dataPendingReason ?? definition.blockingReason,
+    };
+  }
+
   const sourceState = weakestSourceState(input.sources);
   if (["error", "unavailable", "invalid", "not_configured"].includes(sourceState)) {
     return {

@@ -94,6 +94,15 @@ for (const width of [760, 640, 390]) {
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
+
+    await page.goto("/operations");
+    await expect(page.getByRole("heading", { name: "Operations intelligence" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
   });
 }
 
@@ -118,6 +127,19 @@ test("products matches the 1280 by 720 reference composition", async ({ page }, 
   await page.waitForLoadState("networkidle");
   await expect(page.getByRole("heading", { name: "Product intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-products-reference-1280x720.png", {
+    fullPage: true,
+    animations: "disabled",
+  });
+});
+
+test("operations matches the 1280 by 720 reference composition", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "One desktop reference baseline is sufficient");
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/operations");
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("heading", { name: "Operations intelligence" })).toBeVisible();
+  await expect(page).toHaveScreenshot("f3-operations-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
   });

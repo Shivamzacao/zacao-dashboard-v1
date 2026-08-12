@@ -154,7 +154,7 @@ describe("B5 Shopify metric services", () => {
         productTitle: "Synthetic Bar",
         variantTitle: "4 Pack",
         sku: "SKU-A",
-        quantityName: "available",
+        quantityName: "on_hand",
         quantity: 25,
         updatedAt: "2026-07-31T12:00:00.000Z",
       },
@@ -194,7 +194,7 @@ describe("B5 Shopify metric services", () => {
     });
   });
 
-  it("labels inventory groups by product, variant, and quantity state rather than identifiers", () => {
+  it("uses only provider on-hand inventory and keeps provider identifiers out of labels", () => {
     const fact = (sku: string | null, quantityName: string, quantity: number) => ({
       locationId: "gid://shopify/Location/111934701875",
       locationName: "Zacao Fulfillment",
@@ -207,25 +207,24 @@ describe("B5 Shopify metric services", () => {
     });
     const single = buildInventoryBreakdown(context(), [
       fact("ZAC-DC-70-4PK", "reserved", 2),
-      fact("ZAC-MC-42-10PK", "safety_stock", 58),
-      fact(null, "available", 4),
+      fact("ZAC-MC-42-10PK", "on_hand", 58),
+      fact(null, "on_hand", 4),
     ]);
     expect(single.items.map(({ label }) => label)).toEqual([
-      "70% Cacao Dark Chocolate · 4-Pack · Reserved",
-      "42% Cacao Smooth Chocolate · 10-Pack · Safety stock",
-      "70% Cacao Dark Chocolate · 4-Pack · Available",
+      "42% Cacao Smooth Chocolate · 10-Pack · On hand",
+      "70% Cacao Dark Chocolate · 4-Pack · On hand",
     ]);
     // The grouping key still carries the location GID, so groups stay distinct.
     expect(single.items[0]?.key).toContain("gid://shopify/Location/111934701875");
-    expect(single.items[2]?.warnings).toContain("MISSING_SKU");
+    expect(single.items[1]?.warnings).toContain("MISSING_SKU");
 
     const multiple = buildInventoryBreakdown(context(), [
-      fact("ZAC-DC-70-4PK", "available", 12),
-      { ...fact("ZAC-DC-70-4PK", "available", 9), locationId: "loc-2", locationName: "Retail" },
+      fact("ZAC-DC-70-4PK", "on_hand", 12),
+      { ...fact("ZAC-DC-70-4PK", "on_hand", 9), locationId: "loc-2", locationName: "Retail" },
     ]);
     expect(multiple.items.map(({ label }) => label)).toEqual([
-      "Zacao Fulfillment · 70% Cacao Dark Chocolate · 4-Pack · Available",
-      "Retail · 70% Cacao Dark Chocolate · 4-Pack · Available",
+      "Zacao Fulfillment · 70% Cacao Dark Chocolate · 4-Pack · On hand",
+      "Retail · 70% Cacao Dark Chocolate · 4-Pack · On hand",
     ]);
   });
 });

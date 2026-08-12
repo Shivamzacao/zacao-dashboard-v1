@@ -33,6 +33,9 @@ export interface ChartDatum {
   readonly group?: string;
   readonly minValue?: number | null;
   readonly maxValue?: number | null;
+  readonly startDate?: string;
+  readonly endDate?: string;
+  readonly status?: string;
 }
 
 /** How a chart's plotted numbers are rendered on axes, tooltips, and labels. */

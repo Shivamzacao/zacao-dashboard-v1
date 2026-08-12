@@ -17,6 +17,7 @@ import type {
   InventoryFact,
   MetricServiceContext,
   ProductUnitsFact,
+  RefundOrderFact,
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
 } from "./types";
@@ -298,17 +299,44 @@ interface InventoryGroup {
   readonly quantities: number[];
 }
 
+export function buildRefundRateMetric(
+  context: MetricServiceContext,
+  facts: readonly RefundOrderFact[],
+  completeHistory: boolean,
+): MetricViewModel {
+  const eligible = facts.filter(
+    (fact) =>
+      !fact.test &&
+      fact.cancelledAt === null &&
+      fact.createdAt.slice(0, 10) >= context.dataPeriod.startDate &&
+      fact.createdAt.slice(0, 10) <= context.dataPeriod.endDate,
+  );
+  const refunded = eligible.filter(({ refundCount }) => refundCount > 0).length;
+  return metric(
+    context,
+    "operations.refund_rate",
+    completeHistory && eligible.length > 0
+      ? { kind: "rate_basis_points", value: Math.round((refunded / eligible.length) * 10_000) }
+      : null,
+    completeHistory ? ["REFUND_RATE_SNAPSHOT_SEMANTICS"] : ["SOURCE_LIMITED"],
+  );
+}
+
 export function buildInventoryBreakdown(
   context: MetricServiceContext,
   facts: readonly InventoryFact[],
 ): MetricBreakdownViewModel {
+  // Shopify exposes overlapping inventory states (for example `available` is
+  // contained within `on_hand`). Only provider `on_hand` is an inventory
+  // balance; summing all states double-counts the same physical units.
+  const onHandFacts = facts.filter(({ quantityName }) => quantityName === "on_hand");
   // Location GIDs stay in the grouping key — they keep it unique — but never
   // in the label: a chart axis reading `gid://shopify/Location/111934701875`
   // tells a reader nothing. The location name only earns its space once more
   // than one location reports.
-  const multipleLocations = new Set(facts.map(({ locationId }) => locationId)).size > 1;
+  const multipleLocations = new Set(onHandFacts.map(({ locationId }) => locationId)).size > 1;
   const grouped = new Map<string, InventoryGroup>();
-  for (const fact of facts) {
+  for (const fact of onHandFacts) {
     const productKey = fact.sku ?? `${fact.productTitle}:${fact.variantTitle}`;
     const key = `${fact.locationId}:${productKey}:${fact.quantityName}`;
     const existing = grouped.get(key);
@@ -328,11 +356,11 @@ export function buildInventoryBreakdown(
       quantities: [fact.quantity],
     });
   }
-  const total = sumSafeNumbers(facts.map(({ quantity }) => quantity));
+  const total = sumSafeNumbers(onHandFacts.map(({ quantity }) => quantity));
   const base = metric(
     context,
     "inventory.shopify_current",
-    facts.length === 0 ? null : { kind: "count", value: total },
+    onHandFacts.length === 0 ? null : { kind: "count", value: total },
     ["SHOPIFY_LOCATIONS_ONLY"],
   );
   return metricBreakdownViewModelSchema.parse({

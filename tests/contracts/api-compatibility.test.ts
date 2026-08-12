@@ -45,6 +45,7 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       "inventory-lots",
       "forecast-variance",
       "incoming-production",
+      "packaging-stock",
       "partner-performance",
       "growth-next-actions",
       "social-performance",

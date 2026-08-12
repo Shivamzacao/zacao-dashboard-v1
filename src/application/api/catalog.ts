@@ -159,6 +159,14 @@ export const drilldownCatalog = Object.freeze([
     exportable: true,
   }),
   definition({
+    dataset: "packaging-stock",
+    section: "Operations Intelligence",
+    metricKey: "inventory.packaging_stock",
+    fields: ["material", "onHand", "idealMin", "idealMax", "incoming", "eta"],
+    sortFields: ["material", "onHand", "eta"],
+    exportable: true,
+  }),
+  definition({
     dataset: "partner-performance",
     section: "Growth Intelligence",
     metricKey: "partners.performance",

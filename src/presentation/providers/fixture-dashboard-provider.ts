@@ -13,6 +13,7 @@ import type { SourceStatus } from "@/src/domain/contracts";
 import type { DashboardSlug } from "@/src/application/api";
 import {
   f3CustomerPageFixtureData,
+  f3OperationsPageFixtureData,
   f3PageFixtureData,
   f3ProductPageFixtureData,
   type F3PageFixtureData,
@@ -64,6 +65,7 @@ export function createFixtureDashboardProvider(
     getF3PageData: (slug?: DashboardSlug) => {
       if (slug === "customers") return f3CustomerPageFixtureData;
       if (slug === "products") return f3ProductPageFixtureData;
+      if (slug === "operations") return f3OperationsPageFixtureData;
       return f3PageFixtureData;
     },
   });

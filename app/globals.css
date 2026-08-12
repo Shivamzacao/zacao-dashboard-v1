@@ -1557,6 +1557,56 @@ table.sr-only {
   font-size: 9px;
 }
 
+.delivery-timeline {
+  display: grid;
+  gap: 18px;
+  margin: 0;
+  padding: 8px 0 0;
+  list-style: none;
+}
+
+.delivery-timeline-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 0.8fr) minmax(160px, 2fr) minmax(132px, 0.9fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.delivery-timeline-label,
+.delivery-timeline-status {
+  min-width: 0;
+  color: var(--forest-dark);
+  font-size: 11px;
+  line-height: 15px;
+}
+
+.delivery-timeline-label {
+  overflow: hidden;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.delivery-timeline-track {
+  position: relative;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--cream-dark);
+}
+
+.delivery-timeline-bar {
+  position: absolute;
+  inset-block: 0;
+  border-radius: inherit;
+  background: var(--forest);
+}
+
+.delivery-timeline-status strong {
+  display: block;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
 /* Retained for the component fixture page and for restoring the per-source
    panel later; no dashboard page renders it today. */
 .source-readiness-panel {
@@ -2061,6 +2111,16 @@ table.sr-only {
 
   .freshness-pill {
     align-self: flex-start;
+  }
+
+  .delivery-timeline-row {
+    grid-template-columns: minmax(0, 1fr) minmax(112px, 1.4fr);
+    gap: 8px;
+  }
+
+  .delivery-timeline-status {
+    grid-column: 1 / -1;
+    padding-left: calc(100% / 2.4 + 8px);
   }
 }
 

@@ -67,6 +67,13 @@ export interface InventoryFact {
   readonly updatedAt: string;
 }
 
+export interface RefundOrderFact {
+  readonly createdAt: string;
+  readonly test: boolean;
+  readonly cancelledAt: string | null;
+  readonly refundCount: number;
+}
+
 /** Canonical ShopifyQL sales aggregates for one period — provider values only. */
 export interface ShopifySalesTotalsFact {
   readonly orders: number;

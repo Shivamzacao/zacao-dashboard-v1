@@ -12,6 +12,7 @@ import {
   LineChartView,
   StockBandChartView,
   StackedBarChartView,
+  TimelineChartView,
   VerticalBarChartView,
 } from "@/src/presentation/components/dashboard/charts.client";
 import {
@@ -148,6 +149,7 @@ function Chart({
     funnel: <FunnelChartView {...props} />,
     heatmap: <HeatmapChartView {...props} />,
     band: <StockBandChartView {...props} />,
+    timeline: <TimelineChartView {...props} />,
   }[spec.kind];
   return (
     <ChartCard

@@ -15,12 +15,15 @@ import {
   buildMarketingSpendMetric,
   buildMarketingSpendBreakdown,
   buildManufacturerOtifBreakdown,
+  buildManufacturerOperationsViews,
+  buildPackagingViews,
   buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
   buildRealizedLtvViews,
   buildSocialMetricsTable,
   hasComparableInputCostRows,
   hasManufacturerOtifRows,
+  buildWarehouseAccuracyMetric,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -110,6 +113,11 @@ export function createSheetsApiContributors(
       "Inventory_Lots",
       "Additional_Depletions",
       "Production_Orders",
+      "Warehouse_Fulfillment",
+      "Packaging_Materials",
+      "Packaging_Inventory",
+      "Packaging_Orders",
+      "Packaging_Forecast",
       "Location_Master",
       "Sales_Forecast",
       "COGS_By_SKU",
@@ -127,8 +135,23 @@ export function createSheetsApiContributors(
       result.tabs["Location_Master"] ?? [],
     );
     const incoming = toProductionIncomingFacts(result.tabs["Production_Orders"] ?? []);
+    const manufacturer = buildManufacturerOperationsViews(
+      metricContext,
+      result.tabs["Production_Orders"] ?? [],
+    );
+    const packaging = buildPackagingViews(
+      metricContext,
+      result.tabs["Packaging_Materials"] ?? [],
+      result.tabs["Packaging_Inventory"] ?? [],
+      result.tabs["Packaging_Orders"] ?? [],
+      result.tabs["Packaging_Forecast"] ?? [],
+    );
     const fallback = (result.sourceStatus.dataAsOf ?? result.sourceStatus.checkedAt).slice(0, 10);
     return {
+      metrics: [
+        ...manufacturer.metrics,
+        buildWarehouseAccuracyMetric(metricContext, result.tabs["Warehouse_Fulfillment"] ?? []),
+      ],
       breakdowns: [
         buildCombinedInventoryBreakdown(
           metricContext,
@@ -150,6 +173,9 @@ export function createSheetsApiContributors(
           otif.rows,
           syntheticWarnings(result.warnings, otif.usedExample),
         ),
+        manufacturer.performance,
+        packaging.stock,
+        packaging.projection,
       ],
       tables: [
         buildInventoryLotsTable(
@@ -157,6 +183,8 @@ export function createSheetsApiContributors(
           toInventoryLotFacts(result.tabs["Inventory_Lots"] ?? [], fallback),
         ),
         buildIncomingProductionTable(metricContext, incoming.facts),
+        manufacturer.timeline,
+        packaging.table,
       ],
       sourceStatuses: [status],
       warnings: [

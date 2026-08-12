@@ -130,6 +130,7 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
   ],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
+    "shopify-refund-rate",
     "shopify-fulfillment",
     "sheets-operations",
     "v1-composite-metrics",
@@ -292,6 +293,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         new DeferredSourceContributor("shopify-product-units", "shopify", now),
         new DeferredSourceContributor("shopify-catalog-inventory", "shopify", now),
         new DeferredSourceContributor("shopify-history", "shopify", now),
+        new DeferredSourceContributor("shopify-refund-rate", "shopify", now),
         new DeferredSourceContributor("shopify-sales", "shopify", now),
         new DeferredSourceContributor("shopify-purchase-timing", "shopify", now),
         new DeferredSourceContributor("shopify-geography", "shopify", now),

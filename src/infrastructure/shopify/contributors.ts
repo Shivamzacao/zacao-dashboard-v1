@@ -13,6 +13,7 @@ import {
   buildProductSkuVelocityBreakdown,
   buildProductVelocityTable,
   buildPurchaseHeatmapBreakdown,
+  buildRefundRateMetric,
   buildSalesTotalsMetrics,
   buildSalesTrendSeries,
   buildShopifyFunnelMetrics,
@@ -28,7 +29,7 @@ import type {
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 
 import type { ShopifyAdminAdapter } from "./admin-graphql/adapter";
-import type { ShopifyHistory } from "./history";
+import { buildShopifyHistory, type ShopifyHistory } from "./history";
 import {
   mapBillingGeographyFacts,
   mapCustomerCityFacts,
@@ -362,6 +363,46 @@ export function createShopifyContributors(input: {
     },
   );
 
+  const refunds = new ShopifyContributor(
+    "shopify-refund-rate",
+    sourceIdentity,
+    ADMIN_CACHE,
+    async (context) => {
+      const { admin, hasReadAllOrders } = await adapters();
+      const result = await admin.readOrders({
+        dateRange: context.dataPeriod,
+        hasReadAllOrders,
+      });
+      const completeHistory = hasReadAllOrders && !result.truncated;
+      const status = currentStatus(
+        now().toISOString(),
+        buildShopifyHistory({
+          mode: "detailed",
+          requestedStartDate: context.dataPeriod.startDate,
+          requestedEndDate: context.dataPeriod.endDate,
+          earliestDetailedRecordAt: result.records.at(-1)?.createdAt ?? null,
+          hasReadAllOrders,
+          detailedRangeVerified: !result.truncated,
+        }),
+      );
+      return {
+        metrics: [
+          buildRefundRateMetric(
+            metricContext(context, [status]),
+            result.records.map((order) => ({
+              createdAt: order.createdAt,
+              test: order.test,
+              cancelledAt: order.cancelledAt,
+              refundCount: order.refunds.length,
+            })),
+            completeHistory,
+          ),
+        ],
+        sourceStatuses: [status],
+      };
+    },
+  );
+
   const channels = new ShopifyContributor(
     "shopify-channels",
     sourceIdentity,
@@ -413,6 +454,7 @@ export function createShopifyContributors(input: {
     productUnits,
     catalogInventory,
     history,
+    refunds,
     sales,
     purchaseTiming,
     billingGeography,
