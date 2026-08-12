@@ -226,6 +226,22 @@ export const drilldownCatalog = Object.freeze([
     exportable: true,
   }),
   definition({
+    dataset: "investor-pipeline",
+    section: "Growth Intelligence",
+    metricKey: "investors.pipeline",
+    fields: ["investor", "stage", "interestLevel", "checkSizeMinorUnits", "nextStep"],
+    sortFields: ["stage", "interestLevel", "checkSizeMinorUnits", "investor"],
+    exportable: true,
+  }),
+  definition({
+    dataset: "grant-applications",
+    section: "Growth Intelligence",
+    metricKey: "grants.submitted",
+    fields: ["grant", "submittedDate", "requestedAmountMinorUnits", "status"],
+    sortFields: ["submittedDate", "status", "grant", "requestedAmountMinorUnits"],
+    exportable: true,
+  }),
+  definition({
     dataset: "social-performance",
     section: "Marketing Intelligence",
     metricKey: "social.performance",

@@ -37,6 +37,7 @@ import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/con
 import { createV1CompositeContributor } from "@/src/infrastructure/composite/v1-metrics";
 import { createProductSheetMetricsContributor } from "@/src/infrastructure/composite/product-metrics";
 import { createMarketingCompositeContributor } from "@/src/infrastructure/composite/marketing-metrics";
+import { createGrowthCompositeContributor } from "@/src/infrastructure/composite/growth-metrics";
 import { GoogleReadClient } from "@/src/infrastructure/google/client";
 import {
   APPROVED_GOOGLE_FILE_IDS,
@@ -144,7 +145,7 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "sheets-marketing",
     "marketing-composite-metrics",
   ],
-  "Growth Intelligence": ["sheets-growth"],
+  "Growth Intelligence": ["sheets-growth", "growth-composite-metrics"],
   "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
   "Insights and Data Quality": [
     "shopify-history",
@@ -291,6 +292,12 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
           }),
+          createGrowthCompositeContributor({
+            sheets: this.sheetsSource,
+            shopify: this.shopifyAdapters,
+            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+            now,
+          }),
         );
       }
     } else {
@@ -326,6 +333,11 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         ),
         new DeferredSourceContributor(
           "marketing-composite-metrics",
+          this.sheetsSource ? "shopify" : "google_sheets",
+          now,
+        ),
+        new DeferredSourceContributor(
+          "growth-composite-metrics",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),

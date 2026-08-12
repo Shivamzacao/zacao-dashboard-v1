@@ -5,8 +5,11 @@ import {
   buildCombinedInventoryBreakdown,
   buildDepletionsBreakdown,
   buildFinanceActualMetrics,
-  buildGrowthPipelineViews,
+  buildGrantViews,
+  buildGrowthPipelineMetrics,
+  buildGrowthSocialViews,
   buildInputCostMovementBreakdown,
+  buildInvestorViews,
   buildIncomingProductionTable,
   buildInventoryLotsTable,
   buildInventoryValueMetric,
@@ -18,10 +21,8 @@ import {
   buildManufacturerOtifBreakdown,
   buildManufacturerOperationsViews,
   buildPackagingViews,
-  buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
   buildRealizedLtvViews,
-  buildSocialMetricsTable,
   hasComparableInputCostRows,
   hasManufacturerOtifRows,
   buildWarehouseAccuracyMetric,
@@ -43,10 +44,7 @@ import {
 import {
   toDepletionRecords,
   toFinanceActualRecords,
-  toGrowthPipelineRecords,
   toMarketingSpendRecords,
-  toPartnerPerformanceRecords,
-  toSocialMetricsRecords,
 } from "@/src/infrastructure/manual-workbook/records";
 
 import {
@@ -314,30 +312,45 @@ export function createSheetsApiContributors(
   const growth = new SheetsContributor("sheets-growth", async (value) => {
     const result = await source.readPageTabs("growth", [
       "Growth_Pipeline",
-      "Affiliate_Ambassador_Perf",
       "Social_Metrics",
+      "Metric_Targets",
+      "Investor_Pipeline",
+      "Grants",
     ]);
-    const metricContext = context(value, result.sourceStatus);
-    const views = buildGrowthPipelineViews(
-      metricContext,
-      toGrowthPipelineRecords(result.tabs["Growth_Pipeline"] ?? []),
+    const pipeline = selectExampleFallback(result, "Growth_Pipeline");
+    const socialRows = selectExampleFallback(result, "Social_Metrics");
+    const targets = selectExampleFallback(result, "Metric_Targets", (rows) =>
+      rows.some((row) => row["metric_key"] === "growth.time_to_close_target"),
     );
+    const investors = selectExampleFallback(result, "Investor_Pipeline");
+    const grantsRows = selectExampleFallback(result, "Grants");
+    const usedExample =
+      pipeline.usedExample ||
+      socialRows.usedExample ||
+      targets.usedExample ||
+      investors.usedExample ||
+      grantsRows.usedExample;
+    const status = syntheticSourceStatus(result.sourceStatus, usedExample);
+    const warnings = syntheticWarnings(result.warnings, usedExample);
+    const metricContext = context(value, status);
+    const views = buildGrowthPipelineMetrics(metricContext, pipeline.rows, targets.rows);
+    const social = buildGrowthSocialViews(metricContext, socialRows.rows);
+    const investor = buildInvestorViews(metricContext, investors.rows);
+    const grants = buildGrantViews(metricContext, grantsRows.rows);
     return {
-      metrics: [views.open],
-      breakdowns: [views.byType],
-      tables: [
-        views.nextActions,
-        buildPartnerPerformanceTable(
-          metricContext,
-          toPartnerPerformanceRecords(result.tabs["Affiliate_Ambassador_Perf"] ?? []),
-        ),
-        buildSocialMetricsTable(
-          metricContext,
-          toSocialMetricsRecords(result.tabs["Social_Metrics"] ?? []),
-        ),
+      metrics: [
+        ...views.metrics,
+        social.metric,
+        investor.metric,
+        grants.secured,
+        grants.submitted,
+        grants.acceptance,
       ],
-      sourceStatuses: [result.sourceStatus],
-      warnings: result.warnings,
+      breakdowns: [views.byType, views.weightedByIndustry, grants.rolling],
+      series: [social.series],
+      tables: [views.nextActions, investor.table, grants.table],
+      sourceStatuses: [status],
+      warnings,
     };
   });
 
