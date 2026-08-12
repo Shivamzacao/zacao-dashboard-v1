@@ -508,33 +508,35 @@ export function TimelineChartView(props: BaseChartProps) {
   }));
   return (
     <ChartFrame {...props} data={accessibleData}>
-      <ol className="delivery-timeline">
-        {rows.map((item) => {
-          const itemStart = Date.parse(item.startDate ?? "");
-          const itemEnd = Date.parse(item.endDate ?? "");
-          return (
-            <li className="delivery-timeline-row" key={item.key}>
-              <span className="delivery-timeline-label" title={item.label}>
-                {item.label}
-              </span>
-              <span className="delivery-timeline-track">
-                <span
-                  className="delivery-timeline-bar"
-                  style={{
-                    left: `${((itemStart - start) / span) * 100}%`,
-                    width: `${Math.max(((itemEnd - itemStart) / span) * 100, 2)}%`,
-                  }}
-                />
-              </span>
-              <span className="delivery-timeline-status">
-                <strong>{item.endDate}</strong>
-                {item.status ?? "Scheduled"}
-              </span>
-            </li>
-          );
-        })}
-      </ol>
-      <p className="stock-band-note">Bars span production start through expected arrival.</p>
+      <div className="delivery-timeline-scroll">
+        <ol className="delivery-timeline">
+          {rows.map((item) => {
+            const itemStart = Date.parse(item.startDate ?? "");
+            const itemEnd = Date.parse(item.endDate ?? "");
+            return (
+              <li className="delivery-timeline-row" key={item.key}>
+                <span className="delivery-timeline-label" title={item.label}>
+                  {item.label}
+                </span>
+                <span className="delivery-timeline-track">
+                  <span
+                    className="delivery-timeline-bar"
+                    style={{
+                      left: `${((itemStart - start) / span) * 100}%`,
+                      width: `${Math.max(((itemEnd - itemStart) / span) * 100, 2)}%`,
+                    }}
+                  />
+                </span>
+                <span className="delivery-timeline-status">
+                  <strong>{item.endDate}</strong>
+                  {item.status ?? "Scheduled"}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+        <p className="stock-band-note">Bars span production start through expected arrival.</p>
+      </div>
     </ChartFrame>
   );
 }

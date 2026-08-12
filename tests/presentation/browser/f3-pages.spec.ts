@@ -144,3 +144,46 @@ test("operations matches the 1280 by 720 reference composition", async ({ page }
     animations: "disabled",
   });
 });
+
+test("dense operations timelines stay inside their chart card", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop", "One desktop layout check is sufficient");
+  await page.goto("/operations");
+  await page.waitForLoadState("networkidle");
+
+  const timelineHeading = page.getByRole("heading", { name: "Projected delivery timeline" });
+  const timelineCard = page.locator(".chart-card").filter({ has: timelineHeading });
+  const timelineScroll = timelineCard.locator(".delivery-timeline-scroll");
+
+  await timelineScroll.locator(".delivery-timeline").evaluate((list) => {
+    const firstRow = list.firstElementChild;
+    if (!firstRow) throw new Error("Expected at least one delivery timeline row");
+    for (let index = 0; index < 12; index += 1) {
+      list.append(firstRow.cloneNode(true));
+    }
+  });
+
+  await expect(timelineScroll).toHaveCSS("overflow-y", "auto");
+  const geometry = await page.evaluate(() => {
+    const scroll = document.querySelector<HTMLElement>(".delivery-timeline-scroll");
+    const heading = Array.from(document.querySelectorAll("h2")).find(
+      (element) => element.textContent === "Projected delivery timeline",
+    );
+    const card = heading?.closest<HTMLElement>(".dashboard-card");
+    const packagingHeading = Array.from(document.querySelectorAll("h2")).find(
+      (element) => element.textContent === "Packaging material stock",
+    );
+    const packaging = packagingHeading?.closest<HTMLElement>(".dashboard-card");
+    if (!scroll || !card || !packaging) throw new Error("Expected operations timeline cards");
+    return {
+      clientHeight: scroll.clientHeight,
+      scrollHeight: scroll.scrollHeight,
+      scrollBottom: scroll.getBoundingClientRect().bottom,
+      cardBottom: card.getBoundingClientRect().bottom,
+      packagingTop: packaging.getBoundingClientRect().top,
+    };
+  });
+
+  expect(geometry.scrollHeight).toBeGreaterThan(geometry.clientHeight);
+  expect(geometry.scrollBottom).toBeLessThanOrEqual(geometry.cardBottom);
+  expect(geometry.cardBottom).toBeLessThanOrEqual(geometry.packagingTop);
+});
