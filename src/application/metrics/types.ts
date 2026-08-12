@@ -25,6 +25,16 @@ export interface ShopifyFunnelFact {
   readonly conversionRateBasisPoints: number;
 }
 
+export interface ShopifySessionEngagementFact {
+  readonly averageSessionDurationSeconds: number;
+}
+
+export interface CustomerCityFact {
+  readonly city: string;
+  readonly region: string | null;
+  readonly customers: number;
+}
+
 export interface ProductUnitsFact {
   readonly period: string;
   readonly product: string;
@@ -149,6 +159,15 @@ export interface KlaviyoSmsFact {
 export interface KlaviyoTrendPoint {
   readonly period: string;
   readonly count: number | null;
+}
+
+export interface KlaviyoDemographicFact {
+  readonly totalProfiles: number;
+  readonly declaredAgeProfiles: number;
+  readonly invalidAgeProfiles: number;
+  readonly ageBands: readonly Readonly<{ label: string; profiles: number }>[];
+  readonly genders: readonly Readonly<{ label: string; profiles: number }>[];
+  readonly truncated: boolean;
 }
 
 export type ManualMetricCell = string | number | boolean | null;

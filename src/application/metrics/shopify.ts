@@ -12,11 +12,13 @@ import { usd } from "@/src/domain/utilities/money";
 
 import type {
   CatalogVariantFact,
+  CustomerCityFact,
   CustomerClassificationSummary,
   InventoryFact,
   MetricServiceContext,
   ProductUnitsFact,
   ShopifyFunnelFact,
+  ShopifySessionEngagementFact,
 } from "./types";
 import { createMetricViewModel } from "./view-model";
 
@@ -95,6 +97,40 @@ export function buildShopifyFunnelMetrics(
     value: fact.sessions,
   });
   return [funnelMetric, sessionsMetric];
+}
+
+export function buildShopifySessionEngagementMetric(
+  context: MetricServiceContext,
+  fact: ShopifySessionEngagementFact | null,
+): MetricViewModel {
+  return metric(
+    context,
+    "engagement.time_on_site",
+    fact ? { kind: "duration_seconds", value: fact.averageSessionDurationSeconds } : null,
+  );
+}
+
+export function buildCustomerCityBreakdown(
+  context: MetricServiceContext,
+  facts: readonly CustomerCityFact[],
+): MetricBreakdownViewModel {
+  const total = sumSafeNumbers(facts.map(({ customers }) => customers));
+  const base = metric(
+    context,
+    "customers.geo_city",
+    facts.length === 0 ? null : { kind: "count", value: total },
+    ["BILLING_CITY_AGGREGATE_ONLY", "CITY_CUSTOMERS_MAY_OVERLAP"],
+  );
+  return metricBreakdownViewModelSchema.parse({
+    metric: base,
+    dimension: "billing_city",
+    items: facts.map((fact) => ({
+      key: `${fact.city}:${fact.region ?? ""}`,
+      label: fact.region ? `${fact.city}, ${fact.region}` : fact.city,
+      values: [{ kind: "count", value: fact.customers }],
+      warnings: [],
+    })),
+  });
 }
 
 export function buildShopifyFunnelTable(

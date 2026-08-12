@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   mapCatalogVariantFacts,
   mapCustomerClassificationSummary,
+  mapCustomerCityFacts,
   mapInventoryFacts,
   mapNativeChannelFacts,
   mapProductUnitsFacts,
   mapSalesTotalsFact,
   mapSalesTrendPoints,
   mapShopifyFunnelFact,
+  mapShopifySessionEngagementFact,
   parseShopifyQlCount,
   parseShopifyQlMoneyMinorUnits,
   parseShopifyQlRateBasisPoints,
@@ -110,6 +112,42 @@ describe("web funnel fact", () => {
         },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("session engagement and customer city facts", () => {
+  it("passes through provider average duration and keeps no activity distinct", () => {
+    expect(mapShopifySessionEngagementFact([{ average_session_duration: "192.4" }])).toEqual({
+      averageSessionDurationSeconds: 192,
+    });
+    expect(mapShopifySessionEngagementFact([])).toBeNull();
+    expect(mapShopifySessionEngagementFact([{ average_session_duration: null }])).toBeNull();
+    expect(() => mapShopifySessionEngagementFact([{}])).toThrow(/missing the required column/);
+    expect(() =>
+      mapShopifySessionEngagementFact([
+        { average_session_duration: "10" },
+        { average_session_duration: "20" },
+      ]),
+    ).toThrow(/single aggregate row/);
+  });
+
+  it("excludes blank cities, preserves regions, and returns the provider-ranked top seven", () => {
+    const rows = [
+      { billing_city: "", billing_region: "NY", customers: "50" },
+      { billing_city: "Austin", billing_region: "TX", customers: "4" },
+      { billing_city: "New York", billing_region: "NY", customers: "38" },
+      { billing_city: "Brooklyn", billing_region: "NY", customers: "26" },
+      { billing_city: "Los Angeles", billing_region: "CA", customers: "19" },
+      { billing_city: "Toronto", billing_region: "ON", customers: "15" },
+      { billing_city: "San Francisco", billing_region: "CA", customers: "12" },
+      { billing_city: "Chicago", billing_region: null, customers: "6" },
+      { billing_city: "Boston", billing_region: "MA", customers: "3" },
+    ];
+    const facts = mapCustomerCityFacts(rows);
+    expect(facts).toHaveLength(7);
+    expect(facts[0]).toEqual({ city: "New York", region: "NY", customers: 38 });
+    expect(facts[5]).toEqual({ city: "Chicago", region: null, customers: 6 });
+    expect(facts.at(-1)?.city).toBe("Austin");
   });
 });
 

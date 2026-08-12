@@ -31,6 +31,8 @@ export interface PageTableSpec {
   readonly sourceLabel?: string;
   readonly dataset?: string;
   readonly hiddenColumns?: readonly string[];
+  readonly columnOrder?: readonly string[];
+  readonly columnLabels?: Readonly<Record<string, string>>;
 }
 
 export interface DashboardPageSpec {
@@ -261,6 +263,23 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "customers.returning_rate",
         "customers.active",
         "customers.realized_ltv",
+        {
+          metricKey: "engagement.time_on_site",
+          label: "Time on site",
+          sourceLabel: "Shopify",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "marketing.cac",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "marketing.ltv_cac",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "ratio",
+        },
+        { metricKey: "klaviyo.email_open_rate", sourceLabel: "Klaviyo" },
       ],
       charts: [
         {
@@ -277,12 +296,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "funnel",
         },
         {
-          title: "Customer geography",
-          description: "Billing geography where Shopify captures a usable location.",
-          metricKey: "customers.billing_geography",
-          kind: "horizontal",
-        },
-        {
           title: "Customer cohorts",
           description:
             "Revenue LTV by acquisition month; immature fixed-horizon cohorts remain unavailable.",
@@ -296,8 +309,54 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
             { key: "lifetime", label: "Lifetime", tone: "forest" },
           ],
         },
+        {
+          title: "Customers by city",
+          description: "PII-free billing city and state aggregates for qualifying customers.",
+          metricKey: "customers.geo_city",
+          sourceLabel: "Shopify",
+          kind: "horizontal",
+        },
+        {
+          title: "Age mix",
+          description:
+            "Share of the latest Klaviyo profile snapshot by declared age band; reporting-period filters do not apply.",
+          metricKey: "customers.age_mix",
+          sourceLabel: "Klaviyo",
+          kind: "donut",
+        },
+        {
+          title: "Gender mix",
+          description:
+            "Share of the latest Klaviyo profile snapshot by declared gender; undisclosed is preserved and reporting-period filters do not apply.",
+          metricKey: "customers.sex_mix",
+          sourceLabel: "Klaviyo",
+          kind: "donut",
+        },
       ],
-      tables: [],
+      tables: [
+        {
+          title: "Email campaign performance",
+          description: "Open and click rates per Klaviyo campaign with attributed revenue.",
+          metricKey: "klaviyo.campaign_performance",
+          sourceLabel: "Klaviyo",
+          dataset: "klaviyo-campaigns",
+          hiddenColumns: ["id", "channel", "deliveryRateBasisPoints", "conversions"],
+          columnOrder: [
+            "name",
+            "recipients",
+            "openRateBasisPoints",
+            "clickRateBasisPoints",
+            "conversionValueMinorUnits",
+          ],
+          columnLabels: {
+            name: "Campaign",
+            recipients: "Sent",
+            openRateBasisPoints: "Open rate",
+            clickRateBasisPoints: "Click rate",
+            conversionValueMinorUnits: "Revenue",
+          },
+        },
+      ],
     }),
     products: spec({
       slug: "products",

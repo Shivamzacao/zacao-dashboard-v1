@@ -194,6 +194,47 @@ describe("Klaviyo Future-Ready Core adapter", () => {
     expect(() => assertNoKlaviyoPii({ email: "forbidden@example.test" })).toThrow(/PII/);
     expect(() => assertNoKlaviyoPii({ statistics: { clicks: 10 } })).not.toThrow();
   });
+
+  it("reduces profile properties immediately into PII-free demographic aggregates", async () => {
+    const adapter = adapterFor({
+      data: [
+        {
+          id: "profile-1",
+          type: "profile",
+          attributes: {
+            email: "must-not-cross@example.test",
+            properties: { "Age band": "25–34", Gender: " Female " },
+          },
+        },
+        {
+          id: "profile-2",
+          type: "profile",
+          attributes: { properties: { "Age band": "unknown", Gender: "" } },
+        },
+        {
+          id: "profile-3",
+          type: "profile",
+          attributes: { properties: { "Age band": "55+", Gender: "Non-binary" } },
+        },
+      ],
+      links: { next: null },
+    });
+    const result = await adapter.readProfileDemographics({ ageBand: "Age band", gender: "Gender" });
+    expect(result).toMatchObject({
+      totalProfiles: 3,
+      declaredAgeProfiles: 2,
+      invalidAgeProfiles: 1,
+      truncated: false,
+    });
+    expect(result.ageBands.find(({ label }) => label === "25–34")?.profiles).toBe(1);
+    expect(result.genders).toEqual([
+      { label: "Female", profiles: 1 },
+      { label: "Non-binary", profiles: 1 },
+      { label: "Undisclosed", profiles: 1 },
+    ]);
+    expect(JSON.stringify(result)).not.toContain("profile-1");
+    expect(JSON.stringify(result)).not.toContain("must-not-cross");
+  });
 });
 
 describe("Klaviyo source readiness", () => {

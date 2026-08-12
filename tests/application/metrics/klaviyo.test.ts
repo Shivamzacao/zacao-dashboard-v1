@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildKlaviyoEmailOverview,
+  buildKlaviyoDemographicBreakdowns,
   buildKlaviyoEngagementSeries,
   buildKlaviyoPerformanceTable,
   buildKlaviyoSmsOverview,
@@ -83,5 +84,30 @@ describe("B5 Klaviyo future-ready metric services", () => {
     expect(sms[0]?.warnings).not.toContain("KLAVIYO_SEND_DATE_SEMANTICS");
     expect(trend.metric.value).toEqual({ kind: "count", value: 3 });
     expect(trend.metric.warnings).toContain("KLAVIYO_EVENT_TIME_SEMANTICS");
+  });
+
+  it("publishes demographic shares with snapshot and coverage disclosures", () => {
+    const [age, gender] = buildKlaviyoDemographicBreakdowns(context([source("klaviyo")]), {
+      totalProfiles: 10,
+      declaredAgeProfiles: 8,
+      invalidAgeProfiles: 1,
+      ageBands: [
+        { label: "25–34", profiles: 5 },
+        { label: "35–44", profiles: 3 },
+      ],
+      genders: [
+        { label: "Female", profiles: 6 },
+        { label: "Undisclosed", profiles: 4 },
+      ],
+      truncated: false,
+    });
+    expect(age?.items.map(({ label, values }) => [label, values[0]])).toEqual([
+      ["25–34", { kind: "rate_basis_points", value: 6250 }],
+      ["35–44", { kind: "rate_basis_points", value: 3750 }],
+    ]);
+    expect(age?.metric.warnings).toContain("KLAVIYO_AGE_COVERAGE_PARTIAL");
+    expect(age?.metric.warnings).toContain("KLAVIYO_AGE_VALUES_EXCLUDED");
+    expect(gender?.items.at(-1)?.label).toBe("Undisclosed");
+    expect(gender?.metric.warnings).toContain("KLAVIYO_PROFILE_SNAPSHOT");
   });
 });

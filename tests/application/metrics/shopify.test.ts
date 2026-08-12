@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildCatalogTable,
   buildCustomerClassificationMetrics,
+  buildCustomerCityBreakdown,
   buildInventoryBreakdown,
   buildProductUnitsBreakdown,
   buildProductVelocityTable,
   buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
+  buildShopifySessionEngagementMetric,
 } from "@/src/application/metrics";
 
 import { context, source } from "./fixtures";
@@ -66,6 +68,23 @@ describe("B5 Shopify metric services", () => {
       ["commerce.web_funnel", { kind: "rate_basis_points", value: 141 }],
       ["commerce.website_sessions", { kind: "count", value: 1280 }],
     ]);
+  });
+
+  it("publishes average time on site and PII-free city aggregates", () => {
+    expect(
+      buildShopifySessionEngagementMetric(context(), {
+        averageSessionDurationSeconds: 192,
+      }).value,
+    ).toEqual({ kind: "duration_seconds", value: 192 });
+    expect(buildShopifySessionEngagementMetric(context(), null).value).toBeNull();
+
+    const city = buildCustomerCityBreakdown(context(), [
+      { city: "New York", region: "NY", customers: 38 },
+      { city: "Chicago", region: null, customers: 6 },
+    ]);
+    expect(city.metric.value).toEqual({ kind: "count", value: 44 });
+    expect(city.items.map(({ label }) => label)).toEqual(["New York, NY", "Chicago"]);
+    expect(city.metric.warnings).toContain("CITY_CUSTOMERS_MAY_OVERLAP");
   });
 
   it("excludes non-merchandise rows and discloses missing SKU mappings", () => {

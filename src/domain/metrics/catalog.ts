@@ -471,6 +471,64 @@ export const metricCatalog = Object.freeze([
     blockingReason: null,
   }),
   entry({
+    key: "customers.geo_city",
+    label: "Customers by city",
+    sections: ["Customer Intelligence"],
+    v1Class: "core",
+    valueKind: "count",
+    sourceKeys: ["shopify"],
+    sources: "ShopifyQL billing geography",
+    sourceFields: "billing_city, billing_region, customers",
+    calculation:
+      "Rank the top seven usable billing city/region groups by Shopify's provider customer count. Customers are unique within each group and may appear in more than one city group.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
+    key: "engagement.time_on_site",
+    label: "Average time on site",
+    sections: ["Customer Intelligence"],
+    v1Class: "core",
+    valueKind: "duration_seconds",
+    sourceKeys: ["shopify"],
+    sources: "ShopifyQL sessions",
+    sourceFields: "average_session_duration",
+    calculation:
+      "Pass through ShopifyQL average_session_duration in seconds for the requested reporting period; never derive it from session totals.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
+    key: "customers.age_mix",
+    label: "Customer age mix",
+    sections: ["Customer Intelligence"],
+    v1Class: "conditional",
+    valueKind: "rate_basis_points",
+    sourceKeys: ["klaviyo"],
+    sources: "Klaviyo profile attributes",
+    sourceFields: "configured age-band profile property",
+    calculation:
+      "Share of the latest Klaviyo profile snapshot with a declared canonical age band; the selected reporting period does not apply.",
+    status: "CERTIFIABLE",
+    blockingReason:
+      "Configure KLAVIYO_AGE_BAND_PROPERTY and KLAVIYO_GENDER_PROPERTY and grant profiles:read to activate profile demographics.",
+  }),
+  entry({
+    key: "customers.sex_mix",
+    label: "Customer gender mix",
+    sections: ["Customer Intelligence"],
+    v1Class: "conditional",
+    valueKind: "rate_basis_points",
+    sourceKeys: ["klaviyo"],
+    sources: "Klaviyo profile attributes",
+    sourceFields: "configured gender profile property",
+    calculation:
+      "Share of the latest Klaviyo profile snapshot by declared gender, preserving source labels and classifying blanks as Undisclosed; the selected reporting period does not apply.",
+    status: "CERTIFIABLE",
+    blockingReason:
+      "Configure KLAVIYO_AGE_BAND_PROPERTY and KLAVIYO_GENDER_PROPERTY and grant profiles:read to activate profile demographics.",
+  }),
+  entry({
     key: "commerce.web_funnel",
     label: "Shopify acquisition funnel",
     sections: ["Customer Intelligence", "Marketing Intelligence"],
@@ -869,7 +927,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "klaviyo.email_open_rate",
     label: "Email open rate",
-    sections: ["Marketing Intelligence"],
+    sections: ["Customer Intelligence", "Marketing Intelligence"],
     v1Class: "future_ready_core",
     valueKind: "rate_basis_points",
     sourceKeys: ["klaviyo"],
@@ -1026,7 +1084,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "klaviyo.campaign_performance",
     label: "Campaign performance",
-    sections: ["Marketing Intelligence"],
+    sections: ["Customer Intelligence", "Marketing Intelligence"],
     v1Class: "future_ready_core",
     valueKind: "status",
     sourceKeys: ["klaviyo"],
@@ -1095,7 +1153,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "marketing.cac",
     label: "Customer acquisition cost",
-    sections: ["Marketing Intelligence"],
+    sections: ["Customer Intelligence", "Marketing Intelligence"],
     v1Class: "conditional",
     valueKind: "money",
     sourceKeys: ["shopify", "klaviyo", "google_sheets"],
@@ -1123,7 +1181,7 @@ export const metricCatalog = Object.freeze([
   entry({
     key: "marketing.ltv_cac",
     label: "LTV:CAC",
-    sections: ["Marketing Intelligence", "Financial Intelligence"],
+    sections: ["Customer Intelligence", "Marketing Intelligence", "Financial Intelligence"],
     v1Class: "conditional",
     valueKind: "rate_basis_points",
     sourceKeys: ["shopify", "klaviyo", "google_sheets"],

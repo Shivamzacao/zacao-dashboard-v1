@@ -58,6 +58,20 @@ describe("Shopify query allowlist", () => {
         dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
       }),
     ).toContain("SHOW orders, net_sales, total_sales, average_order_value GROUP BY sales_channel");
+    expect(
+      buildShopifyQlQuery({
+        dataset: "session_engagement",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toContain("SHOW average_session_duration");
+    expect(
+      buildShopifyQlQuery({
+        dataset: "billing_city",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toContain(
+      "SHOW customers WHERE billing_city IS NOT NULL GROUP BY billing_city, billing_region",
+    );
     expect(() =>
       buildShopifyQlQuery({
         dataset: "sales_trend",

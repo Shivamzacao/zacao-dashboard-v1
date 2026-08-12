@@ -43,7 +43,7 @@ describe("production dashboard copy style", () => {
     expect(labelsByKey.get("finance.actual_margin")).toBe("Actual gross margin");
     expect(labelsByKey.get("quality.sop_validation")).toBe("S&OP validation");
 
-    expect(dashboardPageSpecs.customers.charts[3]?.series?.map(({ label }) => label)).toEqual([
+    expect(dashboardPageSpecs.customers.charts[2]?.series?.map(({ label }) => label)).toEqual([
       "30 days",
       "60 days",
       "90 days",

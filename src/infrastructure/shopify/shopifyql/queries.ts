@@ -11,8 +11,10 @@ export const shopifyQlDatasetSchema = z.enum([
   "new_returning_customers",
   "returning_customer_rate",
   "web_funnel",
+  "session_engagement",
   "session_geography",
   "billing_geography",
+  "billing_city",
   "purchase_time",
   "native_channels",
   "referrers",
@@ -41,8 +43,11 @@ const datasets: Record<ShopifyQlDataset, string> = {
     "FROM sales SHOW returning_customers, customers, returning_customer_rate",
   web_funnel:
     "FROM sessions SHOW sessions, online_store_visitors, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate",
+  session_engagement: "FROM sessions SHOW average_session_duration",
   session_geography: "FROM sessions SHOW sessions GROUP BY session_country",
   billing_geography: "FROM sales SHOW orders, total_sales GROUP BY billing_country, billing_region",
+  billing_city:
+    "FROM sales SHOW customers WHERE billing_city IS NOT NULL GROUP BY billing_city, billing_region",
   purchase_time: "FROM sales SHOW orders GROUP BY day_of_week, hour_of_day",
   native_channels:
     "FROM sales SHOW orders, net_sales, total_sales, average_order_value GROUP BY sales_channel",
@@ -73,7 +78,8 @@ export function buildShopifyQlQuery(input: {
   const grain = input.grain ?? "month";
   const timeSeries = timeSeriesDatasets.has(dataset) ? ` TIMESERIES ${grain}` : "";
 
-  return `${datasets[dataset]}${timeSeries} SINCE ${dateRange.startDate} UNTIL ${dateRange.endDate}`;
+  const tail = dataset === "billing_city" ? " ORDER BY customers DESC LIMIT 7" : "";
+  return `${datasets[dataset]}${timeSeries} SINCE ${dateRange.startDate} UNTIL ${dateRange.endDate}${tail}`;
 }
 
 export const SHOPIFYQL_QUERY = `

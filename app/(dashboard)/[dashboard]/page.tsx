@@ -91,7 +91,7 @@ export default async function DashboardPage({ params, searchParams }: DashboardP
   }
 
   const shell = phase2FixtureProvider.getShellContext();
-  const pageFixture = phase2FixtureProvider.getF3PageData();
+  const pageFixture = phase2FixtureProvider.getF3PageData(route.slug);
   return (
     <main className="dashboard-content">
       <PageHeader route={route} source={shell.sources[0]} />
