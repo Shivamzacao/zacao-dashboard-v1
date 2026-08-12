@@ -24,7 +24,7 @@ describe("F1 Phase 2 fixture provider", () => {
     expect(phase2FixtureProvider.getF3PageData("customers").currentValues).toHaveProperty(
       "klaviyo.email_open_rate",
     );
-    expect(phase2FixtureProvider.getF3PageData("marketing").currentValues).not.toHaveProperty(
+    expect(phase2FixtureProvider.getF3PageData("marketing").currentValues).toHaveProperty(
       "klaviyo.email_open_rate",
     );
     expect(phase2FixtureProvider.getF3PageData("products").currentValues).toHaveProperty(

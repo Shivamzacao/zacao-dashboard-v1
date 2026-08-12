@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  mapAffiliateSalesFacts,
+  mapAffiliateSessionFacts,
   mapCatalogVariantFacts,
   mapCustomerClassificationSummary,
   mapCustomerCityFacts,
@@ -11,6 +13,7 @@ import {
   mapSalesTrendPoints,
   mapShopifyFunnelFact,
   mapShopifySessionEngagementFact,
+  mapTrafficAttributionFacts,
   parseShopifyQlCount,
   parseShopifyQlMoneyMinorUnits,
   parseShopifyQlRateBasisPoints,
@@ -112,6 +115,43 @@ describe("web funnel fact", () => {
         },
       ]),
     ).toBeNull();
+  });
+});
+
+describe("Marketing ShopifyQL facts", () => {
+  it("preserves provider referrer labels and routes blanks to Unclassified", () => {
+    expect(
+      mapTrafficAttributionFacts([
+        { referrer_source: "Social", sessions: "12" },
+        { referrer_source: "", sessions: "4" },
+      ]),
+    ).toEqual([
+      { source: "Social", sessions: 12 },
+      { source: "Unclassified", sessions: 4 },
+    ]);
+  });
+
+  it("preserves exact affiliate UTM tuples and discount codes", () => {
+    expect(
+      mapAffiliateSessionFacts([
+        {
+          utm_source: "instagram",
+          utm_campaign: "ambassadors",
+          utm_content: "launch-a",
+          sessions: "19",
+        },
+      ]),
+    ).toEqual([
+      {
+        utmSource: "instagram",
+        utmCampaign: "ambassadors",
+        utmContent: "launch-a",
+        sessions: 19,
+      },
+    ]);
+    expect(
+      mapAffiliateSalesFacts([{ discount_code: "AMINA10", orders: "3", net_sales: "125.50" }]),
+    ).toEqual([{ discountCode: "AMINA10", orders: 3, netSalesMinorUnits: 12_550 }]);
   });
 });
 

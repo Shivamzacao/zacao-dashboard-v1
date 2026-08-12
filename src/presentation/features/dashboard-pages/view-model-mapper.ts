@@ -238,6 +238,13 @@ export function mapDashboardPageToDisplayData(
       key: point.period,
       label: compactPeriodLabel(point.period),
       value: numericValue(point.value),
+      ...(point.seriesValues
+        ? {
+            seriesValues: Object.fromEntries(
+              Object.entries(point.seriesValues).map(([key, value]) => [key, numericValue(value)]),
+            ),
+          }
+        : {}),
     }));
   }
 
@@ -364,16 +371,16 @@ export function mapDashboardPageToDisplayData(
     // A stage/count table doubles as funnel chart input. Those plotted values
     // are stage counts, not the metric's own unit (the funnel metric's value
     // is a conversion rate), so the unit is declared alongside the data.
-    if (
-      table.columns.length === 2 &&
-      table.columns[0] === "stage" &&
-      table.columns[1] === "count"
-    ) {
-      chartData[table.metric.key] = table.rows.map((row) => ({
-        key: String(row["stage"]),
-        label: String(row["stage"]),
-        value: typeof row["count"] === "number" ? row["count"] : null,
-      }));
+    if (table.columns[0] === "stage" && table.columns[1] === "count") {
+      chartData[table.metric.key] = table.rows.map((row) => {
+        const rate = row["rateBasisPoints"];
+        return {
+          key: String(row["stage"]),
+          label: String(row["stage"]),
+          value: typeof row["count"] === "number" ? row["count"] : null,
+          ...(typeof rate === "number" ? { conversionRateBasisPoints: rate } : {}),
+        };
+      });
       chartValueFormats[table.metric.key] = "count";
     }
     if (table.metric.key === "production.incoming") {

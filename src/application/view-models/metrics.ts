@@ -72,6 +72,8 @@ export const metricSeriesPointSchema = z
   .object({
     period: z.string().min(1),
     value: metricDisplayValueSchema.nullable(),
+    /** Optional named values for certified multi-series charts. */
+    seriesValues: z.record(z.string().min(1), metricDisplayValueSchema.nullable()).optional(),
   })
   .strict();
 

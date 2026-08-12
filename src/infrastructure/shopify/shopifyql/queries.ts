@@ -13,6 +13,9 @@ export const shopifyQlDatasetSchema = z.enum([
   "web_funnel",
   "session_engagement",
   "session_geography",
+  "traffic_attribution",
+  "affiliate_sessions",
+  "affiliate_sales",
   "billing_geography",
   "billing_city",
   "purchase_time",
@@ -45,6 +48,12 @@ const datasets: Record<ShopifyQlDataset, string> = {
     "FROM sessions SHOW sessions, online_store_visitors, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate",
   session_engagement: "FROM sessions SHOW average_session_duration",
   session_geography: "FROM sessions SHOW sessions GROUP BY session_country",
+  traffic_attribution:
+    "FROM sessions SHOW sessions WHERE human_or_bot_session = 'human' GROUP BY referrer_source",
+  affiliate_sessions:
+    "FROM sessions SHOW sessions WHERE human_or_bot_session = 'human' GROUP BY utm_source, utm_campaign, utm_content",
+  affiliate_sales:
+    "FROM sales SHOW orders, net_sales WHERE discount_code IS NOT NULL GROUP BY discount_code",
   billing_geography: "FROM sales SHOW orders, total_sales GROUP BY billing_country, billing_region",
   billing_city:
     "FROM sales SHOW customers WHERE billing_city IS NOT NULL GROUP BY billing_city, billing_region",
@@ -78,7 +87,12 @@ export function buildShopifyQlQuery(input: {
   const grain = input.grain ?? "month";
   const timeSeries = timeSeriesDatasets.has(dataset) ? ` TIMESERIES ${grain}` : "";
 
-  const tail = dataset === "billing_city" ? " ORDER BY customers DESC LIMIT 7" : "";
+  const tail =
+    dataset === "billing_city"
+      ? " ORDER BY customers DESC LIMIT 7"
+      : dataset === "traffic_attribution"
+        ? " ORDER BY sessions DESC LIMIT 50"
+        : "";
   return `${datasets[dataset]}${timeSeries} SINCE ${dateRange.startDate} UNTIL ${dateRange.endDate}${tail}`;
 }
 

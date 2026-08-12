@@ -1,5 +1,8 @@
 import type { DashboardSlug } from "@/src/application/api";
-import type { ChartSeriesDefinition } from "@/src/presentation/components/dashboard/display-contracts";
+import type {
+  ChartSeriesDefinition,
+  ChartValueFormat,
+} from "@/src/presentation/components/dashboard/display-contracts";
 
 export type ChartKind =
   | "line"
@@ -30,6 +33,7 @@ export interface PageChartSpec {
   readonly sourceLabel?: string;
   readonly secondaryMetricKey?: string;
   readonly series?: readonly ChartSeriesDefinition[];
+  readonly valueFormat?: ChartValueFormat;
 }
 
 export interface PageTableSpec {
@@ -689,51 +693,203 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
     marketing: spec({
       slug: "marketing",
       kpis: [
-        "klaviyo.email_recipients",
-        "klaviyo.email_delivery_rate",
-        "klaviyo.email_open_rate",
-        "klaviyo.email_click_rate",
-        "klaviyo.attributed_revenue",
+        { metricKey: "klaviyo.email_recipients", sourceLabel: "Klaviyo" },
+        { metricKey: "klaviyo.email_delivery_rate", sourceLabel: "Klaviyo" },
+        { metricKey: "klaviyo.email_open_rate", sourceLabel: "Klaviyo" },
+        { metricKey: "klaviyo.email_click_rate", sourceLabel: "Klaviyo" },
+        { metricKey: "klaviyo.attributed_revenue", sourceLabel: "Klaviyo" },
+        { metricKey: "social.followers_total", sourceLabel: "Google Sheets" },
+        { metricKey: "collabs.active", sourceLabel: "Google Sheets" },
+        { metricKey: "ambassadors.active", sourceLabel: "Google Sheets" },
+        {
+          metricKey: "ambassadors.sessions",
+          sourceLabel: "Shopify + affiliate mappings",
+        },
+        {
+          metricKey: "ambassadors.revenue",
+          sourceLabel: "Shopify + affiliate mappings",
+        },
       ],
       charts: [
         {
-          title: "Store conversion funnel",
-          description: "Certified Shopify store-session funnel.",
-          metricKey: "commerce.web_funnel",
+          title: "Marketing spend",
+          description: "Monthly spend from the approved workbook; no attribution is inferred.",
+          metricKey: "marketing.spend",
+          sourceLabel: "Google Sheets",
+          kind: "bar",
+        },
+        {
+          title: "Email conversion funnel",
+          description:
+            "Emails sent progressing through delivery, opens, and clicks — with delivery, open, and click rate shown at each stage.",
+          metricKey: "klaviyo.email_funnel",
+          sourceLabel: "Klaviyo",
           kind: "funnel",
         },
         {
           title: "Email engagement",
-          description: "Klaviyo engagement only when the account records approved activity.",
+          description: "Klaviyo opens and clicks by month, normalized to the reporting timezone.",
           metricKey: "klaviyo.engagement_trend",
+          sourceLabel: "Klaviyo",
           kind: "line",
+          series: [
+            { key: "opens", label: "Opens", tone: "forest" },
+            { key: "clicks", label: "Clicks", tone: "gold" },
+          ],
         },
         {
-          title: "Campaign performance",
-          description: "Approved Klaviyo campaign reporting; no inferred attribution.",
-          metricKey: "klaviyo.campaign_performance",
+          title: "Follower growth by channel",
+          description: "Validated month-end follower counts for maintained social channels.",
+          metricKey: "social.follower_growth",
+          sourceLabel: "Google Sheets",
+          kind: "line",
+          series: [
+            { key: "instagram", label: "Instagram", tone: "forest" },
+            { key: "tiktok", label: "TikTok", tone: "gold" },
+            { key: "youtube", label: "YouTube", tone: "terracotta" },
+          ],
+        },
+        {
+          title: "Collaboration reach",
+          description: "Active and scheduled brand collaborations ranked by audience reach.",
+          metricKey: "collabs.reach",
+          sourceLabel: "Google Sheets",
           kind: "horizontal",
         },
         {
-          title: "Marketing spend",
+          title: "Collaborations by category",
+          description: "Active and scheduled collaborations grouped by approved category.",
+          metricKey: "collabs.by_category",
+          sourceLabel: "Google Sheets",
+          kind: "donut",
+        },
+        {
+          title: "Web traffic by source",
+          description: "Sessions grouped by the provider referrer classification.",
+          metricKey: "traffic.attribution",
+          sourceLabel: "Shopify",
+          kind: "horizontal",
+        },
+        {
+          title: "Social mentions by channel",
+          description: "Recorded brand mentions grouped by platform.",
+          metricKey: "social.mentions_by_channel",
+          sourceLabel: "Google Sheets",
+          kind: "horizontal",
+        },
+        {
+          title: "Affiliate ROI by message",
           description:
-            "Spend from the approved workbook; it does not itself establish CAC or ROAS attribution.",
-          metricKey: "marketing.spend",
-          kind: "bar",
+            "Attributed net sales divided by commission and spend, per messaging category.",
+          metricKey: "marketing.affiliate_roi_message",
+          sourceLabel: "Affiliate records + attribution",
+          kind: "horizontal",
+          valueFormat: "ratio",
+        },
+        {
+          title: "Campaign ROI",
+          description: "Attributed net sales divided by campaign spend.",
+          metricKey: "marketing.campaign_roi",
+          sourceLabel: "Google Sheets + attribution",
+          kind: "horizontal",
+          valueFormat: "ratio",
         },
       ],
       tables: [
         {
-          title: "Klaviyo campaigns",
-          description: "Future-ready campaign dataset with truthful no-activity handling.",
-          metricKey: "klaviyo.campaign_performance",
-          dataset: "klaviyo-campaigns",
+          title: "Klaviyo flows",
+          description: "Approved flow performance under Klaviyo send-date semantics.",
+          metricKey: "klaviyo.flow_performance",
+          sourceLabel: "Klaviyo",
+          dataset: "klaviyo-flows",
+          span: 2,
+          hiddenColumns: ["id"],
+          columnOrder: [
+            "name",
+            "channel",
+            "recipients",
+            "deliveryRateBasisPoints",
+            "openRateBasisPoints",
+            "clickRateBasisPoints",
+            "conversions",
+            "conversionValueMinorUnits",
+          ],
+          columnLabels: {
+            name: "Flow",
+            channel: "Channel",
+            recipients: "Sent",
+            deliveryRateBasisPoints: "Delivery rate",
+            openRateBasisPoints: "Open rate",
+            clickRateBasisPoints: "Click rate",
+            conversions: "Conversions",
+            conversionValueMinorUnits: "Revenue",
+          },
         },
         {
-          title: "Klaviyo flows",
-          description: "Future-ready flow dataset with truthful no-activity handling.",
-          metricKey: "klaviyo.flow_performance",
-          dataset: "klaviyo-flows",
+          title: "Social channel performance",
+          description: "Followers, growth, attributed revenue, and audience reach by channel.",
+          coverageNote:
+            "Revenue is shown only where an attribution source is recorded; missing measures remain unavailable.",
+          metricKey: "social.channel_performance",
+          sourceLabel: "Google Sheets + attributed link tracking",
+          dataset: "social-channels",
+          span: 2,
+          columnOrder: [
+            "channel",
+            "followers",
+            "growthRateBasisPoints",
+            "revenueMinorUnits",
+            "audienceReach",
+          ],
+          columnLabels: {
+            channel: "Channel",
+            followers: "Followers",
+            growthRateBasisPoints: "Growth rate",
+            revenueMinorUnits: "Revenue",
+            audienceReach: "Audience reach",
+          },
+        },
+        {
+          title: "Top ambassadors",
+          description: "Clicks, orders, and attributed revenue per ambassador code.",
+          coverageNote:
+            "Shopify sessions and sales require unique exact UTM and discount-code mappings.",
+          metricKey: "ambassadors.top",
+          sourceLabel: "Shopify + affiliate mappings",
+          dataset: "top-ambassadors",
+          span: 2,
+          columnOrder: [
+            "ambassador",
+            "code",
+            "clicks",
+            "orders",
+            "revenueMinorUnits",
+            "commissionMinorUnits",
+          ],
+          columnLabels: {
+            ambassador: "Ambassador",
+            code: "Code",
+            clicks: "Clicks",
+            orders: "Orders",
+            revenueMinorUnits: "Revenue",
+            commissionMinorUnits: "Commission",
+          },
+        },
+        {
+          title: "Brand collaborations",
+          description: "Active and scheduled collaborations ranked by reach.",
+          metricKey: "collabs.reach",
+          sourceLabel: "Google Sheets",
+          dataset: "brand-collaborations",
+          span: 2,
+          columnOrder: ["partner", "category", "reach", "status", "launchDate"],
+          columnLabels: {
+            partner: "Partner",
+            category: "Category",
+            reach: "Reach",
+            status: "Status",
+            launchDate: "Launch",
+          },
         },
       ],
     }),

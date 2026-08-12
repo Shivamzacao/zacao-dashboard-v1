@@ -13,7 +13,8 @@ import {
   buildMissingSkuCostMetric,
   buildLowInventoryBreakdown,
   buildMarketingSpendMetric,
-  buildMarketingSpendBreakdown,
+  buildMarketingSpendMonthlyBreakdown,
+  buildSocialMarketingViews,
   buildManufacturerOtifBreakdown,
   buildManufacturerOperationsViews,
   buildPackagingViews,
@@ -280,18 +281,31 @@ export function createSheetsApiContributors(
   });
 
   const marketing = new SheetsContributor("sheets-marketing", async (value) => {
-    const result = await source.readPageTabs("marketing", ["Marketing_Spend"]);
+    const result = await source.readPageTabs("marketing", [
+      "Marketing_Spend",
+      "Social_Metrics",
+      "Social_Channel_Performance",
+    ]);
     const metricContext = context(value, result.sourceStatus);
+    const social = buildSocialMarketingViews(
+      metricContext,
+      result.tabs["Social_Metrics"] ?? [],
+      result.tabs["Social_Channel_Performance"] ?? [],
+    );
     return {
       metrics: [
         buildMarketingSpendMetric(
           metricContext,
           toMarketingSpendRecords(result.tabs["Marketing_Spend"] ?? []),
         ),
+        social.followers,
       ],
       breakdowns: [
-        buildMarketingSpendBreakdown(metricContext, result.tabs["Marketing_Spend"] ?? []),
+        buildMarketingSpendMonthlyBreakdown(metricContext, result.tabs["Marketing_Spend"] ?? []),
+        social.mentions,
       ],
+      series: [social.growth],
+      tables: [social.table],
       sourceStatuses: [result.sourceStatus],
       warnings: result.warnings,
     };

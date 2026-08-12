@@ -36,10 +36,12 @@ export interface ChartDatum {
   readonly startDate?: string;
   readonly endDate?: string;
   readonly status?: string;
+  /** Provider-certified funnel rate for this stage, expressed in basis points. */
+  readonly conversionRateBasisPoints?: number | null;
 }
 
 /** How a chart's plotted numbers are rendered on axes, tooltips, and labels. */
-export type ChartValueFormat = "money" | "percent" | "count" | "quantity";
+export type ChartValueFormat = "money" | "percent" | "count" | "quantity" | "ratio";
 
 export interface ChartSeriesDefinition {
   readonly key: string;

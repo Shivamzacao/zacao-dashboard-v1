@@ -1,5 +1,6 @@
 import {
   buildKlaviyoEmailOverview,
+  buildKlaviyoEmailFunnelTable,
   buildKlaviyoDemographicBreakdowns,
   buildKlaviyoEngagementSeries,
   buildKlaviyoNoActivityMetric,
@@ -18,6 +19,7 @@ import type { KlaviyoAdapter } from "./adapter";
 import type { KlaviyoDemographicProperties } from "./config";
 import {
   mapKlaviyoEmailOverviewFact,
+  mergeKlaviyoEngagementPoints,
   mapKlaviyoPerformanceRows,
   mapKlaviyoSmsFact,
   mapKlaviyoTrendPoints,
@@ -85,14 +87,18 @@ export function createKlaviyoContributors(input: {
       // until genuine events exist and reports become queryable.
       const hasEvents = await adapter.readEventPresence();
       const emptyReportRows: ReturnType<typeof normalizeKlaviyoReportRows> = [];
-      const [emailCampaigns, smsCampaigns, flows, campaignReport, flowReport] = await Promise.all([
+      const [emailCampaigns, smsCampaigns, flows] = await Promise.all([
         adapter.readCampaigns("email"),
         adapter.readCampaigns("sms"),
         adapter.readFlows(),
-        hasEvents
+      ]);
+      const hasCampaigns = emailCampaigns.records.length + smsCampaigns.records.length > 0;
+      const hasFlows = flows.records.length > 0;
+      const [campaignReport, flowReport] = await Promise.all([
+        hasEvents && hasCampaigns
           ? adapter.readCampaignReport(context.dataPeriod)
           : Promise.resolve({ rows: emptyReportRows }),
-        hasEvents
+        hasEvents && hasFlows
           ? adapter.readFlowReport(context.dataPeriod)
           : Promise.resolve({ rows: emptyReportRows }),
       ]);
@@ -118,13 +124,15 @@ export function createKlaviyoContributors(input: {
         namesById: flowNames,
       });
       const allRows = [...campaignReport.rows, ...flowReport.rows];
+      const emailFact = mapKlaviyoEmailOverviewFact(allRows);
 
       return {
         metrics: [
-          ...buildKlaviyoEmailOverview(serviceContext, mapKlaviyoEmailOverviewFact(allRows)),
+          ...buildKlaviyoEmailOverview(serviceContext, emailFact),
           ...buildKlaviyoSmsOverview(serviceContext, mapKlaviyoSmsFact(allRows)),
         ],
         tables: [
+          buildKlaviyoEmailFunnelTable(serviceContext, emailFact),
           buildKlaviyoPerformanceTable(serviceContext, "campaign", campaignRows),
           buildKlaviyoPerformanceTable(serviceContext, "flow", flowRows),
         ],
@@ -156,7 +164,10 @@ export function createKlaviyoContributors(input: {
       });
       const serviceContext = metricContext(context, [status]);
       const points = hasActivity
-        ? mapKlaviyoTrendPoints([...opened.series, ...clicked.series])
+        ? mergeKlaviyoEngagementPoints(
+            mapKlaviyoTrendPoints(opened.series),
+            mapKlaviyoTrendPoints(clicked.series),
+          )
         : [];
       return {
         series: [buildKlaviyoEngagementSeries(serviceContext, "month", points)],

@@ -120,7 +120,10 @@ function Chart({
     // A declared unit from the data producer wins: some charts plot values in
     // a different unit than their headline metric (funnel counts under a
     // conversion-rate metric).
-    valueFormat: fixture.chartValueFormats?.[spec.metricKey] ?? chartValueFormat(metric.valueKind),
+    valueFormat:
+      spec.valueFormat ??
+      fixture.chartValueFormats?.[spec.metricKey] ??
+      chartValueFormat(metric.valueKind),
   };
   const series =
     spec.series ??

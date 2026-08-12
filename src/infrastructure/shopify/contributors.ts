@@ -19,6 +19,7 @@ import {
   buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
   buildShopifySessionEngagementMetric,
+  buildTrafficAttributionBreakdown,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -45,6 +46,7 @@ import {
   mapSalesTrendPoints,
   mapShopifyFunnelFact,
   mapShopifySessionEngagementFact,
+  mapTrafficAttributionFacts,
 } from "./facts";
 import type { ShopifyQlAdapter } from "./shopifyql/adapter";
 
@@ -168,6 +170,29 @@ export function createShopifyContributors(input: {
           buildShopifySessionEngagementMetric(
             metricContext(context, [status]),
             mapShopifySessionEngagementFact(result.rows),
+          ),
+        ],
+        sourceStatuses: [status],
+      };
+    },
+  );
+
+  const trafficAttribution = new ShopifyContributor(
+    "shopify-traffic-attribution",
+    sourceIdentity,
+    SHOPIFYQL_CACHE,
+    async (context) => {
+      const { shopifyql } = await adapters();
+      const result = await shopifyql.read({
+        dataset: "traffic_attribution",
+        dateRange: context.dataPeriod,
+      });
+      const status = currentStatus(now().toISOString(), result.history);
+      return {
+        breakdowns: [
+          buildTrafficAttributionBreakdown(
+            metricContext(context, [status]),
+            mapTrafficAttributionFacts(result.rows),
           ),
         ],
         sourceStatuses: [status],
@@ -451,6 +476,7 @@ export function createShopifyContributors(input: {
     customers,
     funnel,
     sessionEngagement,
+    trafficAttribution,
     productUnits,
     catalogInventory,
     history,

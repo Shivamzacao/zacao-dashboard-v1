@@ -1,6 +1,7 @@
 import type {
   KlaviyoPerformanceFact,
   KlaviyoPerformanceRow,
+  KlaviyoEngagementPoint,
   KlaviyoSmsFact,
   KlaviyoTrendPoint,
 } from "@/src/application/metrics/types";
@@ -167,4 +168,27 @@ export function mapKlaviyoTrendPoints(
   return [...points.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([period, count]) => ({ period, count }));
+}
+
+/** Preserve the two audited Klaviyo event series instead of summing unlike events. */
+export function mergeKlaviyoEngagementPoints(
+  opens: readonly KlaviyoTrendPoint[],
+  clicks: readonly KlaviyoTrendPoint[],
+): readonly KlaviyoEngagementPoint[] {
+  const periods = new Map<string, { opens: number | null; clicks: number | null }>();
+  for (const point of opens) {
+    periods.set(point.period, {
+      opens: point.count,
+      clicks: periods.get(point.period)?.clicks ?? null,
+    });
+  }
+  for (const point of clicks) {
+    periods.set(point.period, {
+      opens: periods.get(point.period)?.opens ?? null,
+      clicks: point.count,
+    });
+  }
+  return [...periods]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([period, values]) => ({ period, ...values }));
 }
