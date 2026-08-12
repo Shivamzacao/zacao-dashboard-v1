@@ -641,6 +641,211 @@ export const f3MarketingPageFixtureData: F3PageFixtureData = Object.freeze({
   }),
 });
 
+export const f3GrowthPageFixtureData: F3PageFixtureData = Object.freeze({
+  ...f3PageFixtureData,
+  alerts: [],
+  currentValues: Object.freeze({
+    ...f3PageFixtureData.currentValues,
+    "growth.open_pipeline_value": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 38_500_000 },
+    },
+    "growth.closed_pipeline": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 24_600_000 },
+    },
+    "partners.performance": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 210_000 },
+    },
+    "social.performance": { kind: "count" as const, value: 19_700 },
+    "growth.weighted_pipeline": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 38_500_000 },
+    },
+    "growth.pipeline_by_type": { kind: "count" as const, value: 21 },
+    "growth.weighted_by_industry": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 38_500_000 },
+    },
+    "grants.rolling": { kind: "count" as const, value: 14 },
+    "growth.time_to_close": { kind: "quantity" as const, value: 4.8 },
+    "growth.time_to_close_target": { kind: "quantity" as const, value: 3 },
+    "investors.count": { kind: "count" as const, value: 9 },
+    "grants.secured": {
+      kind: "money" as const,
+      value: { currency: "USD" as const, minorUnits: 18_500_000 },
+    },
+    "grants.submitted": { kind: "count" as const, value: 14 },
+    "grants.acceptance_rate": { kind: "rate_basis_points" as const, value: 3_570 },
+  }),
+  chartData: Object.freeze({
+    ...f3PageFixtureData.chartData,
+    "growth.pipeline_by_type": [
+      { key: "wholesale", label: "Wholesale", value: 9 },
+      { key: "ambassador", label: "Ambassador", value: 6 },
+      { key: "gifting", label: "Corporate gifting", value: 4 },
+      { key: "media", label: "Retail media", value: 2 },
+    ],
+    "partners.performance": [
+      { key: "amara", label: "Amara O.", value: 640 },
+      { key: "kwesi", label: "Kwesi B.", value: 480 },
+      { key: "nina", label: "Nina T.", value: 410 },
+      { key: "jules", label: "Jules R.", value: 320 },
+      { key: "sam", label: "Sam A.", value: 250 },
+    ],
+    "social.performance": [
+      { key: "may", label: "May", value: 13_700 },
+      { key: "jun", label: "Jun", value: 16_060 },
+      { key: "jul", label: "Jul", value: 19_700 },
+    ],
+    "growth.weighted_by_industry": [
+      { key: "grocery", label: "Grocery retail", value: 148_000 },
+      { key: "cafes", label: "Cafés & hospitality", value: 96_000 },
+      { key: "gifting", label: "Corporate gifting", value: 74_000 },
+      { key: "fashion", label: "Fashion & lifestyle", value: 41_000 },
+      { key: "travel", label: "Travel retail", value: 26_000 },
+    ],
+    "grants.rolling": [
+      { key: "week", label: "Past week", value: 1 },
+      { key: "month", label: "Past month", value: 3 },
+      { key: "ytd", label: "Year to date", value: 14 },
+    ],
+  }),
+  rowsByDataset: Object.freeze({
+    ...f3PageFixtureData.rowsByDataset,
+    "partner-performance": [
+      {
+        partner: "Amara O.",
+        partnerType: "Ambassador",
+        platform: "Instagram",
+        orders: 9,
+        revenueMinorUnits: 64_000,
+        commissionMinorUnits: 9_600,
+      },
+      {
+        partner: "Kwesi B.",
+        partnerType: "Ambassador",
+        platform: "TikTok",
+        orders: 7,
+        revenueMinorUnits: 48_000,
+        commissionMinorUnits: 7_200,
+      },
+      {
+        partner: "ShopMy · Nina T.",
+        partnerType: "Affiliate",
+        platform: "ShopMy",
+        orders: 6,
+        revenueMinorUnits: 41_000,
+        commissionMinorUnits: 6_100,
+      },
+      {
+        partner: "Bem Bem Café",
+        partnerType: "Collaboration",
+        platform: "In-store",
+        orders: 5,
+        revenueMinorUnits: 32_000,
+        commissionMinorUnits: 0,
+      },
+    ],
+    "growth-next-actions": [
+      {
+        opportunityName: "Whole Foods NE region",
+        nextAction: "Category review submission",
+        dueDate: "2026-08-19",
+        valueMinorUnits: 14_800_000,
+      },
+      {
+        opportunityName: "Blue Bottle cafe program",
+        nextAction: "Send wholesale samples",
+        dueDate: "2026-08-22",
+        valueMinorUnits: 9_600_000,
+      },
+      {
+        opportunityName: "Q4 corporate gifting",
+        nextAction: "Confirm pricing tiers",
+        dueDate: "2026-08-27",
+        valueMinorUnits: 7_400_000,
+      },
+      {
+        opportunityName: "Studio One Eighty Nine",
+        nextAction: "Approve packaging artwork",
+        dueDate: "2026-09-01",
+        valueMinorUnits: 4_100_000,
+      },
+    ],
+    "investor-pipeline": [
+      {
+        investor: "Kindred Ventures",
+        stage: "Diligence",
+        interestLevel: 5,
+        checkSizeMinorUnits: 25_000_000,
+        nextStep: "Data room review · Aug 18",
+      },
+      {
+        investor: "Sipari Capital",
+        stage: "Second meeting",
+        interestLevel: 4,
+        checkSizeMinorUnits: 15_000_000,
+        nextStep: "Founder call · Aug 21",
+      },
+      {
+        investor: "Accra Angel Collective",
+        stage: "Committed",
+        interestLevel: 5,
+        checkSizeMinorUnits: 10_000_000,
+        nextStep: "Docs out · Aug 14",
+      },
+      {
+        investor: "Terroir Fund",
+        stage: "First meeting",
+        interestLevel: 3,
+        checkSizeMinorUnits: 7_500_000,
+        nextStep: "Send deck · Aug 25",
+      },
+      {
+        investor: "Northsight Partners",
+        stage: "Intro",
+        interestLevel: 2,
+        checkSizeMinorUnits: 5_000_000,
+        nextStep: "Warm intro pending",
+      },
+    ],
+    "grant-applications": [
+      {
+        grant: "USDA Value-Added Producer",
+        submittedDate: "2026-05-02",
+        requestedAmountMinorUnits: 7_500_000,
+        status: "Awarded",
+      },
+      {
+        grant: "NY State Food & Bev Fund",
+        submittedDate: "2026-06-11",
+        requestedAmountMinorUnits: 6_000_000,
+        status: "Awarded",
+      },
+      {
+        grant: "Cocoa Origin Impact Grant",
+        submittedDate: "2026-06-30",
+        requestedAmountMinorUnits: 5_000_000,
+        status: "Awarded",
+      },
+      {
+        grant: "Climate Smart Supply Chain",
+        submittedDate: "2026-07-22",
+        requestedAmountMinorUnits: 12_000_000,
+        status: "Under review",
+      },
+      {
+        grant: "Women in Food Innovation",
+        submittedDate: "2026-08-04",
+        requestedAmountMinorUnits: 4_000_000,
+        status: "Submitted",
+      },
+    ],
+  }),
+});
+
 export const f3ProductPageFixtureData: F3PageFixtureData = Object.freeze({
   ...f3PageFixtureData,
   alerts: [

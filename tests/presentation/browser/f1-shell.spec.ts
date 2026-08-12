@@ -34,6 +34,7 @@ test("invalid URL values recover to the B7 allowlist", async ({ page }) => {
 test("keyboard navigation and responsive drawer preserve focus", async ({ page }) => {
   await page.setViewportSize({ width: 760, height: 768 });
   await page.goto("/executive");
+  await expect(page).toHaveURL(/\/executive\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}$/);
   const menu = page.getByRole("button", { name: "Open navigation" });
   await menu.focus();
   await menu.press("Enter");

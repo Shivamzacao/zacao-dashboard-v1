@@ -21,51 +21,13 @@ export const MARKETING_COLLABORATION_HEADERS = [
   "collaboration_end_date",
 ] as const;
 
-const affiliateBaseHeaders = [
-  "record_id",
-  "period",
-  "partner_id",
-  "partner_name",
-  "platform",
-  "code_or_link",
-  "orders",
-  "revenue_usd",
-  "commission_usd",
-  "posts",
-  "reach",
-  "clicks",
-  "payout_status",
-  "source_status",
-  "data_as_of",
-  "created_at",
-  "updated_at",
-  "updated_by",
-  "source_reference",
-  "notes",
-] as const;
+const affiliateBaseHeaders = MANUAL_TAB_CONTRACTS.Affiliate_Ambassador_Perf.columns
+  .map(({ header }) => header)
+  .filter((header) => !MARKETING_AFFILIATE_HEADERS.includes(header as never));
 
-const collaborationBaseHeaders = [
-  "record_id",
-  "pipeline_type",
-  "opportunity",
-  "stage",
-  "status",
-  "value_usd",
-  "probability_manual",
-  "created_date",
-  "last_activity_date",
-  "next_action",
-  "next_action_date",
-  "closed_date",
-  "actual_value_usd",
-  "source_status",
-  "data_as_of",
-  "created_at",
-  "updated_at",
-  "updated_by",
-  "source_reference",
-  "notes",
-] as const;
+const collaborationBaseHeaders = MANUAL_TAB_CONTRACTS.Growth_Pipeline.columns
+  .map(({ header }) => header)
+  .filter((header) => !MARKETING_COLLABORATION_HEADERS.includes(header as never));
 
 export interface MarketingWorkbookSchemaSnapshot {
   readonly workbookId: string;

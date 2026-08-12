@@ -11,6 +11,7 @@ import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/d
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
 import {
   f3CustomerPageFixtureData,
+  f3GrowthPageFixtureData,
   f3MarketingPageFixtureData,
   f3OperationsPageFixtureData,
   f3PageFixtureData,
@@ -323,12 +324,54 @@ describe("F3 dashboard pages", () => {
     ).toEqual(["Channel", "Followers", "Growth rate", "Revenue", "Audience reach", "Details"]);
   });
 
-  it("keeps conditional Growth and Financial pages structurally complete without fake values", () => {
-    const { rerender } = render(
-      <DashboardPageView spec={dashboardPageSpecs.growth} fixture={f3PageFixtureData} />,
-    );
-    expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
-    rerender(<DashboardPageView spec={dashboardPageSpecs.financial} fixture={f3PageFixtureData} />);
+  it("renders the complete Growth Intelligence HTML composition in the approved order", () => {
+    const growth = dashboardPageSpecs.growth;
+    expect(growth.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "growth.open_pipeline_value",
+      "growth.closed_pipeline",
+      "partners.performance",
+      "social.performance",
+      "growth.weighted_pipeline",
+      "growth.time_to_close",
+      "growth.time_to_close_target",
+      "investors.count",
+      "grants.secured",
+      "grants.submitted",
+      "grants.acceptance_rate",
+    ]);
+    expect(growth.charts.map(({ title }) => title)).toEqual([
+      "Pipeline by type",
+      "Partner performance",
+      "Social performance",
+      "Weighted pipeline by industry",
+      "Grant applications submitted",
+    ]);
+    expect(growth.tables.map(({ title }) => title)).toEqual([
+      "Partner performance",
+      "Next actions",
+      "Investor pipeline",
+      "Grant applications",
+    ]);
+
+    render(<DashboardPageView spec={growth} fixture={f3GrowthPageFixtureData} />);
+    expect(screen.getAllByRole("article")).toHaveLength(11);
+    expect(screen.getByLabelText("Open pipeline: $385,000.00")).toBeTruthy();
+    expect(screen.getByLabelText("Average time to close: 4.8 months")).toBeTruthy();
+    expect(screen.getByLabelText("Grant acceptance rate: 35.7%")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
+    expect(screen.getAllByText(/^Source:/)).toHaveLength(20);
+    expect(growth.tables.map(({ span }) => span)).toEqual([2, 1, 2, 1]);
+
+    const investorTable = screen.getByRole("table", { name: "Investor pipeline" });
+    expect(
+      [...investorTable.querySelectorAll("thead th")].map((cell) =>
+        cell.textContent?.replace(/[↕↑↓]/g, ""),
+      ),
+    ).toEqual(["Investor", "Stage", "Interest level", "Check size", "Next step", "Details"]);
+  });
+
+  it("keeps the conditional Financial page structurally complete without fake values", () => {
+    render(<DashboardPageView spec={dashboardPageSpecs.financial} fixture={f3PageFixtureData} />);
     expect(screen.getAllByText("Data pending").length).toBeGreaterThan(0);
   });
 

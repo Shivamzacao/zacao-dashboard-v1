@@ -51,6 +51,8 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       "packaging-stock",
       "partner-performance",
       "growth-next-actions",
+      "investor-pipeline",
+      "grant-applications",
       "social-performance",
       "channel-performance",
       "detailed-orders",
