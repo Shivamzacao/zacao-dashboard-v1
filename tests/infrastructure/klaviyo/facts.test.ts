@@ -5,6 +5,7 @@ import {
   mapKlaviyoPerformanceRows,
   mapKlaviyoSmsFact,
   mapKlaviyoTrendPoints,
+  mergeKlaviyoEngagementPoints,
 } from "@/src/infrastructure/klaviyo/facts";
 import {
   normalizeKlaviyoAggregate,
@@ -148,5 +149,24 @@ describe("Klaviyo engagement trend points", () => {
 
   it("returns an empty list for an account with zero events", () => {
     expect(mapKlaviyoTrendPoints(normalizeKlaviyoAggregate({ dates: [], data: [] }))).toEqual([]);
+  });
+
+  it("keeps opens and clicks as separate aligned series", () => {
+    expect(
+      mergeKlaviyoEngagementPoints(
+        [
+          { period: "2026-06", count: 10 },
+          { period: "2026-07", count: 12 },
+        ],
+        [
+          { period: "2026-06", count: 2 },
+          { period: "2026-08", count: 3 },
+        ],
+      ),
+    ).toEqual([
+      { period: "2026-06", opens: 10, clicks: 2 },
+      { period: "2026-07", opens: 12, clicks: null },
+      { period: "2026-08", opens: null, clicks: 3 },
+    ]);
   });
 });

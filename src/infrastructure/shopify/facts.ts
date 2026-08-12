@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type {
   BillingGeographyFact,
+  AffiliateSalesFact,
+  AffiliateSessionFact,
   CatalogVariantFact,
   CustomerClassificationSummary,
   CustomerCityFact,
@@ -15,6 +17,7 @@ import type {
   ShopifySessionEngagementFact,
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
+  TrafficAttributionFact,
   WeeklyProductUnitsFact,
 } from "@/src/application/metrics/types";
 import { ratioToBasisPoints } from "@/src/domain/utilities/money";
@@ -145,6 +148,49 @@ export function mapShopifySessionEngagementFact(
   return {
     averageSessionDurationSeconds: parseShopifyQlCount(duration, "average_session_duration"),
   };
+}
+
+export function mapTrafficAttributionFacts(
+  rows: readonly ShopifyQlRow[],
+): readonly TrafficAttributionFact[] {
+  return rows
+    .map((row) => ({
+      source: optionalText(requireColumn(row, "referrer_source")) ?? "Unclassified",
+      sessions: parseShopifyQlCount(requireColumn(row, "sessions"), "sessions"),
+    }))
+    .sort(
+      (left, right) => right.sessions - left.sessions || left.source.localeCompare(right.source),
+    );
+}
+
+export function mapAffiliateSessionFacts(
+  rows: readonly ShopifyQlRow[],
+): readonly AffiliateSessionFact[] {
+  return rows.map((row) => ({
+    utmSource: optionalText(requireColumn(row, "utm_source")),
+    utmCampaign: optionalText(requireColumn(row, "utm_campaign")),
+    utmContent: optionalText(requireColumn(row, "utm_content")),
+    sessions: parseShopifyQlCount(requireColumn(row, "sessions"), "sessions"),
+  }));
+}
+
+export function mapAffiliateSalesFacts(
+  rows: readonly ShopifyQlRow[],
+): readonly AffiliateSalesFact[] {
+  return rows.flatMap((row) => {
+    const discountCode = optionalText(requireColumn(row, "discount_code"));
+    if (!discountCode) return [];
+    return [
+      {
+        discountCode,
+        orders: parseShopifyQlCount(requireColumn(row, "orders"), "orders"),
+        netSalesMinorUnits: parseShopifyQlMoneyMinorUnits(
+          requireColumn(row, "net_sales"),
+          "net_sales",
+        ),
+      },
+    ];
+  });
 }
 
 export function mapProductUnitsFacts(

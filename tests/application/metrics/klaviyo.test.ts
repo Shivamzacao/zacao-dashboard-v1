@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildKlaviyoEmailOverview,
+  buildKlaviyoEmailFunnelTable,
   buildKlaviyoDemographicBreakdowns,
   buildKlaviyoEngagementSeries,
   buildKlaviyoPerformanceTable,
@@ -77,13 +78,28 @@ describe("B5 Klaviyo future-ready metric services", () => {
       measurementLabel: "event_time",
     });
     const trend = buildKlaviyoEngagementSeries(context([source("klaviyo")]), "day", [
-      { period: "2026-07-01T04:00:00.000Z", count: 0 },
-      { period: "2026-07-02T04:00:00.000Z", count: 3 },
+      { period: "2026-07-01T04:00:00.000Z", opens: 0, clicks: 0 },
+      { period: "2026-07-02T04:00:00.000Z", opens: 3, clicks: 1 },
     ]);
     expect(sms[0]?.warnings).toContain("KLAVIYO_EVENT_TIME_SEMANTICS");
     expect(sms[0]?.warnings).not.toContain("KLAVIYO_SEND_DATE_SEMANTICS");
-    expect(trend.metric.value).toEqual({ kind: "count", value: 3 });
+    expect(trend.metric.value).toEqual({ kind: "count", value: 4 });
+    expect(trend.points[1]?.seriesValues).toEqual({
+      opens: { kind: "count", value: 3 },
+      clicks: { kind: "count", value: 1 },
+    });
     expect(trend.metric.warnings).toContain("KLAVIYO_EVENT_TIME_SEMANTICS");
+  });
+
+  it("preserves provider-certified funnel rates instead of recomputing sequential rates", () => {
+    const funnel = buildKlaviyoEmailFunnelTable(context([source("klaviyo")]), performance);
+    expect(funnel.metric.key).toBe("klaviyo.email_funnel");
+    expect(funnel.rows).toEqual([
+      { stage: "Emails sent", count: 100, rateBasisPoints: null },
+      { stage: "Delivered", count: 95, rateBasisPoints: 9500 },
+      { stage: "Opened", count: 50, rateBasisPoints: 5000 },
+      { stage: "Clicked", count: 10, rateBasisPoints: 1000 },
+    ]);
   });
 
   it("publishes demographic shares with snapshot and coverage disclosures", () => {

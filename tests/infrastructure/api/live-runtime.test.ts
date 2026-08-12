@@ -110,6 +110,22 @@ function stubFetch(overrides: { failFunnel?: boolean } = {}) {
             },
           });
         }
+        if (body.includes("GROUP BY referrer_source")) {
+          return json({
+            data: {
+              shopifyqlQuery: {
+                parseErrors: [],
+                tableData: {
+                  columns: [],
+                  rows: [
+                    { referrer_source: "Social", sessions: "240" },
+                    { referrer_source: "Search", sessions: "160" },
+                  ],
+                },
+              },
+            },
+          });
+        }
         if (body.includes("FROM sessions")) {
           if (overrides.failFunnel) return json({}, 500);
           return json({
@@ -433,8 +449,8 @@ describe("LiveBackendApiRuntime", () => {
     });
     const result = await runtime.loadDashboard("Marketing Intelligence", filters);
 
-    const funnel = metricByKey(result.page, "commerce.web_funnel");
-    expect(funnel.value).toEqual({ kind: "rate_basis_points", value: 167 });
+    const traffic = metricByKey(result.page, "traffic.attribution");
+    expect(traffic.value).toEqual({ kind: "count", value: 400 });
 
     const emailOverview = metricByKey(result.page, "klaviyo.email_overview");
     expect(emailOverview.value).toBeNull();

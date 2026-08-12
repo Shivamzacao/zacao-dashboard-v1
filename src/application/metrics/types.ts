@@ -29,6 +29,24 @@ export interface ShopifySessionEngagementFact {
   readonly averageSessionDurationSeconds: number;
 }
 
+export interface TrafficAttributionFact {
+  readonly source: string;
+  readonly sessions: number;
+}
+
+export interface AffiliateSessionFact {
+  readonly utmSource: string | null;
+  readonly utmCampaign: string | null;
+  readonly utmContent: string | null;
+  readonly sessions: number;
+}
+
+export interface AffiliateSalesFact {
+  readonly discountCode: string;
+  readonly orders: number;
+  readonly netSalesMinorUnits: number;
+}
+
 export interface CustomerCityFact {
   readonly city: string;
   readonly region: string | null;
@@ -166,6 +184,12 @@ export interface KlaviyoSmsFact {
 export interface KlaviyoTrendPoint {
   readonly period: string;
   readonly count: number | null;
+}
+
+export interface KlaviyoEngagementPoint {
+  readonly period: string;
+  readonly opens: number | null;
+  readonly clicks: number | null;
 }
 
 export interface KlaviyoDemographicFact {

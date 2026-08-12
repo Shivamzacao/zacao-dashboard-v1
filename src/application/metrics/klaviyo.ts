@@ -13,9 +13,9 @@ import { ratioToBasisPoints } from "@/src/domain/utilities/money";
 import type {
   KlaviyoPerformanceFact,
   KlaviyoDemographicFact,
+  KlaviyoEngagementPoint,
   KlaviyoPerformanceRow,
   KlaviyoSmsFact,
-  KlaviyoTrendPoint,
   MetricServiceContext,
 } from "./types";
 import { createMetricViewModel } from "./view-model";
@@ -165,6 +165,38 @@ export function buildKlaviyoEmailOverview(
   ];
 }
 
+export function buildKlaviyoEmailFunnelTable(
+  context: MetricServiceContext,
+  fact: KlaviyoPerformanceFact | null,
+): MetricTableViewModel {
+  const stages = fact
+    ? [
+        { stage: "Emails sent", count: fact.recipients, rateBasisPoints: null },
+        {
+          stage: "Delivered",
+          count: fact.delivered,
+          rateBasisPoints: fact.deliveryRateBasisPoints,
+        },
+        { stage: "Opened", count: fact.opensUnique, rateBasisPoints: fact.openRateBasisPoints },
+        { stage: "Clicked", count: fact.clicksUnique, rateBasisPoints: fact.clickRateBasisPoints },
+      ]
+    : [];
+  const usable = stages.filter(
+    (row): row is { stage: string; count: number; rateBasisPoints: number | null } =>
+      row.count !== null,
+  );
+  const base = metric(
+    context,
+    "klaviyo.email_funnel",
+    usable.length === 0 ? null : { kind: "count", value: usable[0]?.count ?? 0 },
+  );
+  return metricTableViewModelSchema.parse({
+    metric: base,
+    columns: ["stage", "count", "rateBasisPoints"],
+    rows: usable,
+  });
+}
+
 export function buildKlaviyoSmsOverview(
   context: MetricServiceContext,
   fact: KlaviyoSmsFact | null,
@@ -236,7 +268,7 @@ export function buildKlaviyoPerformanceTable(
 export function buildKlaviyoEngagementSeries(
   context: MetricServiceContext,
   grain: "hour" | "day" | "week" | "month",
-  points: readonly KlaviyoTrendPoint[],
+  points: readonly KlaviyoEngagementPoint[],
 ): MetricSeriesViewModel {
   const base = createMetricViewModel({
     metricKey: "klaviyo.engagement_trend",
@@ -248,7 +280,10 @@ export function buildKlaviyoEngagementSeries(
         ? null
         : {
             kind: "count",
-            value: points.reduce((total, point) => total + (point.count ?? 0), 0),
+            value: points.reduce(
+              (total, point) => total + (point.opens ?? 0) + (point.clicks ?? 0),
+              0,
+            ),
           },
     warnings: ["KLAVIYO_EVENT_TIME_SEMANTICS"],
   });
@@ -257,7 +292,11 @@ export function buildKlaviyoEngagementSeries(
     grain,
     points: points.map((point) => ({
       period: point.period,
-      value: point.count === null ? null : { kind: "count", value: point.count },
+      value: null,
+      seriesValues: {
+        opens: point.opens === null ? null : { kind: "count", value: point.opens },
+        clicks: point.clicks === null ? null : { kind: "count", value: point.clicks },
+      },
     })),
   });
 }

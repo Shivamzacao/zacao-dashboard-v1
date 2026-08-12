@@ -18,6 +18,12 @@ const DATASETS = {
   web_funnel:
     "FROM sessions SHOW sessions, online_store_visitors, sessions_with_cart_additions, sessions_that_reached_checkout, sessions_that_completed_checkout, conversion_rate TIMESERIES month",
   session_geography: "FROM sessions SHOW sessions GROUP BY session_country",
+  traffic_attribution:
+    "FROM sessions SHOW sessions WHERE human_or_bot_session = 'human' GROUP BY referrer_source",
+  affiliate_sessions:
+    "FROM sessions SHOW sessions WHERE human_or_bot_session = 'human' GROUP BY utm_source, utm_campaign, utm_content",
+  affiliate_sales:
+    "FROM sales SHOW orders, net_sales WHERE discount_code IS NOT NULL GROUP BY discount_code",
   billing_geography: "FROM sales SHOW orders, total_sales GROUP BY billing_country, billing_region",
   purchase_time: "FROM sales SHOW orders GROUP BY day_of_week, hour_of_day",
   native_channels: "FROM sales SHOW orders, net_sales, total_sales GROUP BY sales_channel",

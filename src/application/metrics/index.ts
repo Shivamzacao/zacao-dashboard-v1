@@ -3,6 +3,7 @@ export * from "./conditional";
 export * from "./customer-ltv";
 export * from "./klaviyo";
 export * from "./manual";
+export * from "./marketing";
 export * from "./operations";
 export * from "./page";
 export * from "./product-sheet";

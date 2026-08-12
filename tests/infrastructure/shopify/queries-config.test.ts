@@ -72,6 +72,26 @@ describe("Shopify query allowlist", () => {
     ).toContain(
       "SHOW customers WHERE billing_city IS NOT NULL GROUP BY billing_city, billing_region",
     );
+    expect(
+      buildShopifyQlQuery({
+        dataset: "traffic_attribution",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toBe(
+      "FROM sessions SHOW sessions WHERE human_or_bot_session = 'human' GROUP BY referrer_source SINCE 2026-01-01 UNTIL 2026-01-31 ORDER BY sessions DESC LIMIT 50",
+    );
+    expect(
+      buildShopifyQlQuery({
+        dataset: "affiliate_sessions",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toContain("GROUP BY utm_source, utm_campaign, utm_content");
+    expect(
+      buildShopifyQlQuery({
+        dataset: "affiliate_sales",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toContain("WHERE discount_code IS NOT NULL GROUP BY discount_code");
     expect(() =>
       buildShopifyQlQuery({
         dataset: "sales_trend",

@@ -11,6 +11,7 @@ import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/d
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
 import {
   f3CustomerPageFixtureData,
+  f3MarketingPageFixtureData,
   f3OperationsPageFixtureData,
   f3PageFixtureData,
   f3ProductPageFixtureData,
@@ -268,10 +269,58 @@ describe("F3 dashboard pages", () => {
     expect(screen.queryByRole("heading", { name: "Incoming production" })).toBeNull();
   });
 
-  it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {
-    render(<DashboardPageView spec={dashboardPageSpecs.marketing} fixture={f3PageFixtureData} />);
-    expect(screen.getAllByText("No activity").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Spend from the approved workbook/)).toBeTruthy();
+  it("renders the complete Marketing Intelligence HTML composition in the approved order", () => {
+    const marketing = dashboardPageSpecs.marketing;
+    expect(marketing.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "klaviyo.email_recipients",
+      "klaviyo.email_delivery_rate",
+      "klaviyo.email_open_rate",
+      "klaviyo.email_click_rate",
+      "klaviyo.attributed_revenue",
+      "social.followers_total",
+      "collabs.active",
+      "ambassadors.active",
+      "ambassadors.sessions",
+      "ambassadors.revenue",
+    ]);
+    expect(marketing.charts.map(({ title }) => title)).toEqual([
+      "Marketing spend",
+      "Email conversion funnel",
+      "Email engagement",
+      "Follower growth by channel",
+      "Collaboration reach",
+      "Collaborations by category",
+      "Web traffic by source",
+      "Social mentions by channel",
+      "Affiliate ROI by message",
+      "Campaign ROI",
+    ]);
+    expect(marketing.tables.map(({ title }) => title)).toEqual([
+      "Klaviyo flows",
+      "Social channel performance",
+      "Top ambassadors",
+      "Brand collaborations",
+    ]);
+
+    render(<DashboardPageView spec={marketing} fixture={f3MarketingPageFixtureData} />);
+    expect(screen.getAllByRole("article")).toHaveLength(10);
+    expect(screen.getByLabelText("Email recipients: 2,840")).toBeTruthy();
+    expect(screen.getByLabelText("Affiliate-driven revenue: $2,100.00")).toBeTruthy();
+    expect(screen.getAllByText("Business rule required")).toHaveLength(2);
+    expect(screen.getAllByText("Opens").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Clicks").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Store conversion funnel" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Campaign performance" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Klaviyo campaigns" })).toBeNull();
+    expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
+    expect(screen.getAllByText(/^Source:/)).toHaveLength(24);
+
+    const table = screen.getByRole("table", { name: "Social channel performance" });
+    expect(
+      [...table.querySelectorAll("thead th")].map((cell) =>
+        cell.textContent?.replace(/[↕↑↓]/g, ""),
+      ),
+    ).toEqual(["Channel", "Followers", "Growth rate", "Revenue", "Audience reach", "Details"]);
   });
 
   it("keeps conditional Growth and Financial pages structurally complete without fake values", () => {

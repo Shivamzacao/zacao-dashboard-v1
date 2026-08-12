@@ -42,6 +42,7 @@ const tickFormatters: Record<ChartValueFormat, (value: number) => string> = {
   percent: (value) => formatChartValue(value, "percent", "compact"),
   count: (value) => formatChartValue(value, "count", "compact"),
   quantity: (value) => formatChartValue(value, "quantity", "compact"),
+  ratio: (value) => `${formatChartValue(value, "quantity", "compact")}×`,
 };
 
 const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
@@ -49,6 +50,7 @@ const valueFormatters: Record<ChartValueFormat, (value: number) => string> = {
   percent: (value) => formatChartValue(value, "percent", "full"),
   count: (value) => formatChartValue(value, "count", "full"),
   quantity: (value) => formatChartValue(value, "quantity", "full"),
+  ratio: (value) => `${formatChartValue(value, "quantity", "full")}×`,
 };
 
 interface BaseChartProps {
@@ -728,6 +730,7 @@ export function FunnelChartView(props: BaseChartProps) {
           const value = item.value ?? 0;
           const previous = index > 0 ? (stages[index - 1]?.value ?? 0) : null;
           const step = previous === null ? null : stageShare(value, previous);
+          const suppliedRate = item.conversionRateBasisPoints;
           const top = (edges[index] ?? 1) * 100;
           const bottom = (edges[index + 1] ?? top) * 100;
           return (
@@ -737,7 +740,11 @@ export function FunnelChartView(props: BaseChartProps) {
                   {item.label}
                 </span>
                 <span className="funnel-row-step">
-                  {step === null ? "Entry" : `${formatPercent(step * 100)} of previous`}
+                  {suppliedRate !== null && suppliedRate !== undefined
+                    ? `${formatPercent(suppliedRate / 100)} rate`
+                    : step === null
+                      ? "Entry"
+                      : `${formatPercent(step * 100)} of previous`}
                 </span>
               </span>
               <FunnelBand

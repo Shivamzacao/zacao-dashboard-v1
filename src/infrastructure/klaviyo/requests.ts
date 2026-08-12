@@ -13,8 +13,6 @@ export const KLAVIYO_REPORT_STATISTICS = [
   "click_to_open_rate",
   "bounced",
   "bounce_rate",
-  "unsubscribe_uniques",
-  "unsubscribe_rate",
   "spam_complaints",
   "spam_complaint_rate",
   "conversions",

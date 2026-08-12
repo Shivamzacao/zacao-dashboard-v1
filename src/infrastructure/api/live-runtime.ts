@@ -36,6 +36,7 @@ import { SheetsApiClient } from "@/src/infrastructure/sheets-api/client";
 import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/config";
 import { createV1CompositeContributor } from "@/src/infrastructure/composite/v1-metrics";
 import { createProductSheetMetricsContributor } from "@/src/infrastructure/composite/product-metrics";
+import { createMarketingCompositeContributor } from "@/src/infrastructure/composite/marketing-metrics";
 import { GoogleReadClient } from "@/src/infrastructure/google/client";
 import {
   APPROVED_GOOGLE_FILE_IDS,
@@ -137,10 +138,11 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "deferred-google_drive",
   ],
   "Marketing Intelligence": [
-    "shopify-funnel",
+    "shopify-traffic-attribution",
     "klaviyo-performance",
     "klaviyo-engagement",
     "sheets-marketing",
+    "marketing-composite-metrics",
   ],
   "Growth Intelligence": ["sheets-growth"],
   "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
@@ -283,6 +285,12 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
           }),
+          createMarketingCompositeContributor({
+            sheets: this.sheetsSource,
+            shopify: this.shopifyAdapters,
+            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+            now,
+          }),
         );
       }
     } else {
@@ -290,6 +298,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         new DeferredSourceContributor("shopify-customers", "shopify", now),
         new DeferredSourceContributor("shopify-funnel", "shopify", now),
         new DeferredSourceContributor("shopify-session-engagement", "shopify", now),
+        new DeferredSourceContributor("shopify-traffic-attribution", "shopify", now),
         new DeferredSourceContributor("shopify-product-units", "shopify", now),
         new DeferredSourceContributor("shopify-catalog-inventory", "shopify", now),
         new DeferredSourceContributor("shopify-history", "shopify", now),
@@ -312,6 +321,11 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         ),
         new DeferredSourceContributor(
           "product-sheet-example-metrics",
+          this.sheetsSource ? "shopify" : "google_sheets",
+          now,
+        ),
+        new DeferredSourceContributor(
+          "marketing-composite-metrics",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),
