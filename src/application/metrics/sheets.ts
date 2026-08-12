@@ -421,6 +421,162 @@ export function buildProductionCostBreakdown(
   });
 }
 
+function receivedOrderRows(records: readonly SheetRecord[]) {
+  return records.flatMap((record) => {
+    const po = text(record, "po_number");
+    const expectedDate = text(record, "expected_date");
+    const receivedDate = text(record, "received_date");
+    const orderedUnits = numeric(record, "units");
+    const receivedUnits = numeric(record, "received_units");
+    return po && expectedDate && receivedDate && orderedUnits !== null && receivedUnits !== null
+      ? [{ po, expectedDate, receivedDate, orderedUnits, receivedUnits }]
+      : [];
+  });
+}
+
+export function hasManufacturerOtifRows(records: readonly SheetRecord[]): boolean {
+  return receivedOrderRows(records).length > 0;
+}
+
+/**
+ * Workbook-backed manufacturer delivery evidence. The current workbook has no
+ * accepted/damage-free quantity, so this reports only the two supportable
+ * measures: on-time and complete.
+ */
+export function buildManufacturerOtifBreakdown(
+  context: MetricServiceContext,
+  records: readonly SheetRecord[],
+  warnings: readonly string[] = [],
+): MetricBreakdownViewModel {
+  const rows = receivedOrderRows(records);
+  const rate = (count: number) => (rows.length ? Math.round((count / rows.length) * 10_000) : null);
+  const onTime = rate(rows.filter((row) => row.receivedDate <= row.expectedDate).length);
+  const complete = rate(rows.filter((row) => row.receivedUnits >= row.orderedUnits).length);
+  const otif = rate(
+    rows.filter(
+      (row) => row.receivedDate <= row.expectedDate && row.receivedUnits >= row.orderedUnits,
+    ).length,
+  );
+  const base = metric(
+    context,
+    "operations.manufacturer_otif",
+    otif === null ? null : { kind: "rate_basis_points", value: otif },
+    warnings,
+  );
+  const items = [
+    ["on-time", "On-time", onTime],
+    ["complete", "Complete", complete],
+    ["otif", "On-time & complete", otif],
+  ] as const;
+  return metricBreakdownViewModelSchema.parse({
+    metric: base,
+    dimension: "manufacturer_delivery_measure",
+    items: items.flatMap(([key, label, value]) =>
+      value === null
+        ? []
+        : [{ key, label, values: [{ kind: "rate_basis_points", value }], warnings: [] }],
+    ),
+  });
+}
+
+const COST_COMPONENTS = [
+  ["production_cost_usd", "Production"],
+  ["packaging_usd", "Packaging"],
+  ["freight_usd", "Freight"],
+  ["total_unit_cost_usd", "Total landed COGS"],
+] as const;
+
+function subtractMonths(date: string, months: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  value.setUTCMonth(value.getUTCMonth() - months);
+  return value.toISOString().slice(0, 10);
+}
+
+function costPeriodAverages(records: readonly SheetRecord[], date: string) {
+  const rows = records.filter(
+    (record) => text(record, "effective_from") === date && text(record, "cost_basis") === "landed",
+  );
+  return new Map(
+    COST_COMPONENTS.flatMap(([key]) => {
+      const values = rows.flatMap((record) => {
+        const value = numeric(record, key);
+        return value === null ? [] : [value];
+      });
+      return values.length
+        ? ([[key, values.reduce((sum, value) => sum + value, 0) / values.length]] as const)
+        : [];
+    }),
+  );
+}
+
+export function hasComparableInputCostRows(
+  records: readonly SheetRecord[],
+  endDate: string,
+): boolean {
+  const dates = [
+    ...new Set(
+      records.flatMap((record) => {
+        const date = text(record, "effective_from");
+        return text(record, "cost_basis") === "landed" && date && date <= endDate ? [date] : [];
+      }),
+    ),
+  ].sort();
+  const latest = dates.at(-1);
+  return latest ? dates.some((date) => date <= subtractMonths(latest, 3)) : false;
+}
+
+/** Compare like-for-like landed cost components with the latest period three months earlier. */
+export function buildInputCostMovementBreakdown(
+  context: MetricServiceContext,
+  records: readonly SheetRecord[],
+  warnings: readonly string[] = [],
+): MetricBreakdownViewModel {
+  const dates = [
+    ...new Set(
+      records.flatMap((record) => {
+        const date = text(record, "effective_from");
+        return text(record, "cost_basis") === "landed" && date && date <= context.dataPeriod.endDate
+          ? [date]
+          : [];
+      }),
+    ),
+  ].sort();
+  const latestDate = dates.at(-1) ?? null;
+  const priorDate = latestDate
+    ? (dates.filter((date) => date <= subtractMonths(latestDate, 3)).at(-1) ?? null)
+    : null;
+  const latest = latestDate ? costPeriodAverages(records, latestDate) : new Map<string, number>();
+  const prior = priorDate ? costPeriodAverages(records, priorDate) : new Map<string, number>();
+  const movement = new Map(
+    COST_COMPONENTS.flatMap(([key]) => {
+      const current = latest.get(key);
+      const previous = prior.get(key);
+      return current !== undefined && previous !== undefined && previous !== 0
+        ? ([[key, Math.round(((current - previous) / Math.abs(previous)) * 10_000)]] as const)
+        : [];
+    }),
+  );
+  const totalMovement = movement.get("total_unit_cost_usd") ?? null;
+  const periodWarnings =
+    latestDate && priorDate ? [`COMPARISON_PERIODS:${priorDate}:${latestDate}`] : [];
+  const base = metric(
+    context,
+    "manufacturing.input_cost_movement",
+    totalMovement === null ? null : { kind: "rate_basis_points", value: totalMovement },
+    [...warnings, ...periodWarnings],
+  );
+  return metricBreakdownViewModelSchema.parse({
+    metric: base,
+    dimension: "cost_component",
+    items: COST_COMPONENTS.flatMap(([key, label]) => {
+      const value = movement.get(key);
+      return value === undefined
+        ? []
+        : [{ key, label, values: [{ kind: "rate_basis_points", value }], warnings: [] }];
+    }),
+  });
+}
+
 export function buildMarketingSpendBreakdown(
   context: MetricServiceContext,
   records: readonly SheetRecord[],

@@ -5,6 +5,12 @@ export type SheetRecord = Readonly<Record<string, SheetCell>>;
 
 export interface SheetsTabReadResult {
   readonly tabs: Readonly<Record<string, readonly SheetRecord[]>>;
+  /**
+   * Validated workbook rows explicitly labelled `source_status=example`.
+   * Consumers must opt in to these rows and disclose their synthetic status;
+   * they are never mixed into the production tab collection.
+   */
+  readonly exampleTabs?: Readonly<Record<string, readonly SheetRecord[]>>;
   readonly sourceStatus: SourceStatus;
   readonly warnings: readonly string[];
 }

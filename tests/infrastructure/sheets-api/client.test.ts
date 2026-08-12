@@ -123,6 +123,74 @@ describe("SheetsApiClient direct Google source", () => {
     });
   });
 
+  it("keeps validated example rows separate from production rows", async () => {
+    const rows = [
+      [
+        "order_id",
+        "customer_id",
+        "order_date",
+        "first_order_date",
+        "gross_product_sales_usd",
+        "discounts_usd",
+        "refunds_returns_usd",
+        "cancellations_usd",
+        "net_product_revenue_usd",
+        "order_status",
+        "acquisition_channel",
+        "currency",
+        "is_test",
+        "data_as_of",
+        "source_status",
+      ],
+      [
+        "PROD-1",
+        "C-1",
+        "8/1/2026",
+        "8/1/2026",
+        100,
+        0,
+        0,
+        0,
+        100,
+        "paid",
+        "Online Store",
+        "USD",
+        "no",
+        "8/11/2026",
+        "production",
+      ],
+      [
+        "DEMO-1",
+        "DUMMY-CUSTOMER",
+        "8/2/2026",
+        "8/2/2026",
+        80,
+        0,
+        0,
+        0,
+        80,
+        "paid",
+        "Online Store",
+        "USD",
+        "no",
+        "8/11/2026",
+        "example",
+      ],
+    ];
+    const client = new SheetsApiClient(configuration(), {
+      fetch: clientFetch({ titles: ["Sales_Actuals"], rows }) as typeof fetch,
+      accessToken: async () => "token",
+    });
+
+    const result = await client.readPageTabs("customers", ["Sales_Actuals"]);
+
+    expect(result.tabs["Sales_Actuals"]?.map((row) => row["order_id"])).toEqual(["PROD-1"]);
+    expect(result.exampleTabs?.["Sales_Actuals"]?.map((row) => row["order_id"])).toEqual([
+      "DEMO-1",
+    ]);
+    expect(result.sourceStatus.state).toBe("current");
+  });
+
   it("batch reads and normalizes requested tabs", async () => {
     const fetchMock = clientFetch({});
     const client = new SheetsApiClient(configuration(), {

@@ -134,6 +134,7 @@ const SOURCE_WARNING_COPY: Readonly<Record<string, string>> = {
   STALE_SOURCE: "Showing the last confirmed values",
   SOURCE_UNAVAILABLE: "The source could not be reached",
   REQUEST_FAILED: "The source could not be reached",
+  SYNTHETIC_EXAMPLE_DATA: "Showing disclosed demo rows",
 };
 
 function sourceDetail(status: SourceStatus): string | undefined {
@@ -178,6 +179,25 @@ export function mapDashboardPageToDisplayData(
   const stateReasons: Record<string, string> = {};
   const comparisonValues: Record<string, DisplayComparison> = {};
   const alerts: DashboardAlertDisplayModel[] = [];
+  const usesSyntheticSheetRows =
+    page.warnings.includes("SYNTHETIC_EXAMPLE_DATA") ||
+    page.sources.some((source) => source.warningCodes.includes("SYNTHETIC_EXAMPLE_DATA")) ||
+    [
+      ...page.metrics,
+      ...page.series.map(({ metric }) => metric),
+      ...page.breakdowns.map(({ metric }) => metric),
+      ...page.tables.map(({ metric }) => metric),
+    ].some((metric) => metric.warnings.includes("SYNTHETIC_EXAMPLE_DATA"));
+  if (usesSyntheticSheetRows) {
+    alerts.push({
+      key: "synthetic-google-sheets-data",
+      severity: "warning",
+      title: "Demo Google Sheets data is being shown",
+      description:
+        "Production records are missing for one or more Google Sheets metrics. Clearly labelled example rows are being used for preview only.",
+      metadata: ["Synthetic preview", "Google Sheets", "Not certified actuals"],
+    });
+  }
 
   const registerMetric = (metric: MetricViewModel) => {
     states[metric.key] = displayStateFor(metric);

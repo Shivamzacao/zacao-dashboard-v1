@@ -20,6 +20,11 @@ import {
   mapNativeChannelFacts,
   mapWeeklyProductUnitsFacts,
 } from "@/src/infrastructure/shopify/facts";
+import {
+  selectExampleFallback,
+  syntheticSourceStatus,
+  syntheticWarnings,
+} from "@/src/infrastructure/sheets-api/example-fallback";
 
 const CACHE: CachePolicy = { freshForSeconds: 120, staleForSeconds: 900 };
 
@@ -67,7 +72,8 @@ export function createV1CompositeContributor(input: {
         adapters.shopifyql.read({ dataset: "native_channels", dateRange: context.dataPeriod }),
       ]);
       const checkedAt = input.now().toISOString();
-      const statuses = [sheets.sourceStatus, shopifyStatus(checkedAt)];
+      const shopifySourceStatus = shopifyStatus(checkedAt);
+      const statuses = [sheets.sourceStatus, shopifySourceStatus];
       const metricContext = {
         environment: context.environment,
         dataPeriod: context.dataPeriod,
@@ -78,10 +84,19 @@ export function createV1CompositeContributor(input: {
       const skuMaster = sheets.tabs["SKU_Master"] ?? [];
       const forecasts = sheets.tabs["Sales_Forecast"] ?? [];
       const reconciled = reconcileForecastActuals(metricContext, forecasts, skuMaster, actuals);
+      const channelMapping = selectExampleFallback(sheets, "Channel_Mapping");
+      const revenueStatuses = [
+        syntheticSourceStatus(sheets.sourceStatus, channelMapping.usedExample),
+        shopifySourceStatus,
+      ];
+      const revenueContext = {
+        ...metricContext,
+        sourceStatuses: revenueStatuses,
+      };
       const revenueChannels = buildRevenueChannelViews(
-        metricContext,
+        revenueContext,
         channelFacts,
-        sheets.tabs["Channel_Mapping"] ?? [],
+        channelMapping.rows,
       );
       return {
         metrics: [
@@ -106,8 +121,8 @@ export function createV1CompositeContributor(input: {
             forecasts,
           ),
           buildUnclassifiedChannelMetric(
-            metricContext,
-            sheets.tabs["Channel_Mapping"] ?? [],
+            revenueContext,
+            channelMapping.rows,
             channelFacts.map(({ channel }) => channel),
           ),
         ],
@@ -116,8 +131,11 @@ export function createV1CompositeContributor(input: {
           buildForecastVarianceTable(metricContext, reconciled.facts, reconciled.warnings),
           revenueChannels.channelPerformance,
         ],
-        sourceStatuses: statuses,
-        warnings: [...sheets.warnings, ...reconciled.warnings],
+        sourceStatuses: revenueStatuses,
+        warnings: [
+          ...syntheticWarnings(sheets.warnings, channelMapping.usedExample),
+          ...reconciled.warnings,
+        ],
       };
     },
   };
