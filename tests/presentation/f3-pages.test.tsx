@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -71,11 +72,16 @@ describe("F3 dashboard pages", () => {
     expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
   });
 
-  it("uses the approved F2 table, drill-down, and export path for Product Intelligence", () => {
+  it("uses the approved F2 table, drill-down, and export path for Product Intelligence", async () => {
     render(<DashboardPageView spec={dashboardPageSpecs.products} fixture={f3PageFixtureData} />);
     expect(screen.getByRole("table", { name: "Product catalog" })).toBeTruthy();
     expect(screen.getAllByRole("button", { name: "Export CSV" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: /View details for/ })).toHaveLength(6);
+    const viewButtons = screen.getAllByRole("button", { name: /View details for/ });
+    expect(viewButtons).toHaveLength(6);
+
+    await userEvent.click(viewButtons[0]!);
+    expect(screen.getByRole("dialog", { name: "Product catalog detail" })).toBeTruthy();
+    expect(screen.getAllByText("Synthetic Dark Bar").length).toBeGreaterThan(1);
     expect(screen.getByText("Inventory Runway & Reorder Alert")).toBeTruthy();
   });
 
