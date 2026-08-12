@@ -79,9 +79,24 @@ export function createV1CompositeContributor(input: {
           hasReadAllOrders: adapters.hasReadAllOrders,
         }),
       ]);
+      const skuMaster = selectExampleFallback(sheets, "SKU_Master");
+      const locationMaster = selectExampleFallback(sheets, "Location_Master", (rows) =>
+        rows.some(
+          (row) =>
+            typeof row["shopify_location_name"] === "string" &&
+            row["shopify_location_name"].trim() !== "",
+        ),
+      );
+      const stockTargets = selectExampleFallback(sheets, "Metric_Targets", (rows) => {
+        const keys = new Set(rows.map((row) => row["metric_key"]));
+        return keys.has("inventory.stock_min") && keys.has("inventory.stock_max");
+      });
+      const operationalExamplesUsed =
+        skuMaster.usedExample || locationMaster.usedExample || stockTargets.usedExample;
       const checkedAt = input.now().toISOString();
       const shopifySourceStatus = shopifyStatus(checkedAt);
-      const statuses = [sheets.sourceStatus, shopifySourceStatus];
+      const sheetsStatus = syntheticSourceStatus(sheets.sourceStatus, operationalExamplesUsed);
+      const statuses = [sheetsStatus, shopifySourceStatus];
       const metricContext = {
         environment: context.environment,
         dataPeriod: context.dataPeriod,
@@ -89,12 +104,19 @@ export function createV1CompositeContributor(input: {
       };
       const actuals = mapWeeklyProductUnitsFacts(weekly.rows);
       const channelFacts = mapNativeChannelFacts(channels.rows);
-      const skuMaster = sheets.tabs["SKU_Master"] ?? [];
       const forecasts = sheets.tabs["Sales_Forecast"] ?? [];
-      const reconciled = reconcileForecastActuals(metricContext, forecasts, skuMaster, actuals);
+      const reconciled = reconcileForecastActuals(
+        metricContext,
+        forecasts,
+        skuMaster.rows,
+        actuals,
+      );
       const channelMapping = selectExampleFallback(sheets, "Channel_Mapping");
       const revenueStatuses = [
-        syntheticSourceStatus(sheets.sourceStatus, channelMapping.usedExample),
+        syntheticSourceStatus(
+          sheets.sourceStatus,
+          channelMapping.usedExample || operationalExamplesUsed,
+        ),
         shopifySourceStatus,
       ];
       const revenueContext = {
@@ -109,10 +131,10 @@ export function createV1CompositeContributor(input: {
       const inventory = buildOperationalInventoryViews(
         metricContext,
         mapInventoryFacts(products.records),
-        skuMaster,
-        sheets.tabs["Location_Master"] ?? [],
+        skuMaster.rows,
+        locationMaster.rows,
         sheets.tabs["Inventory_Snapshots"] ?? [],
-        sheets.tabs["Metric_Targets"] ?? [],
+        stockTargets.rows,
       );
       return {
         metrics: [
@@ -123,13 +145,17 @@ export function createV1CompositeContributor(input: {
             sheets.tabs["Inventory_Snapshots"] ?? [],
             sheets.tabs["COGS_By_SKU"] ?? [],
           ),
-          buildMissingSkuCostMetric(metricContext, skuMaster, sheets.tabs["COGS_By_SKU"] ?? []),
+          buildMissingSkuCostMetric(
+            metricContext,
+            skuMaster.rows,
+            sheets.tabs["COGS_By_SKU"] ?? [],
+          ),
           buildSellThroughMetric(
             metricContext,
             sheets.tabs["Inventory_Snapshots"] ?? [],
             sheets.tabs["Production_Orders"] ?? [],
             actuals,
-            skuMaster,
+            skuMaster.rows,
           ),
           buildInventoryRunwayMetric(
             metricContext,
@@ -155,7 +181,10 @@ export function createV1CompositeContributor(input: {
         ],
         sourceStatuses: revenueStatuses,
         warnings: [
-          ...syntheticWarnings(sheets.warnings, channelMapping.usedExample),
+          ...syntheticWarnings(
+            sheets.warnings,
+            channelMapping.usedExample || operationalExamplesUsed,
+          ),
           ...reconciled.warnings,
         ],
       };

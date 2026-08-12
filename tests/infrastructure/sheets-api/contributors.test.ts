@@ -172,6 +172,108 @@ describe("Sheets API contributors", () => {
     expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 
+  it("uses disclosed operational examples only where production coverage is unusable", async () => {
+    const source = new FakeSource(
+      {
+        Additional_Depletions: [{ movement_date: "2026-06-01", reason: "sample", quantity: 9 }],
+        Production_Orders: [
+          {
+            po_number: "FUTURE-PO",
+            sku: "SKU-01",
+            units: 200,
+            status: "in_production",
+            expected_date: "2026-10-01",
+          },
+        ],
+      },
+      {
+        Additional_Depletions: [{ movement_date: "2026-08-01", reason: "sample", quantity: 5 }],
+        Production_Orders: [
+          {
+            record_id: "DEMO-INCOMING",
+            po_number: "DEMO-INCOMING",
+            sku: "SKU-01",
+            units: 100,
+            status: "in_production",
+            expected_date: "2026-08-20",
+            confirmed_date: "2026-07-10",
+            production_start_date: "2026-07-12",
+          },
+          {
+            record_id: "DEMO-RECEIVED",
+            po_number: "DEMO-RECEIVED",
+            sku: "SKU-01",
+            units: 100,
+            status: "received",
+            expected_date: "2026-08-05",
+            received_date: "2026-08-04",
+            received_units: 100,
+            accepted_units: 98,
+            confirmed_date: "2026-07-01",
+            production_start_date: "2026-07-03",
+          },
+        ],
+        Warehouse_Fulfillment: [
+          {
+            order_id: "DEMO-WH",
+            promised_ship_at: "2026-08-01T16:00:00Z",
+            shipped_at: "2026-08-01T15:00:00Z",
+            pick_accurate: "yes",
+          },
+        ],
+        Packaging_Materials: [
+          {
+            material_id: "wrap",
+            material_name: "Bar wrappers",
+            ideal_minimum: 30,
+            ideal_maximum: 90,
+            effective_from: "2026-01-01",
+            is_active: "yes",
+          },
+        ],
+        Packaging_Inventory: [
+          { snapshot_date: "2026-07-31", material_id: "wrap", on_hand_quantity: 42 },
+        ],
+        Packaging_Orders: [
+          {
+            po_number: "DEMO-PKG",
+            material_id: "wrap",
+            quantity: 10,
+            eta: "2026-09-12",
+            status: "in_transit",
+          },
+        ],
+        Packaging_Forecast: ["08", "09", "10", "11"].map((month) => ({
+          month: `2026-${month}-01`,
+          material_id: "wrap",
+          consumption_quantity: 10,
+          status: "approved",
+        })),
+      },
+    );
+
+    const result = await contributor(source, "sheets-operations").load(context);
+
+    expect(
+      result.metrics?.find(({ key }) => key === "operations.manufacturer_lead_time")?.value,
+    ).toEqual({ kind: "quantity", value: 34 });
+    expect(
+      result.metrics?.find(({ key }) => key === "operations.warehouse_on_time_accuracy")?.value,
+    ).toEqual({ kind: "rate_basis_points", value: 10_000 });
+    expect(
+      result.breakdowns?.find(({ metric }) => metric.key === "inventory.depletions")?.metric.value,
+    ).toEqual({ kind: "quantity", value: 5 });
+    expect(
+      result.breakdowns?.find(({ metric }) => metric.key === "inventory.packaging_projection")
+        ?.metric.value,
+    ).toEqual({ kind: "quantity", value: 42 });
+    expect(
+      result.tables?.find(({ metric }) => metric.key === "production.incoming")?.metric.value,
+    ).toEqual({ kind: "quantity", value: 100 });
+    expect(result.sourceStatuses[0]).toMatchObject({ state: "partial", completeness: "partial" });
+    expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+
   it("uses an example SKU master to report production cost coverage on Product", async () => {
     const source = new FakeSource(
       {

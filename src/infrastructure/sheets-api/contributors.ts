@@ -122,35 +122,81 @@ export function createSheetsApiContributors(
       "Sales_Forecast",
       "COGS_By_SKU",
     ]);
-    const metricContext = context(value, result.sourceStatus);
     const otif = selectExampleFallback(result, "Production_Orders", hasManufacturerOtifRows);
+    const manufacturerOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
+      rows.some(
+        (row) =>
+          typeof row["confirmed_date"] === "string" && typeof row["received_date"] === "string",
+      ),
+    );
+    const incomingOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
+      toProductionIncomingFacts(rows).facts.some(
+        ({ expectedArrivalDate }) =>
+          expectedArrivalDate === null ||
+          (expectedArrivalDate >= value.dataPeriod.startDate &&
+            expectedArrivalDate <= value.dataPeriod.endDate),
+      ),
+    );
+    const depletions = selectExampleFallback(result, "Additional_Depletions", (rows) =>
+      rows.some((row) => {
+        const date = row["movement_date"];
+        return (
+          typeof date === "string" &&
+          date >= value.dataPeriod.startDate &&
+          date <= value.dataPeriod.endDate
+        );
+      }),
+    );
+    const warehouse = selectExampleFallback(result, "Warehouse_Fulfillment", (rows) =>
+      rows.some((row) => {
+        const date = row["shipped_at"];
+        return (
+          typeof date === "string" &&
+          date.slice(0, 10) >= value.dataPeriod.startDate &&
+          date.slice(0, 10) <= value.dataPeriod.endDate
+        );
+      }),
+    );
+    const packagingMaterials = selectExampleFallback(result, "Packaging_Materials");
+    const packagingInventory = selectExampleFallback(result, "Packaging_Inventory");
+    const packagingOrders = selectExampleFallback(result, "Packaging_Orders");
+    const packagingForecast = selectExampleFallback(result, "Packaging_Forecast");
     const costs = selectExampleFallback(result, "COGS_By_SKU", (rows) =>
       hasComparableInputCostRows(rows, value.dataPeriod.endDate),
     );
-    const usedExample = otif.usedExample || costs.usedExample;
+    const usedExample = [
+      otif,
+      manufacturerOrders,
+      incomingOrders,
+      depletions,
+      warehouse,
+      packagingMaterials,
+      packagingInventory,
+      packagingOrders,
+      packagingForecast,
+      costs,
+    ].some(({ usedExample: used }) => used);
     const status = syntheticSourceStatus(result.sourceStatus, usedExample);
     const fallbackWarnings = syntheticWarnings(result.warnings, usedExample);
+    const metricContext = context(value, status);
     const combined = toCombinedInventoryFacts(
       result.tabs["Inventory_Snapshots"] ?? [],
       result.tabs["Location_Master"] ?? [],
     );
-    const incoming = toProductionIncomingFacts(result.tabs["Production_Orders"] ?? []);
-    const manufacturer = buildManufacturerOperationsViews(
-      metricContext,
-      result.tabs["Production_Orders"] ?? [],
-    );
+    const incoming = toProductionIncomingFacts(incomingOrders.rows);
+    const manufacturer = buildManufacturerOperationsViews(metricContext, manufacturerOrders.rows);
     const packaging = buildPackagingViews(
       metricContext,
-      result.tabs["Packaging_Materials"] ?? [],
-      result.tabs["Packaging_Inventory"] ?? [],
-      result.tabs["Packaging_Orders"] ?? [],
-      result.tabs["Packaging_Forecast"] ?? [],
+      packagingMaterials.rows,
+      packagingInventory.rows,
+      packagingOrders.rows,
+      packagingForecast.rows,
     );
     const fallback = (result.sourceStatus.dataAsOf ?? result.sourceStatus.checkedAt).slice(0, 10);
     return {
       metrics: [
         ...manufacturer.metrics,
-        buildWarehouseAccuracyMetric(metricContext, result.tabs["Warehouse_Fulfillment"] ?? []),
+        buildWarehouseAccuracyMetric(metricContext, warehouse.rows),
       ],
       breakdowns: [
         buildCombinedInventoryBreakdown(
@@ -158,10 +204,7 @@ export function createSheetsApiContributors(
           combined.facts,
           combined.completeRequiredLocations,
         ),
-        buildDepletionsBreakdown(
-          metricContext,
-          toDepletionRecords(result.tabs["Additional_Depletions"] ?? []),
-        ),
+        buildDepletionsBreakdown(metricContext, toDepletionRecords(depletions.rows)),
         buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
         buildInputCostMovementBreakdown(
           context(value, syntheticSourceStatus(result.sourceStatus, costs.usedExample)),
