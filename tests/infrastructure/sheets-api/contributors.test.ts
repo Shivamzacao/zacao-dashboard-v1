@@ -172,6 +172,32 @@ describe("Sheets API contributors", () => {
     expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 
+  it("uses an example SKU master to report production cost coverage on Product", async () => {
+    const source = new FakeSource(
+      {
+        COGS_By_SKU: [
+          {
+            sku: "SKU-01",
+            effective_from: "2026-07-01",
+            cost_basis: "standard",
+            total_unit_cost_usd: 2.5,
+          },
+        ],
+      },
+      {
+        SKU_Master: [{ sku_id: "SKU-01", is_active: "yes", source_status: "example" }],
+      },
+    );
+
+    const result = await contributor(source, "sheets-product").load(context);
+
+    expect(result.metrics?.find(({ key }) => key === "quality.missing_sku_cost")?.value).toEqual({
+      kind: "count",
+      value: 0,
+    });
+    expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+
   it("publishes Realized LTV and aggregate PII-free cohort rows", async () => {
     const source = new FakeSource({
       Sales_Actuals: [

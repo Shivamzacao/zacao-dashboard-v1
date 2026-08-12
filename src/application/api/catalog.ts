@@ -80,7 +80,6 @@ export const drilldownCatalog = Object.freeze([
     ],
     sortFields: ["sku", "units", "revenueMinorUnits", "marginBasisPoints", "status"],
     exportable: true,
-    implementationPending: true,
   }),
   definition({
     dataset: "klaviyo-campaigns",
