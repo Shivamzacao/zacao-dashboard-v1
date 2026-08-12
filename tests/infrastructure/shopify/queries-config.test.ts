@@ -52,6 +52,12 @@ describe("Shopify query allowlist", () => {
         dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
       }),
     ).toContain("GROUP BY line_type, product_title, product_variant_title, product_variant_sku");
+    expect(
+      buildShopifyQlQuery({
+        dataset: "native_channels",
+        dateRange: { startDate: "2026-01-01", endDate: "2026-01-31" },
+      }),
+    ).toContain("SHOW orders, net_sales, total_sales, average_order_value GROUP BY sales_channel");
     expect(() =>
       buildShopifyQlQuery({
         dataset: "sales_trend",

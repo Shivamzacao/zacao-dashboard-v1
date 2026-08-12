@@ -47,8 +47,16 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       "partner-performance",
       "growth-next-actions",
       "social-performance",
+      "channel-performance",
       "detailed-orders",
     ]);
+    expect(
+      apiContractManifest.drilldowns.find(({ dataset }) => dataset === "channel-performance"),
+    ).toMatchObject({
+      exportable: true,
+      sourceLimited: false,
+      implementationPending: false,
+    });
     expect(
       apiContractManifest.drilldowns.find(({ dataset }) => dataset === "detailed-orders"),
     ).toMatchObject({

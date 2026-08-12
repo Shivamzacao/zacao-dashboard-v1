@@ -44,6 +44,18 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       kind: "money",
       value: { currency: "USD", minorUnits: 1_425_000 },
     },
+    "revenue.dtc_total": {
+      kind: "money",
+      value: { currency: "USD", minorUnits: 1_026_000 },
+    },
+    "revenue.retail_total": {
+      kind: "money",
+      value: { currency: "USD", minorUnits: 375_000 },
+    },
+    "revenue.channel_mix": {
+      kind: "money",
+      value: { currency: "USD", minorUnits: 1_425_000 },
+    },
     "operations.fulfillment_summary": { kind: "count", value: 118 },
     "products.mix": { kind: "rate_basis_points", value: 4_100 },
     "quality.unclassified_channel": { kind: "count", value: 3 },
@@ -66,6 +78,17 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
       { key: "online", label: "Online Store", value: 11800 },
       { key: "pos", label: "Point of Sale", value: 1900 },
       { key: "unclassified", label: "Unclassified", value: 550 },
+    ],
+    "revenue.channel_mix": [
+      { key: "site", label: "DTC — Site", value: 5980 },
+      { key: "wholesale", label: "Wholesale / Faire", value: 2180 },
+      { key: "tiktok", label: "TikTok Shop", value: 1420 },
+      { key: "affiliate", label: "DTC — Affiliate", value: 1240 },
+      { key: "distribution", label: "In-store — Distribution", value: 1010 },
+      { key: "shopmy", label: "ShopMy", value: 860 },
+      { key: "ig", label: "IG Shop", value: 760 },
+      { key: "cafes", label: "In-store — Cafés", value: 560 },
+      { key: "events", label: "Events / Pop-ups", value: 240 },
     ],
     "operations.fulfillment_summary": [
       { key: "fulfilled", label: "Fulfilled", value: 118 },
@@ -140,6 +163,71 @@ export const f3PageFixtureData: F3PageFixtureData = Object.freeze({
     "sources.freshness": "percent" as const,
   }),
   rowsByDataset: Object.freeze({
+    "channel-performance": [
+      {
+        channel: "DTC — Site",
+        revenueMinorUnits: 598_000,
+        orders: 54,
+        averageOrderValueMinorUnits: 11_074,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "Wholesale / Faire",
+        revenueMinorUnits: 218_000,
+        orders: 9,
+        averageOrderValueMinorUnits: 24_222,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "TikTok Shop",
+        revenueMinorUnits: 142_000,
+        orders: 16,
+        averageOrderValueMinorUnits: 8_875,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "DTC — Affiliate",
+        revenueMinorUnits: 124_000,
+        orders: 12,
+        averageOrderValueMinorUnits: 10_333,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "In-store — Distribution",
+        revenueMinorUnits: 101_000,
+        orders: 5,
+        averageOrderValueMinorUnits: 20_200,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "ShopMy",
+        revenueMinorUnits: 86_000,
+        orders: 8,
+        averageOrderValueMinorUnits: 10_750,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "IG Shop",
+        revenueMinorUnits: 76_000,
+        orders: 9,
+        averageOrderValueMinorUnits: 8_444,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "In-store — Cafés",
+        revenueMinorUnits: 56_000,
+        orders: 11,
+        averageOrderValueMinorUnits: 5_091,
+        marginBasisPoints: null,
+      },
+      {
+        channel: "Events / Pop-ups",
+        revenueMinorUnits: 24_000,
+        orders: 4,
+        averageOrderValueMinorUnits: 6_000,
+        marginBasisPoints: null,
+      },
+    ],
     "product-catalog": [
       { product: "Synthetic Dark Bar", sku: "SYNTH-DARK-70", status: "Active", price: "$12.00" },
       {

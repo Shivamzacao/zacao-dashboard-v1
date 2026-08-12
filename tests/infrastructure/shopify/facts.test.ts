@@ -4,6 +4,7 @@ import {
   mapCatalogVariantFacts,
   mapCustomerClassificationSummary,
   mapInventoryFacts,
+  mapNativeChannelFacts,
   mapProductUnitsFacts,
   mapSalesTotalsFact,
   mapSalesTrendPoints,
@@ -151,6 +152,49 @@ describe("sales no-activity rows", () => {
     expect(() => mapSalesTrendPoints([{ month: "2026-08-01", net_sales: null }])).toThrow(
       /partially null/,
     );
+  });
+});
+
+describe("native channel facts", () => {
+  it("passes Shopify's grouped AOV through without locally re-dividing it", () => {
+    expect(
+      mapNativeChannelFacts([
+        {
+          sales_channel: "Online Store",
+          orders: "3",
+          net_sales: "30.00",
+          total_sales: "32.00",
+          average_order_value: "11.25",
+        },
+      ]),
+    ).toEqual([
+      {
+        channel: "Online Store",
+        orders: 3,
+        netSalesMinorUnits: 3_000,
+        totalSalesMinorUnits: 3_200,
+        averageOrderValueMinorUnits: 1_125,
+      },
+    ]);
+  });
+
+  it("keeps an empty provider AOV unavailable and requires its column", () => {
+    expect(
+      mapNativeChannelFacts([
+        {
+          sales_channel: "Online Store",
+          orders: "0",
+          net_sales: "0",
+          total_sales: "0",
+          average_order_value: null,
+        },
+      ])[0]?.averageOrderValueMinorUnits,
+    ).toBeNull();
+    expect(() =>
+      mapNativeChannelFacts([
+        { sales_channel: "Online Store", orders: "1", net_sales: "10", total_sales: "10" },
+      ]),
+    ).toThrow(/average_order_value/);
   });
 });
 

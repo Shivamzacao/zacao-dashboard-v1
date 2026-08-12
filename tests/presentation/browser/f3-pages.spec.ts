@@ -67,5 +67,14 @@ for (const width of [760, 640, 390]) {
         () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
       ),
     ).toBe(true);
+
+    await page.goto("/revenue");
+    await expect(page.getByRole("heading", { name: "Revenue intelligence" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      ),
+    ).toBe(true);
   });
 }

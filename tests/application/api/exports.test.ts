@@ -51,6 +51,23 @@ describe("B7 bounded CSV exports", () => {
     ).toBe(400);
   });
 
+  it("exports certified channel performance fields while keeping margin unavailable", async () => {
+    const response = await handlers().exportCsv(
+      new Request(
+        `https://example.test/api/v1/exports/channel-performance?${API_QUERY}&fields=channel,revenueMinorUnits,orders,averageOrderValueMinorUnits,marginBasisPoints`,
+      ),
+      "channel-performance",
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain(
+      "zacao-channel-performance-2026-07-01-to-2026-07-31.csv",
+    );
+    expect(await response.text()).toBe(
+      "channel,revenueMinorUnits,orders,averageOrderValueMinorUnits,marginBasisPoints\r\nDTC — Site,59800,54,1107,\r\n",
+    );
+  });
+
   it("rejects the retired comparison query parameter", async () => {
     const response = await handlers().exportCsv(
       new Request(

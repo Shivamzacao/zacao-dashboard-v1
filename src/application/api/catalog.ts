@@ -195,6 +195,20 @@ export const drilldownCatalog = Object.freeze([
     exportable: true,
   }),
   definition({
+    dataset: "channel-performance",
+    section: "Revenue Intelligence",
+    metricKey: "revenue.channel_mix",
+    fields: [
+      "channel",
+      "revenueMinorUnits",
+      "orders",
+      "averageOrderValueMinorUnits",
+      "marginBasisPoints",
+    ],
+    sortFields: ["channel", "revenueMinorUnits", "orders", "averageOrderValueMinorUnits"],
+    exportable: true,
+  }),
+  definition({
     dataset: "detailed-orders",
     section: "Revenue Intelligence",
     metricKey: "commerce.detailed_order_drilldown",
