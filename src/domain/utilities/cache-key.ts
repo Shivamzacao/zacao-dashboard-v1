@@ -14,7 +14,6 @@ export function createDashboardCacheKey(namespace: string, filters: DashboardFil
     `schema=${CONTRACT_SCHEMA_VERSION}`,
     `start=${normalized.startDate}`,
     `end=${normalized.endDate}`,
-    `comparison=${normalized.comparison}`,
     `channels=${normalized.channels.map(encodeURIComponent).join(",")}`,
     `skus=${normalized.productSkus.map(encodeURIComponent).join(",")}`,
     `locations=${normalized.locations.map(encodeURIComponent).join(",")}`,

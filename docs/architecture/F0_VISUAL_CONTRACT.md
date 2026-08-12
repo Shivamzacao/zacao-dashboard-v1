@@ -48,8 +48,8 @@ There are no authentication, account, admin, settings, or editing routes in V1.
 
 - Default period is rolling last 7 days on every section, replacing the demo's mock 90-day default.
   Rolling last 12 months remains a selectable preset but is no longer the cold-load period.
-- Period, comparison, channel, SKU/product, and location controls appear only when B7 reports support.
-- Comparison and dimension filters reuse the demo's 35 px date-control visual pattern.
+- Period, channel, SKU/product, and location controls appear only when B7 reports support.
+- Dimension filters reuse the demo's 35 px date-control visual pattern.
 - Filters are URL-backed in F1; no browser parameter selects TEST versus PRODUCTION.
 - Export uses only the B7 allowlisted dataset/field contract and preserves current filters.
 - Search is REMOVE_FROM_V1 as an interaction because no approved searchable-object API exists. Its

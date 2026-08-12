@@ -61,7 +61,7 @@ export const metricViewModelSchema = z
     sources: z.array(sourceStatusSchema),
     warnings: z.array(z.string().trim().min(1).max(120)),
     unavailableReason: z.string().trim().min(1).max(500).nullable(),
-    /** Present only when the request asked for a comparison period. */
+    /** Optional certified/static comparison payload; not a dashboard request filter. */
     comparison: metricComparisonSchema.optional(),
   })
   .strict();

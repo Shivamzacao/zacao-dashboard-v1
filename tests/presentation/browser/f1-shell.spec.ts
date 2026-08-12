@@ -3,9 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 
 test("desktop shell, URL state, navigation, and accessibility", async ({ page }) => {
   await page.goto("/executive");
-  await expect(page).toHaveURL(
-    /\/executive\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}&comparison=none/,
-  );
+  await expect(page).toHaveURL(/\/executive\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}$/);
   await expect(page.getByRole("navigation", { name: "Dashboard sections" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Executive health" })).toHaveAttribute(
     "aria-current",
@@ -15,14 +13,9 @@ test("desktop shell, URL state, navigation, and accessibility", async ({ page })
 
   await page.getByLabel("Reporting period").selectOption("last_90_days");
   await expect(page).toHaveURL(/start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}/);
-  await page.getByLabel("Comparison period").selectOption("previous_year");
-  await expect(page).toHaveURL(/comparison=previous_year/);
-  await page.goBack();
-  await expect(page.getByLabel("Comparison period")).toHaveValue("none");
-  await page.goForward();
-  await expect(page.getByLabel("Comparison period")).toHaveValue("previous_year");
-  await page.getByLabel("Comparison period").selectOption("none");
-  await expect(page).toHaveURL(/comparison=none/);
+  await expect(page.getByLabel("Reporting period")).toHaveValue("last_90_days");
+  await expect(page.locator(".dashboard-view")).not.toHaveAttribute("data-pending", "");
+  await expect(page.getByLabel("Comparison period")).toHaveCount(0);
 
   const accessibility = await new AxeBuilder({ page }).analyze();
   expect(accessibility.violations).toEqual([]);
@@ -33,9 +26,7 @@ test("invalid URL values recover to the B7 allowlist", async ({ page }) => {
   await page.goto(
     "/products?start=bad&end=2026-08-07&comparison=future&channels=Unknown&provider=shopify",
   );
-  await expect(page).toHaveURL(
-    /\/products\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}&comparison=none$/,
-  );
+  await expect(page).toHaveURL(/\/products\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}$/);
   await expect(page.getByRole("heading", { name: "Product intelligence" })).toBeVisible();
 });
 

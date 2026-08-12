@@ -18,6 +18,9 @@ describe("F1 Phase 2 fixture provider", () => {
       },
     });
     expect(phase2FixtureProvider.getRepresentativeDashboard().ok).toBe(true);
+    expect(phase2FixtureProvider.getShellContext().supportedFilters).not.toHaveProperty(
+      "comparisons",
+    );
   });
 
   it("rejects unlabelled or structurally invalid fixtures", () => {

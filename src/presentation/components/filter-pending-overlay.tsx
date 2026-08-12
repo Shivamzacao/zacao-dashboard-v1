@@ -1,5 +1,5 @@
 /**
- * Shown while a filter change (comparison period, reporting period, channel,
+ * Shown while a filter change (reporting period, channel,
  * SKU, location) is still waiting on the server render. The controls update
  * optimistically, so without this the page looks finished while it is still
  * showing the previous period's numbers.

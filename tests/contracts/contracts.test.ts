@@ -37,11 +37,20 @@ describe("public contract schema 1.0", () => {
       dashboardFiltersSchema.parse({
         startDate: "2026-01-01",
         endDate: "2026-01-31",
-        comparison: "none",
         channels: [],
         productSkus: [],
         locations: [],
         inventedFilter: true,
+      }),
+    ).toThrow();
+    expect(() =>
+      dashboardFiltersSchema.parse({
+        startDate: "2026-01-01",
+        endDate: "2026-01-31",
+        comparison: "none",
+        channels: [],
+        productSkus: [],
+        locations: [],
       }),
     ).toThrow();
     expect(() => usdMoneySchema.parse({ currency: "USD", minorUnits: 100, dollars: 1 })).toThrow();

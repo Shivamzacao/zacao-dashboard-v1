@@ -7,7 +7,6 @@ import { normalizeDashboardFilters } from "@/src/domain/utilities/filters";
 const filters: DashboardFilters = {
   startDate: "2025-08-06",
   endDate: "2026-08-06",
-  comparison: "previous_year",
   channels: ["Wholesale/Faire", " Website/DTC ", "Website/DTC"],
   productSkus: ["DARK-1", "SMOOTH-4"],
   locations: ["SNAPL"],
@@ -34,6 +33,7 @@ describe("filter normalization and cache keys", () => {
     });
     expect(key).toContain("channels=DTC%20%2F%20Web");
     expect(key).toContain("schema=1.0");
+    expect(key).not.toContain("comparison=");
   });
 
   it.each(["", "Revenue Page", "UPPER"])("rejects unstable namespace %s", (namespace) => {

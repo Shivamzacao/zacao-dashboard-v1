@@ -6,20 +6,20 @@ Status: Implemented in Subphase B1; frozen pending B1 gate approval.
 
 All response and source contracts use `schemaVersion: "1.0"`. A future incompatible change requires a new schema version and traceability impact review.
 
-| Contract family | Canonical implementation | Locked behavior |
-|---|---|---|
-| Money | `src/domain/contracts/money.ts`, `src/domain/utilities/money.ts` | USD integer minor units; decimal text parsed without binary floating-point calculations |
-| Percentage | `src/domain/contracts/percentage.ts`, `src/domain/utilities/money.ts` | Integer basis points; zero denominators return `null` |
-| Reporting dates | `src/domain/contracts/date-range.ts`, `src/domain/utilities/time.ts` | ISO calendar dates with explicit IANA timezone boundaries; no machine-timezone dependence |
-| Filters | `src/domain/contracts/filters.ts`, `src/domain/utilities/filters.ts` | Strict, canonical, deduplicated, sorted multiselect values |
-| Comparison | `src/domain/contracts/date-range.ts` | `none`, `previous_period`, or `previous_year`; metric support is decided later by the approved metric definition |
-| Readiness | `src/domain/contracts/readiness.ts` | Loading, current, no activity, not configured, partial, stale, invalid, unavailable, and error remain distinct |
-| Source status | `src/domain/contracts/source-status.ts` | Source, timestamps, completeness, and non-sensitive warning codes |
-| Errors | `src/domain/contracts/errors.ts` | Stable code, safe message, retryability, and field-path details |
-| Pagination | `src/domain/contracts/pagination.ts` | Bounded cursor requests and explicit next-page metadata |
-| Cache | `src/domain/contracts/cache.ts`, `src/domain/utilities/cache-key.ts` | Versioned canonical keys and explicit fresh/stale metadata |
-| API envelope | `src/domain/contracts/api.ts` | Strict discriminated success/failure envelopes with request ID |
-| Metric definitions | `src/domain/contracts/metric.ts`, `src/domain/metrics/registry.ts` | Unique metric key, schema version, definition version, class, value kind, source, and description |
+| Contract family    | Canonical implementation                                                       | Locked behavior                                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Money              | `src/domain/contracts/money.ts`, `src/domain/utilities/money.ts`               | USD integer minor units; decimal text parsed without binary floating-point calculations                                        |
+| Percentage         | `src/domain/contracts/percentage.ts`, `src/domain/utilities/money.ts`          | Integer basis points; zero denominators return `null`                                                                          |
+| Reporting dates    | `src/domain/contracts/date-range.ts`, `src/domain/utilities/time.ts`           | ISO calendar dates with explicit IANA timezone boundaries; no machine-timezone dependence                                      |
+| Filters            | `src/domain/contracts/filters.ts`, `src/domain/utilities/filters.ts`           | Strict, canonical, deduplicated, sorted multiselect values                                                                     |
+| Metric comparison  | `src/domain/contracts/date-range.ts`, `src/application/view-models/metrics.ts` | Optional presentation payloads may describe `previous_period` or `previous_year`; comparison is not a dashboard request filter |
+| Readiness          | `src/domain/contracts/readiness.ts`                                            | Loading, current, no activity, not configured, partial, stale, invalid, unavailable, and error remain distinct                 |
+| Source status      | `src/domain/contracts/source-status.ts`                                        | Source, timestamps, completeness, and non-sensitive warning codes                                                              |
+| Errors             | `src/domain/contracts/errors.ts`                                               | Stable code, safe message, retryability, and field-path details                                                                |
+| Pagination         | `src/domain/contracts/pagination.ts`                                           | Bounded cursor requests and explicit next-page metadata                                                                        |
+| Cache              | `src/domain/contracts/cache.ts`, `src/domain/utilities/cache-key.ts`           | Versioned canonical keys and explicit fresh/stale metadata                                                                     |
+| API envelope       | `src/domain/contracts/api.ts`                                                  | Strict discriminated success/failure envelopes with request ID                                                                 |
+| Metric definitions | `src/domain/contracts/metric.ts`, `src/domain/metrics/registry.ts`             | Unique metric key, schema version, definition version, class, value kind, source, and description                              |
 
 ## Ports
 

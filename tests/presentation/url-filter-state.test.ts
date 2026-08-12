@@ -18,7 +18,6 @@ describe("F1 URL filter state", () => {
     expect(state.filters).toMatchObject({
       startDate: "2026-08-01",
       endDate: "2026-08-07",
-      comparison: "none",
       channels: [],
       productSkus: [],
       locations: [],
@@ -41,7 +40,20 @@ describe("F1 URL filter state", () => {
       today,
     );
     expect(state.recovered).toBe(true);
-    expect(state.query).toBe("start=2026-08-01&end=2026-08-07&comparison=none");
+    expect(state.query).toBe("start=2026-08-01&end=2026-08-07");
+  });
+
+  it("drops the retired comparison parameter from otherwise valid legacy URLs", () => {
+    const state = parseFrontendFilterState(
+      new URLSearchParams(
+        "start=2026-07-09&end=2026-08-07&comparison=previous_year&channels=Website%2FDTC",
+      ),
+      supported,
+      today,
+    );
+
+    expect(state.recovered).toBe(true);
+    expect(state.query).toBe("start=2026-07-09&end=2026-08-07&channels=Website%2FDTC");
   });
 
   it("uses only B7 allowlisted dimensions and canonical ordering", () => {
@@ -52,13 +64,12 @@ describe("F1 URL filter state", () => {
         channels: ["Website/DTC"],
         productSkus: ["SYNTH-SKU-1"],
         locations: ["SYNTH-WAREHOUSE"],
-        comparison: "previous_year",
       },
       supported,
       today,
     );
     expect(next.query).toBe(
-      "start=2026-08-01&end=2026-08-07&comparison=previous_year&channels=Website%2FDTC&skus=SYNTH-SKU-1&locations=SYNTH-WAREHOUSE",
+      "start=2026-08-01&end=2026-08-07&channels=Website%2FDTC&skus=SYNTH-SKU-1&locations=SYNTH-WAREHOUSE",
     );
   });
 

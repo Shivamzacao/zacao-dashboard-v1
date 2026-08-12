@@ -26,7 +26,6 @@ export const syntheticFrontendDashboardFixture = dashboardApiResponseSchema.pars
   data: {
     page,
     supportedFilters: {
-      comparisons: ["none", "previous_period", "previous_year"],
       channels: ["Website/DTC"],
       productSkus: ["SYNTH-SKU-1"],
       locations: ["SYNTH-WAREHOUSE"],

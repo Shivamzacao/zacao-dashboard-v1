@@ -1280,10 +1280,6 @@ select {
   width: 111px;
 }
 
-.comparison-control select {
-  width: 116px;
-}
-
 .export-trigger {
   display: inline-flex;
   min-width: 86px;
@@ -1799,10 +1795,6 @@ select {
     color: var(--forest-dark);
     background: var(--paper);
     cursor: pointer;
-  }
-
-  .comparison-control {
-    display: none;
   }
 
   .global-filter-bar {

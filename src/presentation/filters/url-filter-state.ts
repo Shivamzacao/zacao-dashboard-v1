@@ -1,7 +1,7 @@
 import { parseDashboardFilters } from "@/src/application/api";
 
 import type { FilterOptions } from "@/src/application/api";
-import type { ComparisonMode, DashboardFilters, IsoDate } from "@/src/domain/contracts";
+import type { DashboardFilters, IsoDate } from "@/src/domain/contracts";
 
 export type DateRangePreset =
   "last_7_days" | "last_30_days" | "last_90_days" | "year_to_date" | "last_12_months";
@@ -13,8 +13,7 @@ export interface FrontendFilterState {
   readonly recovered: boolean;
 }
 
-const allowedKeys = new Set(["start", "end", "comparison", "channels", "skus", "locations"]);
-const comparisons: readonly ComparisonMode[] = ["none", "previous_period", "previous_year"];
+const allowedKeys = new Set(["start", "end", "channels", "skus", "locations"]);
 
 function formatUtcDate(date: Date): IsoDate {
   return date.toISOString().slice(0, 10) as IsoDate;
@@ -88,7 +87,6 @@ export function serializeDashboardFilters(filters: DashboardFilters): string {
   const search = new URLSearchParams();
   search.set("start", filters.startDate);
   search.set("end", filters.endDate);
-  search.set("comparison", filters.comparison);
   if (filters.channels.length > 0) search.set("channels", filters.channels.join(","));
   if (filters.productSkus.length > 0) search.set("skus", filters.productSkus.join(","));
   if (filters.locations.length > 0) search.set("locations", filters.locations.join(","));
@@ -110,18 +108,9 @@ export function parseFrontendFilterState(
     validIsoDate(requestedEnd) &&
     requestedStart <= requestedEnd &&
     daySpan(requestedStart, requestedEnd) <= 366;
-  const requestedComparison = search.get("comparison");
-  const comparison =
-    requestedComparison &&
-    comparisons.includes(requestedComparison as ComparisonMode) &&
-    supported.comparisons.includes(requestedComparison as ComparisonMode)
-      ? (requestedComparison as ComparisonMode)
-      : "none";
-
   const canonical = new URLSearchParams();
   canonical.set("start", validRange ? requestedStart : fallback.startDate);
   canonical.set("end", validRange ? requestedEnd : fallback.endDate);
-  canonical.set("comparison", comparison);
   const channels = supportedList(search, "channels", supported.channels);
   const productSkus = supportedList(search, "skus", supported.productSkus);
   const locations = supportedList(search, "locations", supported.locations);
