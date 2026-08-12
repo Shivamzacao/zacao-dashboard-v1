@@ -156,7 +156,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         },
         {
           title: "Manufacturer delivery performance",
-          description: "On-time, complete, and damage-free rates for received purchase orders.",
+          description: "On-time and complete rates for received purchase orders.",
           metricKey: "operations.manufacturer_otif",
           eyebrow: "Manufacturer delivery performance",
           sourceLabel: "Google Sheets",

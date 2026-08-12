@@ -47,6 +47,23 @@ function pageWith(
 }
 
 describe("mapDashboardPageToDisplayData", () => {
+  it("shows a visible warning when live metrics use disclosed Sheet examples", () => {
+    const display = mapDashboardPageToDisplayData(
+      { ...pageWith([]), warnings: ["SYNTHETIC_EXAMPLE_DATA"] },
+      "production",
+    );
+
+    expect(display.synthetic).toBe(false);
+    expect(display.alerts).toContainEqual({
+      key: "synthetic-google-sheets-data",
+      severity: "warning",
+      title: "Demo Google Sheets data is being shown",
+      description:
+        "Production records are missing for one or more Google Sheets metrics. Clearly labelled example rows are being used for preview only.",
+      metadata: ["Synthetic preview", "Google Sheets", "Not certified actuals"],
+    });
+  });
+
   it("maps aggregate cohort LTV into five nullable money series without PII", () => {
     const cohortMetric = createMetricViewModel({
       metricKey: "customers.realized_ltv_cohorts",

@@ -33,6 +33,7 @@ const STALE_MS = 900_000;
 
 interface CachedRead {
   readonly tabs: Readonly<Record<string, readonly SheetRecord[]>>;
+  readonly exampleTabs: Readonly<Record<string, readonly SheetRecord[]>>;
   readonly warnings: readonly string[];
   readonly fetchedAt: number;
   readonly dataAsOf: string | null;
@@ -69,7 +70,13 @@ function normalizeCell(value: unknown, column: ManualColumnContract): string | n
 }
 
 function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknown[])[]) {
-  if (values.length === 0) return { rows: [] as SheetRecord[], warnings: [] as string[] };
+  if (values.length === 0) {
+    return {
+      rows: [] as SheetRecord[],
+      exampleRows: [] as SheetRecord[],
+      warnings: [] as string[],
+    };
+  }
   const contract = MANUAL_TAB_CONTRACTS[tab];
   const headers = values[0]?.map((value) => String(value).trim()) ?? [];
   // The production Inventory_Snapshots sheet currently has a blank A1 while
@@ -78,11 +85,17 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
   const headerIndexes = new Map(headers.map((header, index) => [header, index]));
   const missing = contract.columns.filter((column) => !headerIndexes.has(column.header));
   if (missing.some((column) => column.required)) {
-    return { rows: [] as SheetRecord[], warnings: [`SHEETS_TAB_INVALID:${tab}`] };
+    return {
+      rows: [] as SheetRecord[],
+      exampleRows: [] as SheetRecord[],
+      warnings: [`SHEETS_TAB_INVALID:${tab}`],
+    };
   }
   const rows: SheetRecord[] = [];
+  const exampleRows: SheetRecord[] = [];
   const warnings: string[] = [];
-  const businessKeys = new Set<string>();
+  const productionBusinessKeys = new Set<string>();
+  const exampleBusinessKeys = new Set<string>();
   for (let index = 1; index < values.length; index += 1) {
     const raw = values[index] ?? [];
     if (raw.every((cell) => cell === null || cell === undefined || cell === "")) continue;
@@ -98,20 +111,25 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
       warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 1}`);
       continue;
     }
-    if (
-      normalized[SOURCE_STATUS_COLUMN] === null ||
-      normalized[SOURCE_STATUS_COLUMN] === PRODUCTION_SOURCE_STATUS
-    ) {
+    const rowStatus = normalized[SOURCE_STATUS_COLUMN];
+    const target =
+      rowStatus === null || rowStatus === PRODUCTION_SOURCE_STATUS
+        ? rows
+        : rowStatus === "example"
+          ? exampleRows
+          : null;
+    if (target) {
+      const businessKeys = target === rows ? productionBusinessKeys : exampleBusinessKeys;
       const businessKey = JSON.stringify(contract.businessKey.map((key) => normalized[key]));
       if (businessKeys.has(businessKey)) {
         warnings.push(`SHEETS_DUPLICATE_BUSINESS_KEY:${tab}:${index + 1}`);
         continue;
       }
       businessKeys.add(businessKey);
-      rows.push(normalized);
+      target.push(normalized);
     }
   }
-  return { rows, warnings };
+  return { rows, exampleRows, warnings };
 }
 
 function dataAsOf(tabs: Readonly<Record<string, readonly SheetRecord[]>>): string | null {
@@ -222,18 +240,27 @@ export class SheetsApiClient implements SheetsTabDataSource {
         ...(signal ? { signal } : {}),
       })) ?? {};
     const tabs: Record<string, readonly SheetRecord[]> = {};
+    const exampleTabs: Record<string, readonly SheetRecord[]> = {};
     const warnings: string[] = [];
     for (const tab of requested) {
       if (!available.has(tab)) {
         tabs[tab] = [];
+        exampleTabs[tab] = [];
         warnings.push(`SHEETS_TAB_MISSING:${tab}`);
         continue;
       }
       const normalized = normalizeRows(tab, raw[tab] ?? []);
       tabs[tab] = normalized.rows;
+      exampleTabs[tab] = normalized.exampleRows;
       warnings.push(...normalized.warnings);
     }
-    return { tabs, warnings, fetchedAt: this.now().getTime(), dataAsOf: dataAsOf(tabs) };
+    return {
+      tabs,
+      exampleTabs,
+      warnings,
+      fetchedAt: this.now().getTime(),
+      dataAsOf: dataAsOf(tabs),
+    };
   }
 
   async readPageTabs(
@@ -272,7 +299,12 @@ export class SheetsApiClient implements SheetsTabDataSource {
         warnings: read.warnings,
         complete: read.warnings.length === 0,
       });
-      return { tabs: read.tabs, sourceStatus: this.lastStatus, warnings: read.warnings };
+      return {
+        tabs: read.tabs,
+        exampleTabs: read.exampleTabs,
+        sourceStatus: this.lastStatus,
+        warnings: read.warnings,
+      };
     } catch (error) {
       if (cached && now.getTime() - cached.fetchedAt <= STALE_MS) {
         const warnings = ["SHEETS_STALE_FALLBACK"];
@@ -284,7 +316,12 @@ export class SheetsApiClient implements SheetsTabDataSource {
           complete: false,
           lastSuccessfulAt: new Date(cached.fetchedAt).toISOString(),
         });
-        return { tabs: cached.tabs, sourceStatus: this.lastStatus, warnings };
+        return {
+          tabs: cached.tabs,
+          exampleTabs: cached.exampleTabs,
+          sourceStatus: this.lastStatus,
+          warnings,
+        };
       }
       const invalid = error instanceof GoogleClientError && error.kind === "malformed_response";
       const warning =

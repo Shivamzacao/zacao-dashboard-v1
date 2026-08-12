@@ -6,6 +6,7 @@ import {
   buildDepletionsBreakdown,
   buildFinanceActualMetrics,
   buildGrowthPipelineViews,
+  buildInputCostMovementBreakdown,
   buildIncomingProductionTable,
   buildInventoryLotsTable,
   buildInventoryValueMetric,
@@ -13,10 +14,13 @@ import {
   buildLowInventoryBreakdown,
   buildMarketingSpendMetric,
   buildMarketingSpendBreakdown,
+  buildManufacturerOtifBreakdown,
   buildPartnerPerformanceTable,
   buildProductionCostBreakdown,
   buildRealizedLtvViews,
   buildSocialMetricsTable,
+  hasComparableInputCostRows,
+  hasManufacturerOtifRows,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -40,6 +44,12 @@ import {
   toPartnerPerformanceRecords,
   toSocialMetricsRecords,
 } from "@/src/infrastructure/manual-workbook/records";
+
+import {
+  selectExampleFallback,
+  syntheticSourceStatus,
+  syntheticWarnings,
+} from "./example-fallback";
 
 const SHEETS_CACHE: CachePolicy = { freshForSeconds: 30, staleForSeconds: 900 };
 
@@ -67,25 +77,30 @@ export function createSheetsApiContributors(
 ): readonly DashboardDatasetContributor[] {
   const customers = new SheetsContributor("sheets-customers", async (value) => {
     const result = await source.readPageTabs("customers", ["Sales_Actuals", "Channel_Mapping"]);
+    const sales = selectExampleFallback(result, "Sales_Actuals");
+    const channelMapping = selectExampleFallback(result, "Channel_Mapping");
+    const usedExample = sales.usedExample || channelMapping.usedExample;
+    const status = syntheticSourceStatus(result.sourceStatus, usedExample);
+    const warnings = syntheticWarnings(result.warnings, usedExample);
     const views = buildRealizedLtvViews({
-      context: context(value, result.sourceStatus),
-      records: result.tabs["Sales_Actuals"] ?? [],
-      channelMapping: result.tabs["Channel_Mapping"] ?? [],
+      context: context(value, status),
+      records: sales.rows,
+      channelMapping: channelMapping.rows,
       channels: value.filters.channels,
-      sourceWarnings: result.warnings,
+      sourceWarnings: warnings,
     });
     return {
       metrics: [
         buildActiveCustomersMetric({
-          context: context(value, result.sourceStatus),
-          records: result.tabs["Sales_Actuals"] ?? [],
-          sourceWarnings: result.warnings,
+          context: context(value, status),
+          records: sales.rows,
+          sourceWarnings: warnings,
         }),
         views.metric,
       ],
       tables: [views.cohorts],
-      sourceStatuses: [result.sourceStatus],
-      warnings: result.warnings,
+      sourceStatuses: [status],
+      warnings,
     };
   });
 
@@ -97,8 +112,16 @@ export function createSheetsApiContributors(
       "Production_Orders",
       "Location_Master",
       "Sales_Forecast",
+      "COGS_By_SKU",
     ]);
     const metricContext = context(value, result.sourceStatus);
+    const otif = selectExampleFallback(result, "Production_Orders", hasManufacturerOtifRows);
+    const costs = selectExampleFallback(result, "COGS_By_SKU", (rows) =>
+      hasComparableInputCostRows(rows, value.dataPeriod.endDate),
+    );
+    const usedExample = otif.usedExample || costs.usedExample;
+    const status = syntheticSourceStatus(result.sourceStatus, usedExample);
+    const fallbackWarnings = syntheticWarnings(result.warnings, usedExample);
     const combined = toCombinedInventoryFacts(
       result.tabs["Inventory_Snapshots"] ?? [],
       result.tabs["Location_Master"] ?? [],
@@ -117,6 +140,16 @@ export function createSheetsApiContributors(
           toDepletionRecords(result.tabs["Additional_Depletions"] ?? []),
         ),
         buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
+        buildInputCostMovementBreakdown(
+          context(value, syntheticSourceStatus(result.sourceStatus, costs.usedExample)),
+          costs.rows,
+          syntheticWarnings(result.warnings, costs.usedExample),
+        ),
+        buildManufacturerOtifBreakdown(
+          context(value, syntheticSourceStatus(result.sourceStatus, otif.usedExample)),
+          otif.rows,
+          syntheticWarnings(result.warnings, otif.usedExample),
+        ),
       ],
       tables: [
         buildInventoryLotsTable(
@@ -125,9 +158,9 @@ export function createSheetsApiContributors(
         ),
         buildIncomingProductionTable(metricContext, incoming.facts),
       ],
-      sourceStatuses: [result.sourceStatus],
+      sourceStatuses: [status],
       warnings: [
-        ...result.warnings,
+        ...fallbackWarnings,
         ...(incoming.excludedWithoutExpectedDate
           ? [`PRODUCTION_ROWS_WITHOUT_EXPECTED_DATE:${incoming.excludedWithoutExpectedDate}`]
           : []),

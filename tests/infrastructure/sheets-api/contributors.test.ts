@@ -34,7 +34,10 @@ const context = {
 };
 
 class FakeSource implements SheetsTabDataSource {
-  constructor(private readonly records: Readonly<Record<string, readonly SheetRecord[]>>) {}
+  constructor(
+    private readonly records: Readonly<Record<string, readonly SheetRecord[]>>,
+    private readonly examples: Readonly<Record<string, readonly SheetRecord[]>> = {},
+  ) {}
 
   sourceStatus() {
     return sourceStatus;
@@ -46,6 +49,7 @@ class FakeSource implements SheetsTabDataSource {
   ): Promise<SheetsTabReadResult> {
     return {
       tabs: Object.fromEntries(tabNames.map((tab) => [tab, this.records[tab] ?? []])),
+      exampleTabs: Object.fromEntries(tabNames.map((tab) => [tab, this.examples[tab] ?? []])),
       sourceStatus,
       warnings: [],
     };
@@ -59,6 +63,115 @@ function contributor(source: SheetsTabDataSource, dataset: string) {
 }
 
 describe("Sheets API contributors", () => {
+  it("uses disclosed example customer rows only when production rows are absent", async () => {
+    const source = new FakeSource(
+      {},
+      {
+        Sales_Actuals: [
+          {
+            order_id: "DEMO-1",
+            customer_id: "DUMMY-CUSTOMER",
+            order_date: "2026-08-05",
+            first_order_date: "2026-08-05",
+            gross_product_sales_usd: 120,
+            discounts_usd: 0,
+            refunds_returns_usd: 0,
+            cancellations_usd: 0,
+            net_product_revenue_usd: 120,
+            order_status: "paid",
+            acquisition_channel: "Online Store",
+            currency: "USD",
+            is_test: "no",
+            data_as_of: "2026-08-10",
+            source_status: "example",
+          },
+        ],
+        Channel_Mapping: [
+          {
+            source_system: "shopify",
+            source_channel_or_name: "Online Store",
+            dashboard_channel: "DTC — Site",
+            effective_from: "2025-01-01",
+            status: "active",
+            source_status: "example",
+          },
+        ],
+      },
+    );
+
+    const result = await contributor(source, "sheets-customers").load(context);
+
+    expect(result.metrics?.find(({ key }) => key === "customers.active")?.value).toEqual({
+      kind: "count",
+      value: 1,
+    });
+    expect(result.metrics?.find(({ key }) => key === "customers.realized_ltv")?.value).toEqual({
+      kind: "money",
+      value: { currency: "USD", minorUnits: 12_000 },
+    });
+    expect(result.sourceStatuses?.[0]).toMatchObject({
+      state: "partial",
+      completeness: "partial",
+    });
+    expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+
+  it("uses disclosed example receiving and cost history for otherwise pending metrics", async () => {
+    const source = new FakeSource(
+      { Production_Orders: [{ po_number: "OPEN-1", status: "open" }] },
+      {
+        Production_Orders: [
+          {
+            po_number: "DEMO-1",
+            expected_date: "2026-08-10",
+            received_date: "2026-08-09",
+            units: 100,
+            received_units: 100,
+          },
+          {
+            po_number: "DEMO-2",
+            expected_date: "2026-08-10",
+            received_date: "2026-08-12",
+            units: 100,
+            received_units: 80,
+          },
+        ],
+        COGS_By_SKU: [
+          {
+            sku: "SKU-01",
+            effective_from: "2026-05-01",
+            cost_basis: "landed",
+            production_cost_usd: 1.5,
+            packaging_usd: 0.3,
+            freight_usd: 0.2,
+            total_unit_cost_usd: 2,
+          },
+          {
+            sku: "SKU-01",
+            effective_from: "2026-08-01",
+            cost_basis: "landed",
+            production_cost_usd: 1.35,
+            packaging_usd: 0.27,
+            freight_usd: 0.18,
+            total_unit_cost_usd: 1.8,
+          },
+        ],
+      },
+    );
+
+    const result = await contributor(source, "sheets-operations").load(context);
+
+    expect(
+      result.breakdowns?.find(({ metric }) => metric.key === "operations.manufacturer_otif")?.metric
+        .value,
+    ).toEqual({ kind: "rate_basis_points", value: 5_000 });
+    expect(
+      result.breakdowns?.find(({ metric }) => metric.key === "manufacturing.input_cost_movement")
+        ?.metric.value,
+    ).toEqual({ kind: "rate_basis_points", value: -1_000 });
+    expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+
   it("publishes Realized LTV and aggregate PII-free cohort rows", async () => {
     const source = new FakeSource({
       Sales_Actuals: [
