@@ -207,6 +207,12 @@ function TableCard({
         </>
       }
     >
+      {spec.coverageNote ? (
+        <p className="table-coverage-note" role="note">
+          <span aria-hidden="true">!</span>
+          {spec.coverageNote}
+        </p>
+      ) : null}
       <DataTable
         caption={spec.title}
         columns={columns}

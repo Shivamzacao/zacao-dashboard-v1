@@ -26,6 +26,7 @@ export interface PageChartSpec {
 export interface PageTableSpec {
   readonly title: string;
   readonly description: string;
+  readonly coverageNote?: string;
   readonly metricKey: string;
   readonly sourceLabel?: string;
   readonly dataset?: string;
@@ -177,6 +178,18 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "commerce.total_sales",
         "commerce.orders",
         "commerce.average_order_value",
+        {
+          metricKey: "revenue.dtc_total",
+          label: "DTC revenue (total)",
+          sourceLabel: "Shopify",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "revenue.retail_total",
+          label: "Wholesale & in-store revenue",
+          sourceLabel: "Shopify + Faire",
+          valuePresentation: "full",
+        },
       ],
       charts: [
         {
@@ -184,12 +197,6 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           description: "Net-sales movement across the selected reporting period.",
           metricKey: "commerce.sales_trend",
           kind: "line",
-        },
-        {
-          title: "Product revenue",
-          description: "Approved merchandise revenue by product.",
-          metricKey: "products.sales",
-          kind: "horizontal",
         },
         {
           title: "Units sold",
@@ -203,6 +210,30 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "commerce.purchase_heatmap",
           kind: "heatmap",
         },
+        {
+          title: "Revenue mix by channel",
+          description: "Net sales across the approved ZACAO channel taxonomy.",
+          metricKey: "revenue.channel_mix",
+          eyebrow: "Revenue by channel",
+          sourceLabel: "Shopify + Google Sheets",
+          kind: "horizontal",
+        },
+        {
+          title: "Margin by channel",
+          description: "Contribution margin after landed COGS, channel fees, and commission.",
+          metricKey: "revenue.channel_margin",
+          eyebrow: "Contribution margin by channel",
+          sourceLabel: "Shopify + mapping / cost sources",
+          kind: "horizontal",
+        },
+        {
+          title: "Sales by SKU",
+          description: "Merchandise net sales grouped by canonical SKU.",
+          metricKey: "products.sales",
+          eyebrow: "Sales by SKU",
+          sourceLabel: "Shopify",
+          kind: "horizontal",
+        },
       ],
       tables: [
         {
@@ -210,6 +241,15 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           description: "Order-level detail depends on complete approved Shopify history.",
           metricKey: "commerce.detailed_order_drilldown",
           dataset: "detailed-orders",
+        },
+        {
+          title: "Channel performance",
+          description: "Revenue, orders, margin, and average order value by channel.",
+          coverageNote:
+            "Margin is unavailable until landed COGS, channel-fee, and commission rules are approved. Revenue, orders, and AOV remain certified.",
+          metricKey: "revenue.channel_mix",
+          sourceLabel: "Shopify + Google Sheets",
+          dataset: "channel-performance",
         },
       ],
     }),

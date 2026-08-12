@@ -92,6 +92,51 @@ describe("F3 dashboard pages", () => {
     expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
   });
 
+  it("renders the complete Revenue Intelligence HTML composition in the approved order", () => {
+    const revenue = dashboardPageSpecs.revenue;
+    expect(revenue.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "commerce.gross_sales",
+      "commerce.discounts",
+      "commerce.returns",
+      "commerce.total_sales",
+      "commerce.orders",
+      "commerce.average_order_value",
+      "revenue.dtc_total",
+      "revenue.retail_total",
+    ]);
+    expect(revenue.charts.map(({ title }) => title)).toEqual([
+      "Revenue trend",
+      "Units sold",
+      "Purchase timing",
+      "Revenue mix by channel",
+      "Margin by channel",
+      "Sales by SKU",
+    ]);
+    expect(revenue.tables.map(({ title }) => title)).toEqual([
+      "Detailed orders",
+      "Channel performance",
+    ]);
+
+    render(<DashboardPageView spec={revenue} fixture={f3PageFixtureData} />);
+    expect(screen.getAllByRole("article")).toHaveLength(8);
+    expect(screen.getByLabelText("DTC revenue (total): $10,260.00")).toBeTruthy();
+    expect(screen.getByLabelText("Wholesale & in-store revenue: $3,750.00")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Product revenue" })).toBeNull();
+    expect(screen.getByText("Business rule required")).toBeTruthy();
+    expect(screen.getByText(/Margin is unavailable until landed COGS/)).toBeTruthy();
+    expect(screen.getAllByText("Source: Shopify").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Source: Shopify + Faire")).toBeTruthy();
+    expect(screen.getByText("Source: Shopify + mapping / cost sources")).toBeTruthy();
+
+    const table = screen.getByRole("table", { name: "Channel performance" });
+    expect(
+      [...table.querySelectorAll("thead th")].map((cell) =>
+        cell.textContent?.replace(/[↕↑↓]/g, ""),
+      ),
+    ).toEqual(["Channel", "Revenue", "Orders", "Average order value", "Margin", "Details"]);
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(9);
+  });
+
   it("uses the approved F2 table, drill-down, and export path for Product Intelligence", async () => {
     render(<DashboardPageView spec={dashboardPageSpecs.products} fixture={f3PageFixtureData} />);
     expect(screen.getByRole("table", { name: "Product catalog" })).toBeTruthy();

@@ -41,6 +41,36 @@ export class FixtureApiRuntime implements BackendApiRuntime {
     };
     const metrics = [];
     const tables = [];
+    if (section === "Revenue Intelligence") {
+      const metric = createMetricViewModel({
+        metricKey: "revenue.channel_mix",
+        environment: this.environment,
+        dataPeriod: context.dataPeriod,
+        sources: [source],
+        value: { kind: "money", value: { currency: "USD", minorUnits: 59_800 } },
+      });
+      tables.push(
+        metricTableViewModelSchema.parse({
+          metric,
+          columns: [
+            "channel",
+            "revenueMinorUnits",
+            "orders",
+            "averageOrderValueMinorUnits",
+            "marginBasisPoints",
+          ],
+          rows: [
+            {
+              channel: "DTC — Site",
+              revenueMinorUnits: 59_800,
+              orders: 54,
+              averageOrderValueMinorUnits: 1_107,
+              marginBasisPoints: null,
+            },
+          ],
+        }),
+      );
+    }
     if (section === "Product Intelligence") {
       const metric = createMetricViewModel({
         metricKey: "products.catalog",

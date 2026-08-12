@@ -305,6 +305,12 @@ export function mapNativeChannelFacts(rows: readonly ShopifyQlRow[]): readonly N
       requireColumn(row, "total_sales"),
       "total_sales",
     ),
+    averageOrderValueMinorUnits: isNoActivityMeasure(requireColumn(row, "average_order_value"))
+      ? null
+      : parseShopifyQlMoneyMinorUnits(
+          requireColumn(row, "average_order_value"),
+          "average_order_value",
+        ),
   }));
 }
 

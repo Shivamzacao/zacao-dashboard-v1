@@ -101,6 +101,7 @@ export interface NativeChannelFact {
   readonly orders: number;
   readonly netSalesMinorUnits: number;
   readonly totalSalesMinorUnits: number;
+  readonly averageOrderValueMinorUnits: number | null;
 }
 
 export interface FulfillmentTrendFact {

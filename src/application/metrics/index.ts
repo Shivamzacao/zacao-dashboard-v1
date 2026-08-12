@@ -4,6 +4,7 @@ export * from "./customer-ltv";
 export * from "./klaviyo";
 export * from "./manual";
 export * from "./page";
+export * from "./revenue-channels";
 export * from "./shopify";
 export * from "./sheets";
 export * from "./source-readiness";

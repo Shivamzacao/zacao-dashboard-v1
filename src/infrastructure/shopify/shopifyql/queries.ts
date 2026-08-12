@@ -44,7 +44,8 @@ const datasets: Record<ShopifyQlDataset, string> = {
   session_geography: "FROM sessions SHOW sessions GROUP BY session_country",
   billing_geography: "FROM sales SHOW orders, total_sales GROUP BY billing_country, billing_region",
   purchase_time: "FROM sales SHOW orders GROUP BY day_of_week, hour_of_day",
-  native_channels: "FROM sales SHOW orders, net_sales, total_sales GROUP BY sales_channel",
+  native_channels:
+    "FROM sales SHOW orders, net_sales, total_sales, average_order_value GROUP BY sales_channel",
   referrers:
     "FROM sales SHOW orders, total_sales GROUP BY order_referrer_source, order_referrer_name",
   fulfillment_trend: "FROM fulfillments SHOW orders_fulfilled, orders_shipped, orders_delivered",

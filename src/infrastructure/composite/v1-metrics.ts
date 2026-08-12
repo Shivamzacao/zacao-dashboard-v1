@@ -3,6 +3,7 @@ import {
   buildInventoryRunwayMetric,
   buildInventoryValueMetric,
   buildMissingSkuCostMetric,
+  buildRevenueChannelViews,
   buildSellThroughMetric,
   buildUnclassifiedChannelMetric,
   reconcileForecastActuals,
@@ -73,11 +74,19 @@ export function createV1CompositeContributor(input: {
         sourceStatuses: statuses,
       };
       const actuals = mapWeeklyProductUnitsFacts(weekly.rows);
+      const channelFacts = mapNativeChannelFacts(channels.rows);
       const skuMaster = sheets.tabs["SKU_Master"] ?? [];
       const forecasts = sheets.tabs["Sales_Forecast"] ?? [];
       const reconciled = reconcileForecastActuals(metricContext, forecasts, skuMaster, actuals);
+      const revenueChannels = buildRevenueChannelViews(
+        metricContext,
+        channelFacts,
+        sheets.tabs["Channel_Mapping"] ?? [],
+      );
       return {
         metrics: [
+          revenueChannels.dtcTotal,
+          revenueChannels.retailTotal,
           buildInventoryValueMetric(
             metricContext,
             sheets.tabs["Inventory_Snapshots"] ?? [],
@@ -99,10 +108,14 @@ export function createV1CompositeContributor(input: {
           buildUnclassifiedChannelMetric(
             metricContext,
             sheets.tabs["Channel_Mapping"] ?? [],
-            mapNativeChannelFacts(channels.rows).map(({ channel }) => channel),
+            channelFacts.map(({ channel }) => channel),
           ),
         ],
-        tables: [buildForecastVarianceTable(metricContext, reconciled.facts, reconciled.warnings)],
+        breakdowns: [revenueChannels.channelMix],
+        tables: [
+          buildForecastVarianceTable(metricContext, reconciled.facts, reconciled.warnings),
+          revenueChannels.channelPerformance,
+        ],
         sourceStatuses: statuses,
         warnings: [...sheets.warnings, ...reconciled.warnings],
       };
