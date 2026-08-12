@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   createBackendApiRuntime,
+  LIVE_DASHBOARD_SECTION_PLAN,
   LiveBackendApiRuntime,
 } from "@/src/infrastructure/api/live-runtime";
 
@@ -356,6 +357,11 @@ describe("createBackendApiRuntime", () => {
 });
 
 describe("LiveBackendApiRuntime", () => {
+  it("loads the Sheets contributors required by Executive and Revenue", () => {
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-operations");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-metrics");
+  });
+
   it("serves certifiable Shopify values while blocked metrics stay null", async () => {
     const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
       fetchImplementation: stubFetch(),
