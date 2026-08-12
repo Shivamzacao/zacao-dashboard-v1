@@ -21,6 +21,12 @@ describe("F1 Phase 2 fixture provider", () => {
     expect(phase2FixtureProvider.getShellContext().supportedFilters).not.toHaveProperty(
       "comparisons",
     );
+    expect(phase2FixtureProvider.getF3PageData("customers").currentValues).toHaveProperty(
+      "klaviyo.email_open_rate",
+    );
+    expect(phase2FixtureProvider.getF3PageData("marketing").currentValues).not.toHaveProperty(
+      "klaviyo.email_open_rate",
+    );
   });
 
   it("rejects unlabelled or structurally invalid fixtures", () => {

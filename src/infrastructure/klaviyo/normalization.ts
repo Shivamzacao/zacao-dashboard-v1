@@ -32,6 +32,10 @@ const flowAttributesSchema = z.object({
   updated: z.string().optional(),
 });
 
+const profileAttributesSchema = z.object({
+  properties: z.record(z.string(), z.unknown()),
+});
+
 export function normalizeKlaviyoAccount(value: unknown) {
   const resource = resourceSchema.parse(value);
   const attributes = accountAttributesSchema.parse(resource.attributes);
@@ -82,6 +86,26 @@ export function normalizeKlaviyoFlow(value: unknown) {
     triggerType: attributes.trigger_type ?? null,
     createdAt: attributes.created ?? null,
     updatedAt: attributes.updated ?? null,
+  } as const;
+}
+
+export function normalizeKlaviyoDemographicProperties(
+  value: unknown,
+  propertyNames: { readonly ageBand: string; readonly gender: string },
+) {
+  const resource = resourceSchema.parse(value);
+  if (resource.type !== "profile")
+    throw new Error("Klaviyo profiles endpoint returned non-profile data");
+  const attributes = profileAttributesSchema.parse(resource.attributes);
+  const text = (property: string): string | null => {
+    const raw = attributes.properties[property];
+    if (typeof raw !== "string") return null;
+    const trimmed = raw.trim();
+    return trimmed === "" ? null : trimmed;
+  };
+  return {
+    ageBand: text(propertyNames.ageBand),
+    gender: text(propertyNames.gender),
   } as const;
 }
 

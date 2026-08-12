@@ -114,8 +114,11 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
   "Customer Intelligence": [
     "shopify-customers",
     "shopify-funnel",
-    "shopify-geography",
+    "shopify-session-engagement",
+    "shopify-customer-city",
     "sheets-customers",
+    "klaviyo-performance",
+    "klaviyo-profiles",
   ],
   "Product Intelligence": [
     "shopify-product-units",
@@ -277,12 +280,14 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       contributors.push(
         new DeferredSourceContributor("shopify-customers", "shopify", now),
         new DeferredSourceContributor("shopify-funnel", "shopify", now),
+        new DeferredSourceContributor("shopify-session-engagement", "shopify", now),
         new DeferredSourceContributor("shopify-product-units", "shopify", now),
         new DeferredSourceContributor("shopify-catalog-inventory", "shopify", now),
         new DeferredSourceContributor("shopify-history", "shopify", now),
         new DeferredSourceContributor("shopify-sales", "shopify", now),
         new DeferredSourceContributor("shopify-purchase-timing", "shopify", now),
         new DeferredSourceContributor("shopify-geography", "shopify", now),
+        new DeferredSourceContributor("shopify-customer-city", "shopify", now),
         new DeferredSourceContributor("shopify-channels", "shopify", now),
         new DeferredSourceContributor("shopify-fulfillment", "shopify", now),
       );
@@ -304,12 +309,14 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           adapter: this.klaviyoAdapter,
           sourceIdentity: "klaviyo",
           now,
+          demographicProperties: klaviyoConfiguration?.demographicProperties ?? null,
         }),
       );
     } else {
       contributors.push(
         new DeferredSourceContributor("klaviyo-performance", "klaviyo", now),
         new DeferredSourceContributor("klaviyo-engagement", "klaviyo", now),
+        new DeferredSourceContributor("klaviyo-profiles", "klaviyo", now),
         new DeferredSourceContributor("klaviyo-readiness", "klaviyo", now),
       );
     }

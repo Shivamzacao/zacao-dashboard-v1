@@ -5,6 +5,7 @@ import {
   buildCampaignReportRequest,
   buildMetricAggregateRequest,
   KLAVIYO_ATTRIBUTED_REVENUE_LABEL,
+  KLAVIYO_PROFILE_READ_SCOPE,
   parseKlaviyoConfiguration,
   reconcileKlaviyoMetricRegistry,
   REQUIRED_KLAVIYO_READ_SCOPES,
@@ -34,6 +35,19 @@ describe("Klaviyo read-only configuration", () => {
     );
     expect(() => parseKlaviyoConfiguration({ ...configuration, apiRevision: "latest" })).toThrow();
     expect(() => parseKlaviyoConfiguration({ ...configuration, maxRetries: 3 })).toThrow();
+    expect(() =>
+      parseKlaviyoConfiguration({
+        ...configuration,
+        demographicProperties: { ageBand: "Age band", gender: "Gender" },
+      }),
+    ).toThrow(/profiles:read/);
+    expect(
+      parseKlaviyoConfiguration({
+        ...configuration,
+        grantedScopes: [...configuration.grantedScopes, KLAVIYO_PROFILE_READ_SCOPE],
+        demographicProperties: { ageBand: "Age band", gender: "Gender" },
+      }).demographicProperties,
+    ).toEqual({ ageBand: "Age band", gender: "Gender" });
   });
 });
 

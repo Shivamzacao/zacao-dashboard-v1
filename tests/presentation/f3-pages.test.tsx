@@ -10,6 +10,7 @@ import { metricCatalog } from "@/src/domain/metrics/catalog";
 import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/dashboard-page.client";
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
 import { f3PageFixtureData } from "@/src/presentation/fixtures/f3-page-data";
+import { f3CustomerPageFixtureData } from "@/src/presentation/fixtures/f3-page-data";
 import { dashboardRoutes } from "@/src/presentation/shell/routes";
 
 afterEach(cleanup);
@@ -135,6 +136,45 @@ describe("F3 dashboard pages", () => {
       ),
     ).toEqual(["Channel", "Revenue", "Orders", "Average order value", "Margin", "Details"]);
     expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(9);
+  });
+
+  it("renders the complete Customer Intelligence HTML composition in the approved order", () => {
+    const customers = dashboardPageSpecs.customers;
+    expect(customers.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "customers.new_count",
+      "customers.returning_count",
+      "customers.returning_rate",
+      "customers.active",
+      "customers.realized_ltv",
+      "engagement.time_on_site",
+      "marketing.cac",
+      "marketing.ltv_cac",
+      "klaviyo.email_open_rate",
+    ]);
+    expect(customers.charts.map(({ title }) => title)).toEqual([
+      "New and returning customers",
+      "Store funnel",
+      "Customer cohorts",
+      "Customers by city",
+      "Age mix",
+      "Gender mix",
+    ]);
+    expect(customers.tables.map(({ title }) => title)).toEqual(["Email campaign performance"]);
+
+    render(<DashboardPageView spec={customers} fixture={f3CustomerPageFixtureData} />);
+    expect(screen.getAllByRole("article")).toHaveLength(9);
+    expect(screen.getByLabelText("Time on site: 3m 12s")).toBeTruthy();
+    expect(screen.getAllByText("Business rule required")).toHaveLength(2);
+    expect(screen.queryByRole("heading", { name: "Customer geography" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Customers by city" })).toBeTruthy();
+    expect(screen.getAllByText(/reporting-period filters do not apply/)).toHaveLength(2);
+    const table = screen.getByRole("table", { name: "Email campaign performance" });
+    expect(
+      [...table.querySelectorAll("thead th")].map((cell) =>
+        cell.textContent?.replace(/[↕↑↓]/g, ""),
+      ),
+    ).toEqual(["Campaign", "Sent", "Open rate", "Click rate", "Revenue", "Details"]);
+    expect(screen.getByText("Welcome flow")).toBeTruthy();
   });
 
   it("uses the approved F2 table, drill-down, and export path for Product Intelligence", async () => {

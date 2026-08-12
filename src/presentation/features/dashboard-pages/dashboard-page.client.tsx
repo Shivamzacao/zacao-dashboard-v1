@@ -177,7 +177,10 @@ function TableCard({
   const metric = requiredMetric(spec.metricKey);
   const state = metricState(metric, fixture);
   const rows = spec.dataset ? (fixture.rowsByDataset[spec.dataset] ?? []) : [];
-  const columns = describeColumns(rows, spec.hiddenColumns);
+  const columns = describeColumns(rows, spec.hiddenColumns, {
+    ...(spec.columnOrder ? { order: spec.columnOrder } : {}),
+    ...(spec.columnLabels ? { labels: spec.columnLabels } : {}),
+  });
   const [openRow, setOpenRow] = useState<DisplayTableRow | null>(null);
   const [exportState, setExportState] = useState<ExportState>(rows.length ? "idle" : "unsupported");
   const tableState: DisplayState = rows.length ? "current" : state;

@@ -97,6 +97,19 @@ function stubFetch(overrides: { failFunnel?: boolean } = {}) {
     }
     if (url.includes("/admin/api/")) {
       if (body.includes("shopifyqlQuery")) {
+        if (body.includes("average_session_duration")) {
+          return json({
+            data: {
+              shopifyqlQuery: {
+                parseErrors: [],
+                tableData: {
+                  columns: [],
+                  rows: [{ average_session_duration: "192" }],
+                },
+              },
+            },
+          });
+        }
         if (body.includes("FROM sessions")) {
           if (overrides.failFunnel) return json({}, 500);
           return json({
@@ -216,6 +229,19 @@ function stubFetch(overrides: { failFunnel?: boolean } = {}) {
                       total_sales: "9000.10",
                     },
                   ],
+                },
+              },
+            },
+          });
+        }
+        if (body.includes("billing_city")) {
+          return json({
+            data: {
+              shopifyqlQuery: {
+                parseErrors: [],
+                tableData: {
+                  columns: [],
+                  rows: [{ billing_city: "New York", billing_region: "NY", customers: "38" }],
                 },
               },
             },
@@ -414,6 +440,22 @@ describe("LiveBackendApiRuntime", () => {
 
     const klaviyoStatus = result.page.sources.find((source) => source.source === "klaviyo");
     expect(klaviyoStatus?.state).toBe("no_activity");
+  });
+
+  it("serves certified Customer session and city metrics while optional demographics stay unconfigured", async () => {
+    const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
+      fetchImplementation: stubFetch(),
+    });
+    const result = await runtime.loadDashboard("Customer Intelligence", filters);
+
+    expect(metricByKey(result.page, "engagement.time_on_site").value).toEqual({
+      kind: "duration_seconds",
+      value: 192,
+    });
+    const city = result.page.breakdowns.find(({ metric }) => metric.key === "customers.geo_city");
+    expect(city?.items[0]).toMatchObject({ label: "New York, NY" });
+    expect(metricByKey(result.page, "customers.age_mix").readiness.state).toBe("not_configured");
+    expect(metricByKey(result.page, "marketing.cac").value).toBeNull();
   });
 
   it("isolates a failing dataset as partial without fabricating zeros", async () => {

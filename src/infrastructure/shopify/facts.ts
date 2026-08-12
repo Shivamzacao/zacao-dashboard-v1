@@ -4,6 +4,7 @@ import type {
   BillingGeographyFact,
   CatalogVariantFact,
   CustomerClassificationSummary,
+  CustomerCityFact,
   FulfillmentTrendFact,
   InventoryFact,
   NativeChannelFact,
@@ -11,6 +12,7 @@ import type {
   ProductUnitsFact,
   PurchaseTimingFact,
   ShopifyFunnelFact,
+  ShopifySessionEngagementFact,
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
   WeeklyProductUnitsFact,
@@ -127,6 +129,21 @@ export function mapShopifyFunnelFact(rows: readonly ShopifyQlRow[]): ShopifyFunn
     reachedCheckout: sum("sessions_that_reached_checkout"),
     completedCheckout,
     conversionRateBasisPoints,
+  };
+}
+
+export function mapShopifySessionEngagementFact(
+  rows: readonly ShopifyQlRow[],
+): ShopifySessionEngagementFact | null {
+  const row = rows[0];
+  if (!row) return null;
+  if (rows.length > 1) {
+    throw new Error("ShopifyQL session engagement must be a single aggregate row");
+  }
+  const duration = requireColumn(row, "average_session_duration");
+  if (duration === null) return null;
+  return {
+    averageSessionDurationSeconds: parseShopifyQlCount(duration, "average_session_duration"),
   };
 }
 
@@ -283,6 +300,27 @@ export function mapBillingGeographyFacts(
       "total_sales",
     ),
   }));
+}
+
+export function mapCustomerCityFacts(rows: readonly ShopifyQlRow[]): readonly CustomerCityFact[] {
+  return rows
+    .flatMap((row) => {
+      const city = optionalText(requireColumn(row, "billing_city"));
+      if (!city) return [];
+      return [
+        {
+          city,
+          region: optionalText(requireColumn(row, "billing_region")),
+          customers: parseShopifyQlCount(requireColumn(row, "customers"), "customers"),
+        },
+      ];
+    })
+    .sort(
+      (left, right) =>
+        right.customers - left.customers ||
+        `${left.city}:${left.region ?? ""}`.localeCompare(`${right.city}:${right.region ?? ""}`),
+    )
+    .slice(0, 7);
 }
 
 export function mapProductSalesFacts(rows: readonly ShopifyQlRow[]): readonly ProductSalesFact[] {

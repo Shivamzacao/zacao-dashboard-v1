@@ -62,4 +62,17 @@ describe("drill-down table presentation", () => {
     expect(describeColumns(rows, ["sku"]).map(({ key }) => key)).toEqual(["product", "status"]);
     expect(rows[0]?.sku).toBe("ZAC-DC-70");
   });
+
+  it("supports page-specific column order and labels without changing row contracts", () => {
+    const rows = [{ name: "Welcome", recipients: 100, openRateBasisPoints: 5200 }];
+    const columns = describeColumns(rows, [], {
+      order: ["name", "openRateBasisPoints", "recipients"],
+      labels: { name: "Campaign", recipients: "Sent", openRateBasisPoints: "Open rate" },
+    });
+    expect(columns.map(({ key, label }) => [key, label])).toEqual([
+      ["name", "Campaign"],
+      ["openRateBasisPoints", "Open rate"],
+      ["recipients", "Sent"],
+    ]);
+  });
 });

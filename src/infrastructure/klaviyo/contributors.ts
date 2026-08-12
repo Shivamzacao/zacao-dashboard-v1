@@ -1,5 +1,6 @@
 import {
   buildKlaviyoEmailOverview,
+  buildKlaviyoDemographicBreakdowns,
   buildKlaviyoEngagementSeries,
   buildKlaviyoNoActivityMetric,
   buildKlaviyoPerformanceTable,
@@ -14,6 +15,7 @@ import type {
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 
 import type { KlaviyoAdapter } from "./adapter";
+import type { KlaviyoDemographicProperties } from "./config";
 import {
   mapKlaviyoEmailOverviewFact,
   mapKlaviyoPerformanceRows,
@@ -69,8 +71,9 @@ export function createKlaviyoContributors(input: {
   adapter: KlaviyoAdapter;
   sourceIdentity: string;
   now: () => Date;
+  demographicProperties?: KlaviyoDemographicProperties | null;
 }): readonly DashboardDatasetContributor[] {
-  const { adapter, sourceIdentity, now } = input;
+  const { adapter, sourceIdentity, now, demographicProperties = null } = input;
 
   const performance = new KlaviyoContributor(
     "klaviyo-performance",
@@ -162,6 +165,45 @@ export function createKlaviyoContributors(input: {
     },
   );
 
+  const demographics = new KlaviyoContributor(
+    "klaviyo-profiles",
+    demographicProperties
+      ? `${sourceIdentity}.profiles.configured`
+      : `${sourceIdentity}.profiles.not-configured`,
+    async (context) => {
+      const checkedAt = now().toISOString();
+      if (!demographicProperties) {
+        const status: SourceStatus = {
+          source: "klaviyo",
+          state: "not_configured",
+          checkedAt,
+          lastSuccessfulAt: null,
+          dataAsOf: null,
+          completeness: "unknown",
+          warningCodes: ["KLAVIYO_PROFILE_PROPERTIES_NOT_CONFIGURED"],
+        };
+        return {
+          breakdowns: buildKlaviyoDemographicBreakdowns(metricContext(context, [status]), null),
+          sourceStatuses: [status],
+        };
+      }
+      const fact = await adapter.readProfileDemographics(demographicProperties);
+      const baseStatus = klaviyoSourceStatus({ checkedAt, recordCount: fact.totalProfiles });
+      const status: SourceStatus = fact.truncated
+        ? {
+            ...baseStatus,
+            state: "partial",
+            completeness: "partial",
+            warningCodes: [...baseStatus.warningCodes, "KLAVIYO_PROFILES_TRUNCATED"],
+          }
+        : baseStatus;
+      return {
+        breakdowns: buildKlaviyoDemographicBreakdowns(metricContext(context, [status]), fact),
+        sourceStatuses: [status],
+      };
+    },
+  );
+
   const readiness = new KlaviyoContributor("klaviyo-readiness", sourceIdentity, async (context) => {
     const hasEvents = await adapter.readEventPresence();
     const status = klaviyoSourceStatus({
@@ -174,5 +216,5 @@ export function createKlaviyoContributors(input: {
     };
   });
 
-  return [performance, engagement, readiness];
+  return [performance, engagement, demographics, readiness];
 }

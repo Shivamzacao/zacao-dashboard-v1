@@ -10,7 +10,9 @@ import type {
   FilterOptions,
 } from "@/src/application/api";
 import type { SourceStatus } from "@/src/domain/contracts";
+import type { DashboardSlug } from "@/src/application/api";
 import {
+  f3CustomerPageFixtureData,
   f3PageFixtureData,
   type F3PageFixtureData,
 } from "@/src/presentation/fixtures/f3-page-data";
@@ -27,7 +29,7 @@ export interface DashboardDataProvider {
   getShellContext(): FixtureShellContext;
   getRepresentativeDashboard(): DashboardApiResponse;
   getRepresentativeDrilldown(): DrilldownApiResponse;
-  getF3PageData(): F3PageFixtureData;
+  getF3PageData(slug?: DashboardSlug): F3PageFixtureData;
 }
 
 interface FixtureBundleInput {
@@ -58,7 +60,8 @@ export function createFixtureDashboardProvider(
       }),
     getRepresentativeDashboard: () => dashboard,
     getRepresentativeDrilldown: () => drilldown,
-    getF3PageData: () => f3PageFixtureData,
+    getF3PageData: (slug?: DashboardSlug) =>
+      slug === "customers" ? f3CustomerPageFixtureData : f3PageFixtureData,
   });
 }
 

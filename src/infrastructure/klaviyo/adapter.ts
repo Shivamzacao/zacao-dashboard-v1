@@ -1,9 +1,10 @@
 import { z } from "zod";
 
+import type { KlaviyoDemographicFact } from "@/src/application/metrics/types";
 import type { DateRange } from "@/src/domain/contracts/date-range";
 
 import type { KlaviyoClient } from "./client";
-import type { KlaviyoConfiguration } from "./config";
+import type { KlaviyoConfiguration, KlaviyoDemographicProperties } from "./config";
 import { KLAVIYO_ATTRIBUTED_REVENUE_LABEL, VERIFIED_KLAVIYO_METRICS } from "./metric-registry";
 import {
   assertNoKlaviyoPii,
@@ -11,11 +12,12 @@ import {
   normalizeKlaviyoAccount,
   normalizeKlaviyoAggregate,
   normalizeKlaviyoCampaign,
+  normalizeKlaviyoDemographicProperties,
   normalizeKlaviyoFlow,
   normalizeKlaviyoMetric,
   normalizeKlaviyoReportRows,
 } from "./normalization";
-import { collectKlaviyoPages } from "./pagination";
+import { collectKlaviyoPages, visitKlaviyoPages } from "./pagination";
 import {
   buildCampaignReportRequest,
   buildFlowReportRequest,
@@ -28,6 +30,8 @@ const reportSchema = z.object({
   data: z.object({ attributes: z.object({ results: z.array(z.unknown()) }) }),
 });
 const aggregateSchema = z.object({ data: z.object({ attributes: z.unknown() }) });
+
+const AGE_BANDS = ["18–24", "25–34", "35–44", "45–54", "55+"] as const;
 
 export interface KlaviyoDiscoveryResult<T> {
   readonly records: readonly T[];
@@ -145,6 +149,55 @@ export class KlaviyoAdapter {
   async readEventPresence(signal?: AbortSignal): Promise<boolean> {
     const response = await this.client.get<unknown>("/api/events?page[size]=1", signal);
     return collectionSchema.parse(response.body).data.length > 0;
+  }
+
+  async readProfileDemographics(
+    properties: KlaviyoDemographicProperties,
+    signal?: AbortSignal,
+  ): Promise<KlaviyoDemographicFact> {
+    const ageCounts = new Map<string, number>(AGE_BANDS.map((band) => [band, 0]));
+    const genderCounts = new Map<string, number>();
+    let totalProfiles = 0;
+    let declaredAgeProfiles = 0;
+    let invalidAgeProfiles = 0;
+    const query = new URLSearchParams({
+      "fields[profile]": "properties",
+      "page[size]": "100",
+    });
+    const pageResult = await visitKlaviyoPages({
+      client: this.client,
+      initialPath: `/api/profiles?${query.toString()}`,
+      maxPages: this.maxPages,
+      ...(signal ? { signal } : {}),
+      visit: (record) => {
+        const profile = normalizeKlaviyoDemographicProperties(record, properties);
+        totalProfiles += 1;
+        if (profile.ageBand !== null) {
+          if (ageCounts.has(profile.ageBand)) {
+            ageCounts.set(profile.ageBand, (ageCounts.get(profile.ageBand) ?? 0) + 1);
+            declaredAgeProfiles += 1;
+          } else {
+            invalidAgeProfiles += 1;
+          }
+        }
+        const gender = profile.gender ?? "Undisclosed";
+        genderCounts.set(gender, (genderCounts.get(gender) ?? 0) + 1);
+      },
+    });
+    const fact = {
+      totalProfiles,
+      declaredAgeProfiles,
+      invalidAgeProfiles,
+      ageBands: [...ageCounts].map(([label, profiles]) => ({ label, profiles })),
+      genders: [...genderCounts]
+        .map(([label, profiles]) => ({ label, profiles }))
+        .sort(
+          (left, right) => right.profiles - left.profiles || left.label.localeCompare(right.label),
+        ),
+      truncated: pageResult.truncated,
+    } as const;
+    assertNoKlaviyoPii(fact);
+    return fact;
   }
 
   private async discover<T>(

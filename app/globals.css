@@ -1066,6 +1066,13 @@ select {
   border: 0;
 }
 
+/* Accessible chart tables can retain a wide intrinsic table width even after
+   clipping. Keeping those tables fixed prevents that hidden width from
+   expanding the document on narrow screens. */
+table.sr-only {
+  position: fixed;
+}
+
 .dashboard-shell {
   min-height: 100vh;
 }

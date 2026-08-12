@@ -11,6 +11,8 @@ const MANAGED_KEYS = [
   "KLAVIYO_PRIVATE_API_KEY",
   "KLAVIYO_API_REVISION",
   "KLAVIYO_CONVERSION_METRIC_ID",
+  "KLAVIYO_AGE_BAND_PROPERTY",
+  "KLAVIYO_GENDER_PROPERTY",
 ] as const;
 
 let saved: Record<string, string | undefined>;
@@ -83,5 +85,20 @@ describe("Klaviyo configuration loader", () => {
     process.env["KLAVIYO_PRIVATE_API_KEY"] = "sanitized-klaviyo-key";
     process.env["KLAVIYO_API_REVISION"] = "july-2026";
     expect(() => loadKlaviyoConfigurationOrNull()).toThrow();
+  });
+
+  it("requires both demographic properties and adds profile read scope only when configured", () => {
+    process.env["KLAVIYO_PRIVATE_API_KEY"] = "sanitized-klaviyo-key";
+    process.env["KLAVIYO_API_REVISION"] = "2026-07-15";
+    process.env["KLAVIYO_AGE_BAND_PROPERTY"] = "Age band";
+    expect(() => loadKlaviyoConfigurationOrNull()).toThrow(/configured together/);
+
+    process.env["KLAVIYO_GENDER_PROPERTY"] = "Gender";
+    const configuration = loadKlaviyoConfigurationOrNull();
+    expect(configuration?.demographicProperties).toEqual({
+      ageBand: "Age band",
+      gender: "Gender",
+    });
+    expect(configuration?.grantedScopes).toContain("profiles:read");
   });
 });

@@ -101,19 +101,30 @@ function isOpaqueColumn(key: string, rows: readonly DisplayTableRow[]): boolean 
 export function describeColumns(
   rows: readonly DisplayTableRow[],
   hiddenColumns: readonly string[] = [],
+  options: {
+    readonly order?: readonly string[];
+    readonly labels?: Readonly<Record<string, string>>;
+  } = {},
 ): readonly DashboardTableColumn<DisplayTableRow>[] {
   const first = rows[0];
   if (!first) return [];
   const hidden = new Set(hiddenColumns);
-  return Object.keys(first)
-    .filter((key) => !hidden.has(key) && !isOpaqueColumn(key, rows))
-    .map((key) => ({
-      key,
-      label: columnLabel(key),
-      sortable: true,
-      // Sorting still runs on the raw accessor value, so money and rates order
-      // numerically even though the cell renders formatted.
-      numeric: typeof first[key] === "number",
-      render: (value) => formatCell(key, value),
-    }));
+  const available = Object.keys(first).filter(
+    (key) => !hidden.has(key) && !isOpaqueColumn(key, rows),
+  );
+  const keys = options.order
+    ? [
+        ...options.order.filter((key) => available.includes(key)),
+        ...available.filter((key) => !options.order?.includes(key)),
+      ]
+    : available;
+  return keys.map((key) => ({
+    key,
+    label: options.labels?.[key] ?? columnLabel(key),
+    sortable: true,
+    // Sorting still runs on the raw accessor value, so money and rates order
+    // numerically even though the cell renders formatted.
+    numeric: typeof first[key] === "number",
+    render: (value) => formatCell(key, value),
+  }));
 }

@@ -1,5 +1,6 @@
 import {
   buildBillingGeographyBreakdown,
+  buildCustomerCityBreakdown,
   buildCatalogTable,
   buildFulfillmentSummaryBreakdown,
   buildNativeChannelMixBreakdown,
@@ -15,6 +16,7 @@ import {
   buildSalesTrendSeries,
   buildShopifyFunnelMetrics,
   buildShopifyFunnelTable,
+  buildShopifySessionEngagementMetric,
 } from "@/src/application/metrics";
 import type { MetricServiceContext } from "@/src/application/metrics/types";
 import type {
@@ -28,6 +30,7 @@ import type { ShopifyAdminAdapter } from "./admin-graphql/adapter";
 import type { ShopifyHistory } from "./history";
 import {
   mapBillingGeographyFacts,
+  mapCustomerCityFacts,
   mapCatalogVariantFacts,
   mapFulfillmentTrendFacts,
   mapNativeChannelFacts,
@@ -39,6 +42,7 @@ import {
   mapSalesTotalsFact,
   mapSalesTrendPoints,
   mapShopifyFunnelFact,
+  mapShopifySessionEngagementFact,
 } from "./facts";
 import type { ShopifyQlAdapter } from "./shopifyql/adapter";
 
@@ -141,6 +145,29 @@ export function createShopifyContributors(input: {
       return {
         metrics: buildShopifyFunnelMetrics(serviceContext, fact),
         tables: [buildShopifyFunnelTable(serviceContext, fact)],
+        sourceStatuses: [status],
+      };
+    },
+  );
+
+  const sessionEngagement = new ShopifyContributor(
+    "shopify-session-engagement",
+    sourceIdentity,
+    SHOPIFYQL_CACHE,
+    async (context) => {
+      const { shopifyql } = await adapters();
+      const result = await shopifyql.read({
+        dataset: "session_engagement",
+        dateRange: context.dataPeriod,
+      });
+      const status = currentStatus(now().toISOString(), result.history);
+      return {
+        metrics: [
+          buildShopifySessionEngagementMetric(
+            metricContext(context, [status]),
+            mapShopifySessionEngagementFact(result.rows),
+          ),
+        ],
         sourceStatuses: [status],
       };
     },
@@ -250,6 +277,29 @@ export function createShopifyContributors(input: {
     },
   );
 
+  const customerCity = new ShopifyContributor(
+    "shopify-customer-city",
+    sourceIdentity,
+    SHOPIFYQL_CACHE,
+    async (context) => {
+      const { shopifyql } = await adapters();
+      const result = await shopifyql.read({
+        dataset: "billing_city",
+        dateRange: context.dataPeriod,
+      });
+      const status = currentStatus(now().toISOString(), result.history);
+      return {
+        breakdowns: [
+          buildCustomerCityBreakdown(
+            metricContext(context, [status]),
+            mapCustomerCityFacts(result.rows),
+          ),
+        ],
+        sourceStatuses: [status],
+      };
+    },
+  );
+
   const catalogInventory = new ShopifyContributor(
     "shopify-catalog-inventory",
     sourceIdentity,
@@ -343,12 +393,14 @@ export function createShopifyContributors(input: {
   return [
     customers,
     funnel,
+    sessionEngagement,
     productUnits,
     catalogInventory,
     history,
     sales,
     purchaseTiming,
     billingGeography,
+    customerCity,
     channels,
     fulfillment,
   ];
