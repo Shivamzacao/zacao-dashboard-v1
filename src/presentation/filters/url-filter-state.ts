@@ -3,7 +3,8 @@ import { parseDashboardFilters } from "@/src/application/api";
 import type { FilterOptions } from "@/src/application/api";
 import type { ComparisonMode, DashboardFilters, IsoDate } from "@/src/domain/contracts";
 
-export type DateRangePreset = "last_30_days" | "last_90_days" | "year_to_date" | "last_12_months";
+export type DateRangePreset =
+  "last_7_days" | "last_30_days" | "last_90_days" | "year_to_date" | "last_12_months";
 
 export interface FrontendFilterState {
   readonly filters: DashboardFilters;
@@ -45,6 +46,7 @@ export function dateRangeForPreset(
   preset: DateRangePreset,
   today: IsoDate,
 ): Readonly<{ startDate: IsoDate; endDate: IsoDate }> {
+  if (preset === "last_7_days") return { startDate: shiftDays(today, -6), endDate: today };
   if (preset === "last_30_days") return { startDate: shiftDays(today, -29), endDate: today };
   if (preset === "last_90_days") return { startDate: shiftDays(today, -89), endDate: today };
   if (preset === "year_to_date") return { startDate: firstDayOfYear(today), endDate: today };
@@ -57,6 +59,7 @@ function matchingPreset(
   today: IsoDate,
 ): DateRangePreset | "custom" {
   const presets: readonly DateRangePreset[] = [
+    "last_7_days",
     "last_30_days",
     "last_90_days",
     "year_to_date",
@@ -97,9 +100,9 @@ export function parseFrontendFilterState(
   supported: FilterOptions,
   today: IsoDate,
 ): FrontendFilterState {
-  // Every section loads on the rolling 30-day window unless the URL asks for
+  // Every section loads on the rolling 7-day window unless the URL asks for
   // something else, so a cold visit to any tab reads the cheapest period.
-  const fallback = dateRangeForPreset("last_30_days", today);
+  const fallback = dateRangeForPreset("last_7_days", today);
   const requestedStart = search.get("start");
   const requestedEnd = search.get("end");
   const validRange =

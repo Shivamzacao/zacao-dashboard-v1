@@ -12,11 +12,11 @@ const today = "2026-08-07" as const;
 const supported = phase2FixtureProvider.getShellContext().supportedFilters;
 
 describe("F1 URL filter state", () => {
-  it("uses the rolling thirty-day default and round-trips deterministically", () => {
+  it("uses the rolling seven-day default and round-trips deterministically", () => {
     const state = parseFrontendFilterState(new URLSearchParams(), supported, today);
-    expect(state.preset).toBe("last_30_days");
+    expect(state.preset).toBe("last_7_days");
     expect(state.filters).toMatchObject({
-      startDate: "2026-07-09",
+      startDate: "2026-08-01",
       endDate: "2026-08-07",
       comparison: "none",
       channels: [],
@@ -41,7 +41,7 @@ describe("F1 URL filter state", () => {
       today,
     );
     expect(state.recovered).toBe(true);
-    expect(state.query).toBe("start=2026-07-09&end=2026-08-07&comparison=none");
+    expect(state.query).toBe("start=2026-08-01&end=2026-08-07&comparison=none");
   });
 
   it("uses only B7 allowlisted dimensions and canonical ordering", () => {
@@ -58,11 +58,15 @@ describe("F1 URL filter state", () => {
       today,
     );
     expect(next.query).toBe(
-      "start=2026-07-09&end=2026-08-07&comparison=previous_year&channels=Website%2FDTC&skus=SYNTH-SKU-1&locations=SYNTH-WAREHOUSE",
+      "start=2026-08-01&end=2026-08-07&comparison=previous_year&channels=Website%2FDTC&skus=SYNTH-SKU-1&locations=SYNTH-WAREHOUSE",
     );
   });
 
   it("supports only the confirmed period presets", () => {
+    expect(dateRangeForPreset("last_7_days", today)).toEqual({
+      startDate: "2026-08-01",
+      endDate: today,
+    });
     expect(dateRangeForPreset("last_30_days", today)).toEqual({
       startDate: "2026-07-09",
       endDate: today,

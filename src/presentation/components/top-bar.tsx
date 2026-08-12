@@ -9,6 +9,7 @@ import type {
 } from "@/src/presentation/filters/url-filter-state";
 
 const dateLabels: Readonly<Record<DateRangePreset, string>> = {
+  last_7_days: "Last 7 days",
   last_30_days: "Last 30 days",
   last_90_days: "Last 90 days",
   year_to_date: "Year to date",
