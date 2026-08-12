@@ -13,6 +13,7 @@ import type {
   SourceIndicatorModel,
 } from "@/src/presentation/components/dashboard/display-contracts";
 import {
+  formatDate,
   formatPercent,
   formatQuantity,
 } from "@/src/presentation/components/dashboard/format-display-value";
@@ -198,6 +199,7 @@ export function mapDashboardPageToDisplayData(
       metadata: ["Synthetic preview", "Google Sheets", "Not certified actuals"],
     });
   }
+  const packagingAlerts: Array<DashboardAlertDisplayModel & { readonly shortfall: number }> = [];
 
   const registerMetric = (metric: MetricViewModel) => {
     states[metric.key] = displayStateFor(metric);
@@ -258,25 +260,98 @@ export function mapDashboardPageToDisplayData(
         });
       }
     }
+    if (breakdown.metric.key === "inventory.packaging_stock" && breakdown.metric.value !== null) {
+      for (const item of breakdown.items) {
+        const warningNumber = (prefix: string) => {
+          const warning = item.warnings.find((value) => value.startsWith(prefix));
+          return warning ? Number(warning.slice(prefix.length)) : NaN;
+        };
+        const warningText = (prefix: string) =>
+          item.warnings.find((value) => value.startsWith(prefix))?.slice(prefix.length) ?? null;
+        const minimum = warningNumber("IDEAL_MIN:");
+        const maximum = warningNumber("IDEAL_MAX:");
+        const incoming = warningNumber("INCOMING:");
+        const current = numericValue(item.values[0] ?? null);
+        if (
+          current === null ||
+          !Number.isFinite(minimum) ||
+          !Number.isFinite(maximum) ||
+          current >= minimum
+        )
+          continue;
+        const po = warningText("PO:");
+        const eta = warningText("ETA:");
+        packagingAlerts.push({
+          key: `${breakdown.metric.key}:${item.key}`,
+          severity: current <= minimum * 0.5 ? "danger" : "warning",
+          title: `${item.label} are below the ideal band`,
+          description: `${formatQuantity(current)} on hand against a ${formatQuantity(minimum)}–${formatQuantity(maximum)} ideal range.${incoming > 0 ? ` ${po ?? "An incoming PO"} (${formatQuantity(incoming)} units) is expected${eta ? ` ${formatDate(eta)}` : ""}.` : ""}`,
+          metadata: [
+            "Packaging risk",
+            ...(po ? [po] : []),
+            ...(eta ? [`ETA ${formatDate(eta)}`] : []),
+          ],
+          shortfall: (minimum - current) / minimum,
+        });
+      }
+    }
     // The day/hour heatmap key is "<day>:<hour>" (see buildPurchaseHeatmapBreakdown);
     // splitting it into a group/label pair lets HeatmapChartView lay the data
     // out as a day-by-hour grid instead of 168 flat category-axis ticks.
-    chartData[breakdown.metric.key] =
-      breakdown.dimension === "day_hour"
-        ? breakdown.items.map((item) => {
-            const [day, hour] = item.key.split(":");
-            return {
-              key: item.key,
-              label: hour ?? item.label,
-              value: numericValue(item.values[0] ?? null),
-              group: day ?? "",
-            };
-          })
-        : breakdown.items.map((item) => ({
+    chartData[breakdown.metric.key] = ["packaging_material_band", "sku_stock_band"].includes(
+      breakdown.dimension,
+    )
+      ? breakdown.items.map((item) => {
+          const warningNumber = (prefix: string) => {
+            const warning = item.warnings.find((value) => value.startsWith(prefix));
+            return warning ? Number(warning.slice(prefix.length)) : null;
+          };
+          return {
             key: item.key,
             label: item.label,
             value: numericValue(item.values[0] ?? null),
-          }));
+            minValue: warningNumber("IDEAL_MIN:"),
+            maxValue: warningNumber("IDEAL_MAX:"),
+          };
+        })
+      : breakdown.dimension === "packaging_month_series"
+        ? breakdown.items.map((item) => {
+            const seriesValues: Record<string, number | null> = {};
+            item.warnings.forEach((warning, index) => {
+              if (!warning.startsWith("SERIES:")) return;
+              const [, , label = ""] = warning.split(":");
+              const normalized = label.toLowerCase();
+              const key = normalized.includes("wrapper")
+                ? "barWrappers"
+                : normalized.includes("shipper")
+                  ? "shipperBoxes"
+                  : normalized.includes("carton")
+                    ? "cartons"
+                    : null;
+              if (key) seriesValues[key] = numericValue(item.values[index] ?? null);
+            });
+            return {
+              key: item.key,
+              label: compactPeriodLabel(item.label),
+              value: numericValue(item.values[0] ?? null),
+              seriesValues,
+            };
+          })
+        : breakdown.dimension === "day_hour"
+          ? breakdown.items.map((item) => {
+              const [day, hour] = item.key.split(":");
+              return {
+                key: item.key,
+                label: hour ?? item.label,
+                value: numericValue(item.values[0] ?? null),
+                group: day ?? "",
+              };
+            })
+          : breakdown.items.map((item) => ({
+              key: item.key,
+              label: item.label,
+              value: numericValue(item.values[0] ?? null),
+            }));
   }
 
   const rowsByDataset: Record<string, readonly DisplayTableRow[]> = {};
@@ -308,6 +383,17 @@ export function mapDashboardPageToDisplayData(
         value: typeof row["incomingUnits"] === "number" ? row["incomingUnits"] : null,
       }));
       chartValueFormats[table.metric.key] = "count";
+    }
+    if (table.metric.key === "production.delivery_timeline") {
+      chartData[table.metric.key] = table.rows.map((row, index) => ({
+        key: String(row["poNumber"] ?? index),
+        label: `${String(row["poNumber"] ?? "PO")} · ${String(row["item"] ?? "Item")}`,
+        value: typeof row["quantity"] === "number" ? row["quantity"] : null,
+        startDate: String(row["startDate"] ?? ""),
+        endDate: String(row["endDate"] ?? ""),
+        status: `${formatQuantity(typeof row["quantity"] === "number" ? row["quantity"] : 0)} units · ${String(row["status"] ?? "Scheduled")}`,
+      }));
+      chartValueFormats[table.metric.key] = "quantity";
     }
     if (table.metric.key === "forecast.variance") {
       chartData[table.metric.key] = table.rows.map((row, index) => ({
@@ -361,6 +447,8 @@ export function mapDashboardPageToDisplayData(
       chartValueFormats[table.metric.key] = "money";
     }
   }
+
+  alerts.push(...packagingAlerts.sort((left, right) => right.shortfall - left.shortfall));
 
   return {
     environment,

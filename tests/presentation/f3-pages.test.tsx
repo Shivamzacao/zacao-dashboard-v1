@@ -11,6 +11,7 @@ import { DashboardPageView } from "@/src/presentation/features/dashboard-pages/d
 import { dashboardPageSpecs } from "@/src/presentation/features/dashboard-pages/page-specs";
 import {
   f3CustomerPageFixtureData,
+  f3OperationsPageFixtureData,
   f3PageFixtureData,
   f3ProductPageFixtureData,
 } from "@/src/presentation/fixtures/f3-page-data";
@@ -227,6 +228,44 @@ describe("F3 dashboard pages", () => {
     await userEvent.click(viewButtons[0]!);
     expect(screen.getByRole("dialog", { name: "Product catalog detail" })).toBeTruthy();
     expect(screen.getAllByText("Dark 70%").length).toBeGreaterThan(1);
+  });
+
+  it("matches the HTML Operations Intelligence composition and conditional packaging alert", () => {
+    const operations = dashboardPageSpecs.operations;
+    expect(operations.kpis.map(({ metricKey }) => metricKey)).toEqual([
+      "inventory.shopify_current",
+      "operations.shipped_delivered",
+      "inventory.combined",
+      "forecast.variance",
+      "production.incoming",
+      "operations.manufacturer_otif",
+      "operations.manufacturer_lead_time",
+      "operations.warehouse_on_time_accuracy",
+      "operations.refund_rate",
+      "inventory.stock_health",
+    ]);
+    expect(operations.charts.map(({ title }) => title)).toEqual([
+      "Fulfillment status",
+      "Combined inventory",
+      "Forecast variance",
+      "Additional depletions",
+      "Projected delivery timeline",
+      "Stock versus ideal band",
+      "Packaging material stock",
+      "Packaging stock projection",
+      "Manufacturer delivery performance",
+    ]);
+    expect(operations.tables.map(({ title }) => title)).toEqual([
+      "Inventory lots & FEFO",
+      "Incoming production schedule",
+      "Packaging material stock",
+    ]);
+    render(<DashboardPageView spec={operations} fixture={f3OperationsPageFixtureData} />);
+    expect(screen.getAllByRole("article")).toHaveLength(11);
+    expect(screen.getByText("Cartons (12ct) are below the ideal band")).toBeTruthy();
+    expect(screen.getByText("Medium")).toBeTruthy();
+    expect(screen.getByRole("table", { name: "Packaging material stock" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Incoming production" })).toBeNull();
   });
 
   it("renders Klaviyo as no activity and keeps attribution blocked independently", () => {

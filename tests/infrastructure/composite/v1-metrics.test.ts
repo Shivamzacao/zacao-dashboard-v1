@@ -78,9 +78,22 @@ describe("V1 composite Sheet example fallback", () => {
       },
       requestId: null,
     }));
+    const readProducts = vi.fn(async () => ({
+      records: [],
+      truncated: false,
+      history: {
+        mode: "detailed" as const,
+        completeness: "partial" as const,
+        requestedStartDate: context.dataPeriod.startDate,
+        requestedEndDate: context.dataPeriod.endDate,
+        earliestDetailedRecordAt: null,
+        hasReadAllOrders: false,
+        warningCodes: [],
+      },
+    }));
     const shopify = (async () => ({
       shopifyql: { read },
-      admin: {},
+      admin: { readProducts },
       hasReadAllOrders: false,
     })) as unknown as ShopifyAdapterProvider;
     const contributor = createV1CompositeContributor({

@@ -3,6 +3,7 @@ import {
   buildInventoryRunwayMetric,
   buildInventoryValueMetric,
   buildMissingSkuCostMetric,
+  buildOperationalInventoryViews,
   buildRevenueChannelViews,
   buildSellThroughMetric,
   buildUnclassifiedChannelMetric,
@@ -17,6 +18,7 @@ import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import type { ShopifyAdapterProvider } from "@/src/infrastructure/shopify/contributors";
 import {
+  mapInventoryFacts,
   mapNativeChannelFacts,
   mapWeeklyProductUnitsFacts,
 } from "@/src/infrastructure/shopify/facts";
@@ -60,16 +62,22 @@ export function createV1CompositeContributor(input: {
           "SKU_Master",
           "Channel_Mapping",
           "COGS_By_SKU",
+          "Location_Master",
+          "Metric_Targets",
         ]),
         input.shopify(),
       ]);
-      const [weekly, channels] = await Promise.all([
+      const [weekly, channels, products] = await Promise.all([
         adapters.shopifyql.read({
           dataset: "product_units_weekly",
           dateRange: context.dataPeriod,
           grain: "week",
         }),
         adapters.shopifyql.read({ dataset: "native_channels", dateRange: context.dataPeriod }),
+        adapters.admin.readProducts({
+          dateRange: context.dataPeriod,
+          hasReadAllOrders: adapters.hasReadAllOrders,
+        }),
       ]);
       const checkedAt = input.now().toISOString();
       const shopifySourceStatus = shopifyStatus(checkedAt);
@@ -98,6 +106,14 @@ export function createV1CompositeContributor(input: {
         channelFacts,
         channelMapping.rows,
       );
+      const inventory = buildOperationalInventoryViews(
+        metricContext,
+        mapInventoryFacts(products.records),
+        skuMaster,
+        sheets.tabs["Location_Master"] ?? [],
+        sheets.tabs["Inventory_Snapshots"] ?? [],
+        sheets.tabs["Metric_Targets"] ?? [],
+      );
       return {
         metrics: [
           revenueChannels.dtcTotal,
@@ -125,8 +141,14 @@ export function createV1CompositeContributor(input: {
             channelMapping.rows,
             channelFacts.map(({ channel }) => channel),
           ),
+          inventory.stockHealth,
         ],
-        breakdowns: [revenueChannels.channelMix],
+        breakdowns: [
+          revenueChannels.channelMix,
+          inventory.shopify,
+          inventory.combined,
+          inventory.stockBand,
+        ],
         tables: [
           buildForecastVarianceTable(metricContext, reconciled.facts, reconciled.warnings),
           revenueChannels.channelPerformance,

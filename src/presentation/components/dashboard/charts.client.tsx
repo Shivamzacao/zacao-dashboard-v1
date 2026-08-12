@@ -488,6 +488,57 @@ export function StockBandChartView(props: BaseChartProps) {
   );
 }
 
+export function TimelineChartView(props: BaseChartProps) {
+  const rows = (props.data ?? []).filter((item) => {
+    if (!item.startDate || !item.endDate || item.value === null) return false;
+    const startDate = Date.parse(item.startDate);
+    const endDate = Date.parse(item.endDate);
+    return Number.isFinite(startDate) && Number.isFinite(endDate) && endDate >= startDate;
+  });
+  const timestamps = rows.flatMap((item) => [
+    Date.parse(item.startDate ?? ""),
+    Date.parse(item.endDate ?? ""),
+  ]);
+  const start = Math.min(...timestamps);
+  const end = Math.max(...timestamps);
+  const span = Math.max(end - start, 86_400_000);
+  const accessibleData = rows.map((item) => ({
+    ...item,
+    label: `${item.label} · ${item.startDate} to ${item.endDate}${item.status ? ` · ${item.status}` : ""}`,
+  }));
+  return (
+    <ChartFrame {...props} data={accessibleData}>
+      <ol className="delivery-timeline">
+        {rows.map((item) => {
+          const itemStart = Date.parse(item.startDate ?? "");
+          const itemEnd = Date.parse(item.endDate ?? "");
+          return (
+            <li className="delivery-timeline-row" key={item.key}>
+              <span className="delivery-timeline-label" title={item.label}>
+                {item.label}
+              </span>
+              <span className="delivery-timeline-track">
+                <span
+                  className="delivery-timeline-bar"
+                  style={{
+                    left: `${((itemStart - start) / span) * 100}%`,
+                    width: `${Math.max(((itemEnd - itemStart) / span) * 100, 2)}%`,
+                  }}
+                />
+              </span>
+              <span className="delivery-timeline-status">
+                <strong>{item.endDate}</strong>
+                {item.status ?? "Scheduled"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="stock-band-note">Bars span production start through expected arrival.</p>
+    </ChartFrame>
+  );
+}
+
 export function StackedBarChartView(props: SeriesChartProps) {
   return <BarChartView {...props} stacked />;
 }

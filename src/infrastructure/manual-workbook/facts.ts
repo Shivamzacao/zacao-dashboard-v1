@@ -132,8 +132,7 @@ export function toProductionIncomingFacts(
         poNumber,
         poLine: text(record, "record_id") ?? poNumber,
         sku,
-        // The workbook does not capture a destination warehouse (ADR-003).
-        destinationWarehouse: "Unassigned",
+        destinationWarehouse: text(record, "destination_warehouse") ?? "Unassigned",
         status,
         expectedArrivalDate,
         incomingUnits: units,

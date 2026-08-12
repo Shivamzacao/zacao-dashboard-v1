@@ -2,7 +2,16 @@ import type { DashboardSlug } from "@/src/application/api";
 import type { ChartSeriesDefinition } from "@/src/presentation/components/dashboard/display-contracts";
 
 export type ChartKind =
-  "line" | "area" | "bar" | "horizontal" | "stacked" | "donut" | "funnel" | "heatmap" | "band";
+  | "line"
+  | "area"
+  | "bar"
+  | "horizontal"
+  | "stacked"
+  | "donut"
+  | "funnel"
+  | "heatmap"
+  | "band"
+  | "timeline";
 
 export interface PageKpiSpec {
   readonly metricKey: string;
@@ -503,11 +512,42 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
     operations: spec({
       slug: "operations",
       kpis: [
-        "inventory.shopify_current",
-        "operations.shipped_delivered",
-        "inventory.combined",
-        "forecast.variance",
-        "production.incoming",
+        { metricKey: "inventory.shopify_current", valuePresentation: "full", unitSuffix: "bars" },
+        { metricKey: "operations.shipped_delivered", valuePresentation: "full" },
+        { metricKey: "inventory.combined", valuePresentation: "full", unitSuffix: "bars" },
+        { metricKey: "forecast.variance", valuePresentation: "full" },
+        { metricKey: "production.incoming", valuePresentation: "full" },
+        {
+          metricKey: "operations.manufacturer_otif",
+          label: "On-time & complete (manufacturer)",
+          sourceLabel: "Google Sheets",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "operations.manufacturer_lead_time",
+          label: "Average manufacturer lead time",
+          sourceLabel: "Google Sheets",
+          valuePresentation: "full",
+          unitSuffix: "days",
+        },
+        {
+          metricKey: "operations.warehouse_on_time_accuracy",
+          label: "Warehouse on-time & accurate",
+          sourceLabel: "3PL",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "operations.refund_rate",
+          label: "Refund rate",
+          sourceLabel: "Shopify",
+          valuePresentation: "full",
+        },
+        {
+          metricKey: "inventory.stock_health",
+          label: "Stock level health",
+          sourceLabel: "Shopify + Google Sheets",
+          valuePresentation: "full",
+        },
       ],
       charts: [
         {
@@ -529,30 +569,120 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           kind: "line",
         },
         {
-          title: "Incoming production",
-          description: "Approved production quantities and expected dates.",
-          metricKey: "production.incoming",
-          kind: "area",
-        },
-        {
           title: "Additional depletions",
           description: "Validated non-revenue inventory movements grouped by reason.",
           metricKey: "inventory.depletions",
           kind: "donut",
         },
+        {
+          title: "Projected delivery timeline",
+          description:
+            "Certified production starts and expected arrival dates for active purchase orders.",
+          metricKey: "production.delivery_timeline",
+          sourceLabel: "Google Sheets",
+          kind: "timeline",
+        },
+        {
+          title: "Stock versus ideal band",
+          description: "Current bar-equivalent stock against each SKU's effective approved band.",
+          metricKey: "inventory.sku_stock",
+          sourceLabel: "Shopify + Google Sheets",
+          kind: "band",
+        },
+        {
+          title: "Packaging material stock",
+          description: "Latest packaging quantities against effective approved ideal bands.",
+          metricKey: "inventory.packaging_stock",
+          sourceLabel: "Google Sheets",
+          kind: "band",
+        },
+        {
+          title: "Packaging stock projection",
+          description:
+            "Four complete months of stock, certified incoming POs, and approved consumption.",
+          metricKey: "inventory.packaging_projection",
+          sourceLabel: "Google Sheets",
+          kind: "line",
+          series: [
+            { key: "barWrappers", label: "Bar wrappers", tone: "forest" },
+            { key: "cartons", label: "Cartons", tone: "gold" },
+            { key: "shipperBoxes", label: "Shipper boxes", tone: "terracotta" },
+          ],
+        },
+        {
+          title: "Manufacturer delivery performance",
+          description: "On-time, complete and damage-free rates across eligible purchase orders.",
+          metricKey: "operations.manufacturer_performance",
+          sourceLabel: "Google Sheets",
+          kind: "horizontal",
+        },
       ],
       tables: [
         {
-          title: "Inventory lots and FEFO",
+          title: "Inventory lots & FEFO",
           description: "Lot, best-by, and FEFO readiness from validated source rows.",
           metricKey: "inventory.lots",
+          sourceLabel: "Google Sheets",
           dataset: "inventory-lots",
+          span: 2,
+          hiddenColumns: ["asOfDate", "warnings"],
+          columnOrder: ["warehouse", "sku", "lotCode", "bestByDate", "quantityRemaining", "status"],
+          columnLabels: {
+            warehouse: "Warehouse",
+            sku: "SKU",
+            lotCode: "Lot",
+            bestByDate: "Best by",
+            quantityRemaining: "Quantity",
+            status: "Status",
+          },
         },
         {
           title: "Incoming production schedule",
           description: "Production records and timing from the approved operational source.",
           metricKey: "production.incoming",
+          sourceLabel: "Google Sheets",
           dataset: "incoming-production",
+          span: 2,
+          hiddenColumns: [
+            "poNumber",
+            "poLine",
+            "unitsReceived",
+            "incomingValueMinorUnits",
+            "freightMinorUnits",
+          ],
+          columnOrder: [
+            "sku",
+            "incomingUnits",
+            "expectedArrivalDate",
+            "status",
+            "destinationWarehouse",
+          ],
+          columnLabels: {
+            sku: "Item",
+            incomingUnits: "Quantity",
+            expectedArrivalDate: "Expected arrival",
+            status: "Status",
+            destinationWarehouse: "Destination",
+          },
+        },
+        {
+          title: "Packaging material stock",
+          description: "Latest stock, approved band, and open incoming purchase order coverage.",
+          coverageNote:
+            "Rows remain unavailable where stock, effective bands, or incoming-PO coverage is incomplete.",
+          metricKey: "inventory.packaging_stock",
+          sourceLabel: "Google Sheets",
+          dataset: "packaging-stock",
+          span: 2,
+          columnOrder: ["material", "onHand", "idealMin", "idealMax", "incoming", "eta"],
+          columnLabels: {
+            material: "Material",
+            onHand: "On hand",
+            idealMin: "Ideal minimum",
+            idealMax: "Ideal maximum",
+            incoming: "Incoming",
+            eta: "ETA",
+          },
         },
       ],
     }),
