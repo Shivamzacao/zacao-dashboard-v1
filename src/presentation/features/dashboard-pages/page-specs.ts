@@ -483,6 +483,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           dataset: "product-catalog",
           hiddenColumns: ["sku"],
           hideExport: true,
+          span: 2,
         },
         {
           title: "SKU margin & cost",
@@ -1041,7 +1042,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "growth.next_actions",
           sourceLabel: "Google Sheets",
           dataset: "growth-next-actions",
-          span: 1,
+          span: 2,
           columnOrder: ["opportunityName", "nextAction", "dueDate", "valueMinorUnits"],
           columnLabels: {
             opportunityName: "Opportunity",
@@ -1072,7 +1073,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "grants.submitted",
           sourceLabel: "Google Sheets",
           dataset: "grant-applications",
-          span: 1,
+          span: 2,
           columnOrder: ["grant", "submittedDate", "requestedAmountMinorUnits", "status"],
           columnLabels: {
             grant: "Grant",
