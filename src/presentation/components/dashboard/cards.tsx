@@ -45,7 +45,13 @@ export function ChartCard(props: CardShellProps) {
 }
 
 export function SourceBadge({ label }: { readonly label: string }) {
-  return <span className="source-badge">Source: {label}</span>;
+  // `title` keeps the full provenance readable when a narrow card ellipsises
+  // the pill.
+  return (
+    <span className="source-badge" title={`Source: ${label}`}>
+      Source: {label}
+    </span>
+  );
 }
 
 export function KpiCard({ model }: { readonly model: KpiDisplayModel }) {
@@ -66,28 +72,20 @@ export function KpiCard({ model }: { readonly model: KpiDisplayModel }) {
     >
       <div className="kpi-card-label-row">
         <p>{model.label}</p>
-        <div className="kpi-card-tools">
-          {model.sourceLabel ? <SourceBadge label={model.sourceLabel} /> : null}
-          {model.helpText ? (
-            <Tooltip
-              label={model.helpText}
-              className="help-marker"
-              accessibleName={`About ${model.label}`}
-            >
-              <span aria-hidden="true">?</span>
-            </Tooltip>
-          ) : null}
-        </div>
+        {model.helpText ? (
+          <Tooltip
+            label={model.helpText}
+            className="help-marker"
+            accessibleName={`About ${model.label}`}
+          >
+            <span aria-hidden="true">?</span>
+          </Tooltip>
+        ) : null}
       </div>
       {isValueAvailable ? (
-        <>
-          <p className="kpi-card-value" title={accessibleValue}>
-            {displayedValue}
-          </p>
-          {model.state !== "current" ? (
-            <span className="kpi-state-label">{stateLabel(model.state)}</span>
-          ) : null}
-        </>
+        <p className="kpi-card-value" title={accessibleValue}>
+          {displayedValue}
+        </p>
       ) : (
         <StateSurface
           state={model.state === "current" ? "unavailable" : model.state}
@@ -95,6 +93,17 @@ export function KpiCard({ model }: { readonly model: KpiDisplayModel }) {
           compact
         />
       )}
+      {/* Provenance and readiness live on their own row at the foot of the
+          card. Both used to sit in the label row, where the state label was
+          pinned over the source pill and the help marker. */}
+      {model.sourceLabel || (isValueAvailable && model.state !== "current") ? (
+        <div className="kpi-card-bottom">
+          {isValueAvailable && model.state !== "current" ? (
+            <span className="kpi-state-label">{stateLabel(model.state)}</span>
+          ) : null}
+          {model.sourceLabel ? <SourceBadge label={model.sourceLabel} /> : null}
+        </div>
+      ) : null}
     </article>
   );
 }
