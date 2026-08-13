@@ -361,7 +361,7 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByLabelText("Grant acceptance rate: 35.7%")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
     expect(screen.getAllByText(/^Source:/)).toHaveLength(20);
-    expect(growth.tables.map(({ span }) => span)).toEqual([2, 1, 2, 1]);
+    expect(growth.tables.map(({ span }) => span)).toEqual([2, 1, 2, 2]);
 
     const investorTable = screen.getByRole("table", { name: "Investor pipeline" });
     expect(
