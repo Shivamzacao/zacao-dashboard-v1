@@ -139,4 +139,58 @@ describe("product sales breakdown", () => {
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items).toHaveLength(1);
   });
+
+  it("qualifies labels with the variant so sibling SKUs never share a label", () => {
+    const breakdown = buildProductSalesBreakdown(context, [
+      {
+        product: "70% Cacao Dark Chocolate",
+        variant: "4-Pack",
+        sku: "ZAC-DC-70-4PK",
+        merchandise: true,
+        netSalesMinorUnits: 26_900,
+      },
+      {
+        product: "70% Cacao Dark Chocolate",
+        variant: "10-Pack",
+        sku: "ZAC-DC-70-10PK",
+        merchandise: true,
+        netSalesMinorUnits: 14_400,
+      },
+      {
+        product: "Origin Bar",
+        variant: "Default Title",
+        sku: "ZAC-OB",
+        merchandise: true,
+        netSalesMinorUnits: 3_600,
+      },
+    ]);
+    expect(breakdown.items.map(({ label }) => label)).toEqual([
+      "70% Cacao Dark Chocolate · 4-Pack",
+      "70% Cacao Dark Chocolate · 10-Pack",
+      "Origin Bar",
+    ]);
+  });
+
+  it("falls back to the SKU when sibling variants share a title", () => {
+    const breakdown = buildProductSalesBreakdown(context, [
+      {
+        product: "Limited Drop",
+        variant: null,
+        sku: "ZAC-LD-A",
+        merchandise: true,
+        netSalesMinorUnits: 10_000,
+      },
+      {
+        product: "Limited Drop",
+        variant: null,
+        sku: "ZAC-LD-B",
+        merchandise: true,
+        netSalesMinorUnits: 5_000,
+      },
+    ]);
+    expect(breakdown.items.map(({ label }) => label)).toEqual([
+      "Limited Drop · ZAC-LD-A",
+      "Limited Drop · ZAC-LD-B",
+    ]);
+  });
 });

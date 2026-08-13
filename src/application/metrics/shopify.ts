@@ -21,6 +21,7 @@ import type {
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
 } from "./types";
+import { buildSkuGroupLabels, isUnmappedSkuKey, skuGroupKey } from "./sku-labels";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -160,16 +161,17 @@ export function buildProductUnitsBreakdown(
   facts: readonly ProductUnitsFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise }) => merchandise);
-  const grouped = new Map<string, { product: string; values: number[] }>();
+  const grouped = new Map<string, { product: string; variant: string | null; values: number[] }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `UNMAPPED:${fact.product}:${fact.variant ?? ""}`;
+    const key = skuGroupKey(fact);
     const existing = grouped.get(key);
     if (existing) {
       existing.values.push(fact.units);
     } else {
-      grouped.set(key, { product: fact.product, values: [fact.units] });
+      grouped.set(key, { product: fact.product, variant: fact.variant, values: [fact.units] });
     }
   }
+  const labels = buildSkuGroupLabels(grouped);
   const total = sumSafeNumbers(merchandise.map(({ units }) => units));
   const warnings = facts.length === merchandise.length ? [] : ["NON_MERCHANDISE_ROWS_EXCLUDED"];
   const base = metric(
@@ -181,11 +183,11 @@ export function buildProductUnitsBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, { product, values }]) => ({
+    items: [...grouped.entries()].map(([key, { values }]) => ({
       key,
-      label: key.startsWith("UNMAPPED:") ? key : product,
+      label: labels.get(key) ?? key,
       values: [{ kind: "count", value: sumSafeNumbers(values) }],
-      warnings: key.startsWith("UNMAPPED:") ? ["MISSING_SKU"] : [],
+      warnings: isUnmappedSkuKey(key) ? ["MISSING_SKU"] : [],
     })),
   });
 }
