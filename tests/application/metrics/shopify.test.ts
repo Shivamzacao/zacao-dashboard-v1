@@ -132,6 +132,66 @@ describe("B5 Shopify metric services", () => {
     ]);
   });
 
+  it("sums pack-size variants into one product bar and discloses unattributed provider rows", () => {
+    const facts = [
+      {
+        period: "2026-07",
+        product: "42% Cacao Smooth Chocolate",
+        variant: "10-Pack",
+        sku: "ZAC-MC-42-10PK",
+        merchandise: true,
+        units: 13,
+      },
+      {
+        period: "2026-07",
+        product: "42% Cacao Smooth Chocolate",
+        variant: "4-Pack",
+        sku: "ZAC-MC-42-4PK",
+        merchandise: true,
+        units: 1,
+      },
+      {
+        period: "2026-07",
+        product: "70% Cacao Dark Chocolate",
+        variant: "10-Pack",
+        sku: "ZAC-DC-70-10PK",
+        merchandise: true,
+        units: 9,
+      },
+      {
+        period: "2026-07",
+        product: "(blank product)",
+        variant: null,
+        sku: null,
+        merchandise: true,
+        units: 12,
+      },
+    ] as const;
+    const breakdown = buildProductUnitsBreakdown(context(), facts);
+    expect(breakdown.dimension).toBe("product");
+    expect(breakdown.items).toEqual([
+      {
+        key: "42% Cacao Smooth Chocolate",
+        label: "42% Cacao Smooth Chocolate",
+        values: [{ kind: "count", value: 14 }],
+        warnings: [],
+      },
+      {
+        key: "70% Cacao Dark Chocolate",
+        label: "70% Cacao Dark Chocolate",
+        values: [{ kind: "count", value: 9 }],
+        warnings: [],
+      },
+      {
+        key: "UNATTRIBUTED_PRODUCT",
+        label: "Unattributed (no product record)",
+        values: [{ kind: "count", value: 12 }],
+        warnings: ["MISSING_SKU"],
+      },
+    ]);
+    expect(breakdown.metric.value).toEqual({ kind: "count", value: 35 });
+  });
+
   it("returns sanitized catalog/current inventory without treating Shopify cost as sheet authority", () => {
     const catalog = [
       {

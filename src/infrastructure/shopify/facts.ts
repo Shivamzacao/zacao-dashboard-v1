@@ -20,6 +20,7 @@ import type {
   TrafficAttributionFact,
   WeeklyProductUnitsFact,
 } from "@/src/application/metrics/types";
+import { BLANK_PRODUCT_TITLE } from "@/src/application/metrics/sku-labels";
 import { ratioToBasisPoints } from "@/src/domain/utilities/money";
 
 import type { normalizeProduct } from "./normalization";
@@ -199,7 +200,7 @@ export function mapProductUnitsFacts(
 ): readonly ProductUnitsFact[] {
   return rows.map((row) => ({
     period: periodLabel,
-    product: optionalText(requireColumn(row, "product_title")) ?? "(blank product)",
+    product: optionalText(requireColumn(row, "product_title")) ?? BLANK_PRODUCT_TITLE,
     variant: optionalText(requireColumn(row, "product_variant_title")),
     sku: optionalText(requireColumn(row, "product_variant_sku")),
     merchandise: optionalText(requireColumn(row, "line_type"))?.toLowerCase() === "product",
@@ -371,7 +372,7 @@ export function mapCustomerCityFacts(rows: readonly ShopifyQlRow[]): readonly Cu
 
 export function mapProductSalesFacts(rows: readonly ShopifyQlRow[]): readonly ProductSalesFact[] {
   return rows.map((row) => ({
-    product: optionalText(requireColumn(row, "product_title")) ?? "(blank product)",
+    product: optionalText(requireColumn(row, "product_title")) ?? BLANK_PRODUCT_TITLE,
     variant: optionalText(requireColumn(row, "product_variant_title")),
     sku: optionalText(requireColumn(row, "product_variant_sku")),
     merchandise: optionalText(requireColumn(row, "line_type"))?.toLowerCase() === "product",

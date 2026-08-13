@@ -193,4 +193,28 @@ describe("product sales breakdown", () => {
       "Limited Drop · ZAC-LD-B",
     ]);
   });
+
+  it("names unattributable provider rows instead of an internal grouping key", () => {
+    const breakdown = buildProductSalesBreakdown(context, [
+      {
+        product: "70% Cacao Dark Chocolate",
+        variant: "10-Pack",
+        sku: "ZAC-DC-70-10PK",
+        merchandise: true,
+        netSalesMinorUnits: 26_900,
+      },
+      {
+        product: "(blank product)",
+        variant: null,
+        sku: null,
+        merchandise: true,
+        netSalesMinorUnits: -9_838,
+      },
+    ]);
+    expect(breakdown.items.map(({ label }) => label)).toEqual([
+      "70% Cacao Dark Chocolate · 10-Pack",
+      "Unattributed (no product record)",
+    ]);
+    expect(breakdown.items.at(-1)?.warnings).toContain("MISSING_SKU");
+  });
 });

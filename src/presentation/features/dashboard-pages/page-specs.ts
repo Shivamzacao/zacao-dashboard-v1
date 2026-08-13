@@ -220,7 +220,8 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           title: "Units sold",
           description: "Net merchandise items sold by approved product.",
           metricKey: "products.units_sold",
-          kind: "bar",
+          // Horizontal: product names need a full row each to stay readable.
+          kind: "horizontal",
         },
         {
           title: "Purchase timing",

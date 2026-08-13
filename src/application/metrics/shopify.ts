@@ -21,7 +21,11 @@ import type {
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
 } from "./types";
-import { buildSkuGroupLabels, isUnmappedSkuKey, skuGroupKey } from "./sku-labels";
+import {
+  isAttributedProduct,
+  UNATTRIBUTED_PRODUCT_KEY,
+  UNATTRIBUTED_PRODUCT_LABEL,
+} from "./sku-labels";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -156,22 +160,35 @@ export function buildShopifyFunnelTable(
   });
 }
 
+/**
+ * Shopify reports merchandise at variant grain, so one catalog product returns
+ * one row per pack size. Readers count products, not pack sizes, so the bars are
+ * the product and the variants sum into it — per-SKU units stay available in the
+ * product velocity table. Rows the provider cannot attribute to any product
+ * (Faire wholesale lines with no product reference) collapse into a single
+ * disclosed bar instead of leaking the internal grouping key.
+ */
 export function buildProductUnitsBreakdown(
   context: MetricServiceContext,
   facts: readonly ProductUnitsFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise }) => merchandise);
-  const grouped = new Map<string, { product: string; variant: string | null; values: number[] }>();
+  const grouped = new Map<string, { label: string; mapped: boolean; values: number[] }>();
   for (const fact of merchandise) {
-    const key = skuGroupKey(fact);
+    const attributed = isAttributedProduct(fact);
+    const key = attributed ? fact.product : UNATTRIBUTED_PRODUCT_KEY;
     const existing = grouped.get(key);
     if (existing) {
       existing.values.push(fact.units);
+      existing.mapped = existing.mapped && fact.sku !== null;
     } else {
-      grouped.set(key, { product: fact.product, variant: fact.variant, values: [fact.units] });
+      grouped.set(key, {
+        label: attributed ? fact.product : UNATTRIBUTED_PRODUCT_LABEL,
+        mapped: fact.sku !== null,
+        values: [fact.units],
+      });
     }
   }
-  const labels = buildSkuGroupLabels(grouped);
   const total = sumSafeNumbers(merchandise.map(({ units }) => units));
   const warnings = facts.length === merchandise.length ? [] : ["NON_MERCHANDISE_ROWS_EXCLUDED"];
   const base = metric(
@@ -182,12 +199,12 @@ export function buildProductUnitsBreakdown(
   );
   return metricBreakdownViewModelSchema.parse({
     metric: base,
-    dimension: "sku",
-    items: [...grouped.entries()].map(([key, { values }]) => ({
+    dimension: "product",
+    items: [...grouped.entries()].map(([key, { label, mapped, values }]) => ({
       key,
-      label: labels.get(key) ?? key,
+      label,
       values: [{ kind: "count", value: sumSafeNumbers(values) }],
-      warnings: isUnmappedSkuKey(key) ? ["MISSING_SKU"] : [],
+      warnings: mapped ? [] : ["MISSING_SKU"],
     })),
   });
 }
