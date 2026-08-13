@@ -1042,7 +1042,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           metricKey: "growth.next_actions",
           sourceLabel: "Google Sheets",
           dataset: "growth-next-actions",
-          span: 1,
+          span: 2,
           columnOrder: ["opportunityName", "nextAction", "dueDate", "valueMinorUnits"],
           columnLabels: {
             opportunityName: "Opportunity",
