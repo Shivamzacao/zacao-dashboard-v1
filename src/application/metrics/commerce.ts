@@ -6,11 +6,6 @@ import {
   type MetricViewModel,
 } from "@/src/application/view-models";
 import { sumSafeNumbers } from "@/src/domain/metrics/calculations";
-import {
-  isUnmappedProductKey,
-  productVariantLabel,
-  UNMAPPED_KEY_PREFIX,
-} from "@/src/domain/metrics/product-identity";
 import { usd } from "@/src/domain/utilities/money";
 
 import type {
@@ -23,6 +18,7 @@ import type {
   ShopifySalesTotalsFact,
   ShopifySalesTrendPoint,
 } from "./types";
+import { buildSkuGroupLabels, isUnmappedSkuKey, skuGroupKey } from "./sku-labels";
 import { createMetricViewModel } from "./view-model";
 
 function metric(
@@ -215,19 +211,21 @@ export function buildProductMixBreakdown(
   facts: readonly ProductSalesFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise: isMerchandise }) => isMerchandise);
-  const grouped = new Map<string, { label: string; netSales: number }>();
+  const grouped = new Map<string, { product: string; variant: string | null; netSales: number }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `${UNMAPPED_KEY_PREFIX}${fact.product}:${fact.variant ?? ""}`;
+    const key = skuGroupKey(fact);
     const existing = grouped.get(key);
     if (existing) {
       existing.netSales += fact.netSalesMinorUnits;
     } else {
       grouped.set(key, {
-        label: productVariantLabel(fact),
+        product: fact.product,
+        variant: fact.variant,
         netSales: fact.netSalesMinorUnits,
       });
     }
   }
+  const labels = buildSkuGroupLabels(grouped);
   const total = sumSafeNumbers([...grouped.values()].map(({ netSales }) => netSales));
   // The headline value is the leading SKU's share of merchandise net sales.
   const leadingShare =
@@ -246,9 +244,9 @@ export function buildProductMixBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, { label, netSales }]) => ({
+    items: [...grouped.entries()].map(([key, { netSales }]) => ({
       key,
-      label,
+      label: labels.get(key) ?? key,
       values:
         total === 0
           ? [money(netSales)]
@@ -259,7 +257,7 @@ export function buildProductMixBreakdown(
               },
               money(netSales),
             ],
-      warnings: isUnmappedProductKey(key) ? ["MISSING_SKU"] : [],
+      warnings: isUnmappedSkuKey(key) ? ["MISSING_SKU"] : [],
     })),
   });
 }
@@ -269,16 +267,21 @@ export function buildProductSalesBreakdown(
   facts: readonly ProductSalesFact[],
 ): MetricBreakdownViewModel {
   const merchandise = facts.filter(({ merchandise: isMerchandise }) => isMerchandise);
-  const grouped = new Map<string, { label: string; values: number[] }>();
+  const grouped = new Map<string, { product: string; variant: string | null; values: number[] }>();
   for (const fact of merchandise) {
-    const key = fact.sku ?? `${UNMAPPED_KEY_PREFIX}${fact.product}:${fact.variant ?? ""}`;
+    const key = skuGroupKey(fact);
     const existing = grouped.get(key);
     if (existing) {
       existing.values.push(fact.netSalesMinorUnits);
     } else {
-      grouped.set(key, { label: productVariantLabel(fact), values: [fact.netSalesMinorUnits] });
+      grouped.set(key, {
+        product: fact.product,
+        variant: fact.variant,
+        values: [fact.netSalesMinorUnits],
+      });
     }
   }
+  const labels = buildSkuGroupLabels(grouped);
   const total = sumSafeNumbers(merchandise.map(({ netSalesMinorUnits }) => netSalesMinorUnits));
   const warnings = facts.length === merchandise.length ? [] : ["NON_MERCHANDISE_ROWS_EXCLUDED"];
   const base = metric(
@@ -290,11 +293,11 @@ export function buildProductSalesBreakdown(
   return metricBreakdownViewModelSchema.parse({
     metric: base,
     dimension: "sku",
-    items: [...grouped.entries()].map(([key, { label, values }]) => ({
+    items: [...grouped.entries()].map(([key, { values }]) => ({
       key,
-      label,
+      label: labels.get(key) ?? key,
       values: [money(sumSafeNumbers(values))],
-      warnings: isUnmappedProductKey(key) ? ["MISSING_SKU"] : [],
+      warnings: isUnmappedSkuKey(key) ? ["MISSING_SKU"] : [],
     })),
   });
 }

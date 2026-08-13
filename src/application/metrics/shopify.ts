@@ -8,11 +8,6 @@ import {
   metricTableViewModelSchema,
 } from "@/src/application/view-models";
 import { sumSafeNumbers } from "@/src/domain/metrics/calculations";
-import {
-  isAttributedProduct,
-  UNATTRIBUTED_PRODUCT_KEY,
-  UNATTRIBUTED_PRODUCT_LABEL,
-} from "@/src/domain/metrics/product-identity";
 import { usd } from "@/src/domain/utilities/money";
 
 import type {
@@ -26,6 +21,11 @@ import type {
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
 } from "./types";
+import {
+  isAttributedProduct,
+  UNATTRIBUTED_PRODUCT_KEY,
+  UNATTRIBUTED_PRODUCT_LABEL,
+} from "./sku-labels";
 import { createMetricViewModel } from "./view-model";
 
 function metric(

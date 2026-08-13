@@ -20,7 +20,7 @@ import type {
   TrafficAttributionFact,
   WeeklyProductUnitsFact,
 } from "@/src/application/metrics/types";
-import { BLANK_PRODUCT_TITLE } from "@/src/domain/metrics/product-identity";
+import { BLANK_PRODUCT_TITLE } from "@/src/application/metrics/sku-labels";
 import { ratioToBasisPoints } from "@/src/domain/utilities/money";
 
 import type { normalizeProduct } from "./normalization";
