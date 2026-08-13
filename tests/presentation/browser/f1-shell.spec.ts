@@ -28,7 +28,7 @@ test("invalid URL values recover to the B7 allowlist", async ({ page }) => {
     "/products?start=bad&end=2026-08-07&comparison=future&channels=Unknown&provider=shopify",
   );
   await expect(page).toHaveURL(/\/products\?start=\d{4}-\d{2}-\d{2}&end=\d{4}-\d{2}-\d{2}$/);
-  await expect(page.getByRole("heading", { name: "Product intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Product Intelligence" })).toBeVisible();
 });
 
 test("keyboard navigation and responsive drawer preserve focus", async ({ page }) => {
@@ -46,7 +46,7 @@ test("keyboard navigation and responsive drawer preserve focus", async ({ page }
   const executive = page.getByRole("link", { name: "Executive health" });
   await executive.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(page.getByRole("link", { name: "Revenue intelligence" })).toBeFocused();
+  await expect(page.getByRole("link", { name: "Revenue Intelligence" })).toBeFocused();
 });
 
 test("unsupported route renders the approved not-found state", async ({ page }) => {
