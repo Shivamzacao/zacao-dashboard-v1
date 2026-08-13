@@ -62,27 +62,30 @@ const shopifyqlPayloads: Record<string, unknown> = {
       },
     ],
   },
-  product_line: {
-    columns: [],
-    rows: [
-      {
-        line_type: "product",
-        product_title: "70% Cacao Dark Chocolate",
-        product_variant_title: "10-Pack",
-        product_variant_sku: "ZAC-DC-70-10PK",
-        net_sales: "6761.32",
-        orders: "77",
-        net_items_sold: "665",
-      },
-    ],
-  },
 };
+
+const defaultProductLineRows = [
+  {
+    line_type: "product",
+    product_title: "70% Cacao Dark Chocolate",
+    product_variant_title: "10-Pack",
+    product_variant_sku: "ZAC-DC-70-10PK",
+    net_sales: "6761.32",
+    orders: "77",
+    net_items_sold: "665",
+  },
+];
 
 /**
  * A stub Shopify + Klaviyo backend: token minting, ShopifyQL, admin GraphQL,
  * and empty-account Klaviyo endpoints, keyed off the request URL/body.
  */
-function stubFetch(overrides: { failFunnel?: boolean } = {}) {
+function stubFetch(
+  overrides: {
+    failFunnel?: boolean;
+    productLineRows?: readonly Record<string, string>[];
+  } = {},
+) {
   return vi.fn<typeof fetch>(async (input, init) => {
     const url = String(input);
     const body = typeof init?.body === "string" ? init.body : "";
@@ -265,7 +268,13 @@ function stubFetch(overrides: { failFunnel?: boolean } = {}) {
         }
         return json({
           data: {
-            shopifyqlQuery: { parseErrors: [], tableData: shopifyqlPayloads["product_line"] },
+            shopifyqlQuery: {
+              parseErrors: [],
+              tableData: {
+                columns: [],
+                rows: overrides.productLineRows ?? defaultProductLineRows,
+              },
+            },
           },
         });
       }
@@ -430,6 +439,32 @@ describe("LiveBackendApiRuntime", () => {
     const healthScore = metricByKey(result.page, "executive.business_health_score");
     expect(healthScore.value).toBeNull();
     expect(healthScore.readiness.warningCodes).toContain("BUSINESS_RULE_REQUIRED");
+  });
+
+  it("keeps sibling variant SKUs of one product on distinctly labelled bars", async () => {
+    const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
+      fetchImplementation: stubFetch({
+        productLineRows: [
+          ...defaultProductLineRows,
+          {
+            line_type: "product",
+            product_title: "70% Cacao Dark Chocolate",
+            product_variant_title: "4-Pack",
+            product_variant_sku: "ZAC-DC-70-4PK",
+            net_sales: "2690.00",
+            orders: "31",
+            net_items_sold: "124",
+          },
+        ],
+      }),
+    });
+    const result = await runtime.loadDashboard("Product Intelligence", filters);
+
+    const sales = result.page.breakdowns.find(({ metric }) => metric.key === "products.sales");
+    expect(sales?.items.map(({ label }) => label)).toEqual([
+      "70% Cacao Dark Chocolate · 10-Pack",
+      "70% Cacao Dark Chocolate · 4-Pack",
+    ]);
   });
 
   it("includes commerce.total_sales on Financial Intelligence, not just Revenue", async () => {
