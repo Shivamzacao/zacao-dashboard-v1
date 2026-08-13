@@ -32,6 +32,16 @@ const SOURCE_LABELS: Readonly<Record<SourceStatus["source"], string>> = {
   google_drive: "Google Drive",
 };
 
+// States that carry no freshness evidence at all. These mirror the "usable"
+// filter the freshness contributor applies to the metric's own sources, so the
+// chart plots exactly the sources that answered.
+const STATES_WITHOUT_FRESHNESS: readonly string[] = [
+  "not_configured",
+  "unavailable",
+  "invalid",
+  "error",
+];
+
 const drilldownDatasetByMetricKey = new Map(
   drilldownCatalog.map((definition) => [definition.metricKey, definition.dataset]),
 );
@@ -472,11 +482,20 @@ export function mapDashboardPageToDisplayData(
       chartValueFormats[table.metric.key] = "count";
     }
     if (table.metric.key === "sources.freshness") {
-      chartData[table.metric.key] = table.rows.map((row, index) => ({
-        key: String(row["source"] ?? index),
-        label: String(row["source"] ?? index),
-        value: row["state"] === "current" ? 100 : row["state"] === "stale" ? 50 : 0,
-      }));
+      // A source that reported no freshness has nothing to plot, so it is
+      // withheld rather than drawn as an empty bar that reads like a source
+      // that is connected but completely stale. The drilldown rows still carry
+      // every source's state, and the card keeps its own warnings.
+      chartData[table.metric.key] = table.rows
+        .filter((row) => !STATES_WITHOUT_FRESHNESS.includes(String(row["state"])))
+        .map((row, index) => {
+          const source = String(row["source"] ?? index);
+          return {
+            key: source,
+            label: SOURCE_LABELS[source as SourceStatus["source"]] ?? source,
+            value: row["state"] === "current" ? 100 : row["state"] === "stale" ? 50 : 0,
+          };
+        });
       chartValueFormats[table.metric.key] = "percent";
     }
     if (table.metric.key === "social.performance") {
