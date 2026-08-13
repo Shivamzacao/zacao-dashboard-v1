@@ -139,4 +139,36 @@ describe("product sales breakdown", () => {
     expect(breakdown.metric.warnings).toContain("NON_MERCHANDISE_ROWS_EXCLUDED");
     expect(breakdown.items).toHaveLength(1);
   });
+
+  it("names each variant and never surfaces an internal grouping key", () => {
+    const breakdown = buildProductSalesBreakdown(context, [
+      {
+        product: "70% Cacao",
+        variant: "10-Pack",
+        sku: "ZAC-DC-70-10PK",
+        merchandise: true,
+        netSalesMinorUnits: 26_900,
+      },
+      {
+        product: "70% Cacao",
+        variant: "4-Pack",
+        sku: "ZAC-DC-70-4PK",
+        merchandise: true,
+        netSalesMinorUnits: 14_400,
+      },
+      {
+        product: "(blank product)",
+        variant: null,
+        sku: null,
+        merchandise: true,
+        netSalesMinorUnits: -9_838,
+      },
+    ]);
+    expect(breakdown.items.map(({ label }) => label)).toEqual([
+      "70% Cacao · 10-Pack",
+      "70% Cacao · 4-Pack",
+      "Unattributed (no product record)",
+    ]);
+    expect(breakdown.items.at(-1)?.warnings).toContain("MISSING_SKU");
+  });
 });

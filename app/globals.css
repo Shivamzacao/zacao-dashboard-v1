@@ -550,7 +550,10 @@ select {
 }
 .ranked-bar {
   display: grid;
-  grid-template-columns: minmax(0, 11rem) 1fr auto;
+  /* Wide enough for a product name plus its pack size ("… · 10-Pack"); below
+     this the variant is the first thing the ellipsis eats, which makes two rows
+     of the same product read identically. */
+  grid-template-columns: minmax(0, 13rem) 1fr auto;
   align-items: center;
   gap: 10px;
 }
