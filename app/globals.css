@@ -3,6 +3,7 @@
 @theme {
   --color-zacao-cream: #f4ecdb;
   --color-zacao-cream-soft: #faf7ef;
+  --color-zacao-cream-dark: #f2f3ef;
   --color-zacao-paper: #ffffff;
   --color-zacao-canvas: #f7f7f3;
   --color-zacao-forest: #005d45;
@@ -22,6 +23,7 @@
 :root {
   --cream: #f4ecdb;
   --cream-soft: #faf7ef;
+  --cream-dark: #f2f3ef;
   --paper: #ffffff;
   --canvas: #f7f7f3;
   --forest: #005d45;
@@ -339,15 +341,18 @@ select {
   border-top-color: transparent;
   animation: state-spin 800ms linear infinite;
 }
-.state-error,
-.state-invalid {
+/* Scoped to .state-surface so the tint lands only on the inner state box. A bare
+   `.state-error` would also match `.kpi-card`/`.chart-frame`, which carry a
+   `state-*` class, and would repaint the whole card by source order. */
+.state-surface.state-error,
+.state-surface.state-invalid {
   color: #8b3127;
   background: #fff8f6;
 }
-.state-stale,
-.state-partial,
-.state-business_rule_required,
-.state-data_pending {
+.state-surface.state-stale,
+.state-surface.state-partial,
+.state-surface.state-business_rule_required,
+.state-surface.state-data_pending {
   color: #7a4a08;
   background: #fffbf3;
 }
@@ -468,6 +473,8 @@ select {
   padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 999px;
+  /* Pinned because `.state-symbol` draws its ring from currentColor. */
+  color: var(--forest-dark);
   background: var(--paper);
 }
 .source-indicator > div {
@@ -1617,7 +1624,7 @@ table.sr-only {
 .rebate-tier-row.is-current {
   border-color: var(--gold);
   box-shadow: inset 0 0 0 1px var(--gold);
-  background: var(--cream);
+  background: var(--cream-soft);
 }
 
 .rebate-tier-label {
