@@ -54,7 +54,6 @@ export function SidebarNavigation({ pathname, query, onNavigate }: SidebarNaviga
         }
       }}
     >
-      <p className="sidebar-section-label">Intelligence</p>
       <ul className="sidebar-navigation-list">
         {dashboardRoutes.map((route) => {
           const active = isDashboardRouteActive(pathname, route.href);

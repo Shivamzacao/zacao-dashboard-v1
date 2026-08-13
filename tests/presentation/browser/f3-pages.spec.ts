@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 
 const pages = [
   ["executive", "Executive health"],
-  ["revenue", "Revenue intelligence"],
-  ["customers", "Customer intelligence"],
-  ["products", "Product intelligence"],
-  ["operations", "Operations intelligence"],
-  ["marketing", "Marketing intelligence"],
+  ["revenue", "Revenue Intelligence"],
+  ["customers", "Customer Intelligence"],
+  ["products", "Product Intelligence"],
+  ["operations", "Operations Intelligence"],
+  ["marketing", "Marketing Intelligence"],
   ["insights", "Insights and data quality"],
-  ["growth", "Growth intelligence"],
-  ["financial", "Financial intelligence"],
+  ["growth", "Growth Intelligence"],
+  ["financial", "Financial Intelligence"],
 ] as const;
 
 for (const [slug, title] of pages) {
@@ -69,7 +69,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/revenue");
-    await expect(page.getByRole("heading", { name: "Revenue intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Revenue Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -78,7 +78,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/customers");
-    await expect(page.getByRole("heading", { name: "Customer intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Customer Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -87,7 +87,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/products");
-    await expect(page.getByRole("heading", { name: "Product intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Product Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -96,7 +96,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/operations");
-    await expect(page.getByRole("heading", { name: "Operations intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Operations Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -105,7 +105,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/marketing");
-    await expect(page.getByRole("heading", { name: "Marketing intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Marketing Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -114,7 +114,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/growth");
-    await expect(page.getByRole("heading", { name: "Growth intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Growth Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -123,7 +123,7 @@ for (const width of [760, 640, 390]) {
     ).toBe(true);
 
     await page.goto("/financial");
-    await expect(page.getByRole("heading", { name: "Financial intelligence" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Financial Intelligence" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Open navigation" })).toBeVisible();
     expect(
       await page.evaluate(
@@ -139,7 +139,7 @@ test("customers matches the 1280 by 720 reference composition", async ({ page },
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/customers");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Customer intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Customer Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-customers-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
@@ -152,7 +152,7 @@ test("products matches the 1280 by 720 reference composition", async ({ page }, 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/products");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Product intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Product Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-products-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
@@ -165,7 +165,7 @@ test("operations matches the 1280 by 720 reference composition", async ({ page }
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/operations");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Operations intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operations Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-operations-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
@@ -221,7 +221,7 @@ test("marketing matches the 1280 by 720 reference composition", async ({ page },
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/marketing");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Marketing intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Marketing Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-marketing-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
@@ -234,7 +234,7 @@ test("growth matches the 1280 by 720 reference composition", async ({ page }, te
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/growth");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Growth intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Growth Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-growth-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",
@@ -247,7 +247,7 @@ test("financial matches the 1280 by 720 reference composition", async ({ page },
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/financial");
   await page.waitForLoadState("networkidle");
-  await expect(page.getByRole("heading", { name: "Financial intelligence" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Financial Intelligence" })).toBeVisible();
   await expect(page).toHaveScreenshot("f3-financial-reference-1280x720.png", {
     fullPage: true,
     animations: "disabled",

@@ -26,7 +26,7 @@ describe("F1 shell components", () => {
     render(<SidebarNavigation pathname="/products" query="start=2025-08-08&end=2026-08-07" />);
     expect(screen.getAllByRole("link")).toHaveLength(9);
     expect(
-      screen.getByRole("link", { name: /Product intelligence/ }).getAttribute("aria-current"),
+      screen.getByRole("link", { name: /Product Intelligence/ }).getAttribute("aria-current"),
     ).toBe("page");
     expect(screen.queryByText(/settings|administrator|profile/i)).toBeNull();
     expect(dashboardRoutes.map((route) => route.href)).toEqual([

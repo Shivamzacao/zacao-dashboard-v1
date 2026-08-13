@@ -13,13 +13,13 @@ chart-card, table, status, and source-footnote patterns. Demo numbers are visual
 | V1 route      | Demo section                               | B7 contract                     | Decision                                     |
 | ------------- | ------------------------------------------ | ------------------------------- | -------------------------------------------- |
 | `/executive`  | Executive health                           | `/api/v1/dashboards/executive`  | REBUILD_TO_MATCH                             |
-| `/revenue`    | Revenue intelligence                       | `/api/v1/dashboards/revenue`    | REBUILD_TO_MATCH                             |
-| `/customers`  | Customer intelligence                      | `/api/v1/dashboards/customers`  | REBUILD_TO_MATCH                             |
-| `/products`   | Product intelligence                       | `/api/v1/dashboards/products`   | REBUILD_TO_MATCH                             |
+| `/revenue`    | Revenue Intelligence                       | `/api/v1/dashboards/revenue`    | REBUILD_TO_MATCH                             |
+| `/customers`  | Customer Intelligence                      | `/api/v1/dashboards/customers`  | REBUILD_TO_MATCH                             |
+| `/products`   | Product Intelligence                       | `/api/v1/dashboards/products`   | REBUILD_TO_MATCH                             |
 | `/operations` | Not present                                | `/api/v1/dashboards/operations` | CONDITIONAL — compose approved patterns only |
-| `/marketing`  | Marketing intelligence                     | `/api/v1/dashboards/marketing`  | REBUILD_TO_MATCH                             |
-| `/growth`     | Growth intelligence                        | `/api/v1/dashboards/growth`     | CONDITIONAL                                  |
-| `/financial`  | Financial intelligence                     | `/api/v1/dashboards/financial`  | CONDITIONAL                                  |
+| `/marketing`  | Marketing Intelligence                     | `/api/v1/dashboards/marketing`  | REBUILD_TO_MATCH                             |
+| `/growth`     | Growth Intelligence                        | `/api/v1/dashboards/growth`     | CONDITIONAL                                  |
+| `/financial`  | Financial Intelligence                     | `/api/v1/dashboards/financial`  | CONDITIONAL                                  |
 | `/insights`   | Insights & recommendations; validation tab | `/api/v1/dashboards/insights`   | REBUILD_TO_MATCH                             |
 
 There are no authentication, account, admin, settings, or editing routes in V1.
