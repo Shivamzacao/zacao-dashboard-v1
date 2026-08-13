@@ -156,11 +156,15 @@ export function F2ComponentMatrix() {
               sparkline: [0, 0, 0],
             }}
           />
+          {/* Source badge, help marker and a non-current state label together:
+              the crowded corner that has to stay legible. */}
           <KpiCard
             model={{
               label: "Refund adjustment with a deliberately long label",
               value: { kind: "money", value: { currency: "USD", minorUnits: -125050 } },
               state: "partial",
+              sourceLabel: "Shopify + Google Sheets",
+              helpText: "Synthetic TEST fixture. Not ZACAO business performance.",
               comparison: { label: "comparison", value: null },
             }}
           />
@@ -169,6 +173,8 @@ export function F2ComponentMatrix() {
               label: "Conversion rate",
               value: { kind: "rate_basis_points", value: 264 },
               state: "stale",
+              sourceLabel: "Shopify",
+              helpText: "Synthetic TEST fixture. Not ZACAO business performance.",
               comparison: { label: "vs prior", value: "-0.4%", tone: "warning" },
             }}
           />

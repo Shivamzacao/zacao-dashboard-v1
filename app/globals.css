@@ -130,12 +130,14 @@ select {
   justify-content: flex-end;
   gap: 7px;
 }
+/* `inline-block`, not `inline-flex`: `text-overflow` only trims the text of a
+   block container, so a flex pill clipped long provenance mid-word with no
+   ellipsis. */
 .source-badge {
-  display: inline-flex;
+  display: inline-block;
   max-width: 220px;
   min-height: 21px;
-  align-items: center;
-  padding: 3px 8px;
+  padding: 4px 8px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -181,7 +183,9 @@ select {
 }
 
 .kpi-card {
+  display: flex;
   position: relative;
+  flex-direction: column;
   min-height: 147px;
   padding: 16px;
   overflow: hidden;
@@ -197,23 +201,13 @@ select {
   gap: 8px;
 }
 .kpi-card-label-row p {
+  min-width: 0;
   margin: 0;
   color: var(--forest-dark);
   font-size: 11px;
   font-weight: 650;
   line-height: 15px;
   letter-spacing: 0.2px;
-}
-.kpi-card-tools {
-  display: flex;
-  flex: 0 1 auto;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  min-width: 0;
-}
-.kpi-card-tools .source-badge {
-  max-width: 190px;
 }
 .help-marker {
   display: grid;
@@ -250,9 +244,19 @@ select {
 .kpi-card-bottom {
   display: flex;
   min-width: 0;
+  /* `auto` pins the row to the foot of the card, so provenance lines up across
+     a row of cards whose values and state boxes are different heights. */
+  margin-top: auto;
+  padding-top: 10px;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px 8px;
+}
+/* Right-aligned even when no state pill precedes it. */
+.kpi-card-bottom .source-badge {
+  max-width: 100%;
+  margin-left: auto;
 }
 .comparison-pill {
   display: inline-flex;
@@ -293,13 +297,24 @@ select {
   flex: 0 1 90px;
   color: var(--forest);
 }
+/* In flow, not pinned to the card corner: the top-right of a KPI card already
+   belongs to the source badge and the help marker, and an absolute label
+   printed straight over them. */
 .kpi-state-label {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  color: var(--forest-dark);
+  display: inline-block;
+  max-width: 100%;
+  padding: 4px 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  color: #7a4a08;
+  background: #bc7b2417;
   font-size: 9px;
+  font-weight: 700;
+  line-height: 13px;
+  letter-spacing: 0.6px;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .state-surface {
