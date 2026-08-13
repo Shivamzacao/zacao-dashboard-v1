@@ -278,6 +278,39 @@ describe("mapDashboardPageToDisplayData", () => {
     expect(display.chartValueFormats?.["commerce.web_funnel"]).toBe("count");
   });
 
+  it("labels freshness bars with source display names and withholds sources without freshness", () => {
+    const freshnessMetric = createMetricViewModel({
+      metricKey: "sources.freshness",
+      environment: "production",
+      dataPeriod,
+      sources: [shopifyCurrent, googleSheetsCurrent],
+      value: { kind: "status", value: "Source status available" },
+    });
+    const table = metricTableViewModelSchema.parse({
+      metric: freshnessMetric,
+      columns: ["source", "state"],
+      rows: [
+        { source: "shopify", state: "current" },
+        { source: "klaviyo", state: "stale" },
+        { source: "google_sheets", state: "current" },
+        { source: "google_drive", state: "unavailable" },
+      ],
+    });
+    const display = mapDashboardPageToDisplayData(
+      { ...pageWith([]), tables: [table] },
+      "production",
+    );
+
+    // Raw source keys are internal identifiers; the axis reads product names. A
+    // source that never answered has no freshness to plot, so it is withheld
+    // instead of being drawn as a zero bar next to the sources that did.
+    expect(display.chartData["sources.freshness"]).toEqual([
+      { key: "shopify", label: "Shopify", value: 100 },
+      { key: "klaviyo", label: "Klaviyo", value: 50 },
+      { key: "google_sheets", label: "Google Sheets", value: 100 },
+    ]);
+  });
+
   it("maps source statuses onto indicator models with truthful states", () => {
     const display = mapDashboardPageToDisplayData(pageWith([]), "production");
     expect(display.sources).toEqual([
