@@ -2,6 +2,7 @@ import {
   buildCashPositionMetric,
   buildActiveCustomersMetric,
   buildCashPositionBreakdown,
+  buildCogsPerBarViews,
   buildCombinedInventoryBreakdown,
   buildDepletionsBreakdown,
   buildFinanceActualMetrics,
@@ -33,7 +34,7 @@ import type {
   DashboardDatasetContributor,
   OrchestrationContext,
 } from "@/src/application/orchestration";
-import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
+import type { SheetsDashboardPage, SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import {
   toCashPositionFacts,
@@ -76,6 +77,7 @@ class SheetsContributor implements DashboardDatasetContributor {
 
 export function createSheetsApiContributors(
   source: SheetsTabDataSource,
+  executiveSource: SheetsTabDataSource | null = null,
 ): readonly DashboardDatasetContributor[] {
   const customers = new SheetsContributor("sheets-customers", async (value) => {
     const result = await source.readPageTabs("customers", ["Sales_Actuals", "Channel_Mapping"]);
@@ -106,137 +108,164 @@ export function createSheetsApiContributors(
     };
   });
 
-  const operations = new SheetsContributor("sheets-operations", async (value) => {
-    const result = await source.readPageTabs("operations", [
-      "Inventory_Snapshots",
-      "Inventory_Lots",
-      "Additional_Depletions",
-      "Production_Orders",
-      "Warehouse_Fulfillment",
-      "Packaging_Materials",
-      "Packaging_Inventory",
-      "Packaging_Orders",
-      "Packaging_Forecast",
-      "Location_Master",
-      "Sales_Forecast",
-      "COGS_By_SKU",
-    ]);
-    const otif = selectExampleFallback(result, "Production_Orders", hasManufacturerOtifRows);
-    const manufacturerOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
-      rows.some(
-        (row) =>
-          typeof row["confirmed_date"] === "string" && typeof row["received_date"] === "string",
-      ),
-    );
-    const incomingOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
-      toProductionIncomingFacts(rows).facts.some(
-        ({ expectedArrivalDate }) =>
-          expectedArrivalDate === null ||
-          (expectedArrivalDate >= value.dataPeriod.startDate &&
-            expectedArrivalDate <= value.dataPeriod.endDate),
-      ),
-    );
-    const depletions = selectExampleFallback(result, "Additional_Depletions", (rows) =>
-      rows.some((row) => {
-        const date = row["movement_date"];
-        return (
-          typeof date === "string" &&
-          date >= value.dataPeriod.startDate &&
-          date <= value.dataPeriod.endDate
-        );
-      }),
-    );
-    const warehouse = selectExampleFallback(result, "Warehouse_Fulfillment", (rows) =>
-      rows.some((row) => {
-        const date = row["shipped_at"];
-        return (
-          typeof date === "string" &&
-          date.slice(0, 10) >= value.dataPeriod.startDate &&
-          date.slice(0, 10) <= value.dataPeriod.endDate
-        );
-      }),
-    );
-    const packagingMaterials = selectExampleFallback(result, "Packaging_Materials");
-    const packagingInventory = selectExampleFallback(result, "Packaging_Inventory");
-    const packagingOrders = selectExampleFallback(result, "Packaging_Orders");
-    const packagingForecast = selectExampleFallback(result, "Packaging_Forecast");
-    const costs = selectExampleFallback(result, "COGS_By_SKU", (rows) =>
-      hasComparableInputCostRows(rows, value.dataPeriod.endDate),
-    );
-    const usedExample = [
-      otif,
-      manufacturerOrders,
-      incomingOrders,
-      depletions,
-      warehouse,
-      packagingMaterials,
-      packagingInventory,
-      packagingOrders,
-      packagingForecast,
-      costs,
-    ].some(({ usedExample: used }) => used);
-    const status = syntheticSourceStatus(result.sourceStatus, usedExample);
-    const fallbackWarnings = syntheticWarnings(result.warnings, usedExample);
-    const metricContext = context(value, status);
-    const combined = toCombinedInventoryFacts(
-      result.tabs["Inventory_Snapshots"] ?? [],
-      result.tabs["Location_Master"] ?? [],
-    );
-    const incoming = toProductionIncomingFacts(incomingOrders.rows);
-    const manufacturer = buildManufacturerOperationsViews(metricContext, manufacturerOrders.rows);
-    const packaging = buildPackagingViews(
-      metricContext,
-      packagingMaterials.rows,
-      packagingInventory.rows,
-      packagingOrders.rows,
-      packagingForecast.rows,
-    );
-    const fallback = (result.sourceStatus.dataAsOf ?? result.sourceStatus.checkedAt).slice(0, 10);
-    return {
-      metrics: [
-        ...manufacturer.metrics,
-        buildWarehouseAccuracyMetric(metricContext, warehouse.rows),
-      ],
-      breakdowns: [
-        buildCombinedInventoryBreakdown(
-          metricContext,
-          combined.facts,
-          combined.completeRequiredLocations,
+  // Executive Health and Operations Intelligence share this loader but not their
+  // workbook: the migration runs page by page, so Executive Health reads the new
+  // operations workbook while Operations Intelligence stays on the legacy one.
+  const operationsLoader =
+    (from: SheetsTabDataSource, page: SheetsDashboardPage) =>
+    async (value: OrchestrationContext) => {
+      const result = await from.readPageTabs(page, [
+        "Inventory_Snapshots",
+        "Inventory_Lots",
+        "Additional_Depletions",
+        "Production_Orders",
+        "Warehouse_Fulfillment",
+        "Packaging_Materials",
+        "Packaging_Inventory",
+        "Packaging_Orders",
+        "Packaging_Forecast",
+        "Location_Master",
+        "Sales_Forecast",
+        "COGS_By_SKU",
+        "Metric_Targets",
+        "SKU_Master",
+      ]);
+      const otif = selectExampleFallback(result, "Production_Orders", hasManufacturerOtifRows);
+      const manufacturerOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
+        rows.some(
+          (row) =>
+            typeof row["confirmed_date"] === "string" && typeof row["received_date"] === "string",
         ),
-        buildDepletionsBreakdown(metricContext, toDepletionRecords(depletions.rows)),
-        buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
-        buildInputCostMovementBreakdown(
-          context(value, syntheticSourceStatus(result.sourceStatus, costs.usedExample)),
-          costs.rows,
-          syntheticWarnings(result.warnings, costs.usedExample),
+      );
+      const incomingOrders = selectExampleFallback(result, "Production_Orders", (rows) =>
+        toProductionIncomingFacts(rows).facts.some(
+          ({ expectedArrivalDate }) =>
+            expectedArrivalDate === null ||
+            (expectedArrivalDate >= value.dataPeriod.startDate &&
+              expectedArrivalDate <= value.dataPeriod.endDate),
         ),
-        buildManufacturerOtifBreakdown(
-          context(value, syntheticSourceStatus(result.sourceStatus, otif.usedExample)),
-          otif.rows,
-          syntheticWarnings(result.warnings, otif.usedExample),
-        ),
-        manufacturer.performance,
-        packaging.stock,
-        packaging.projection,
-      ],
-      tables: [
-        buildInventoryLotsTable(
-          metricContext,
-          toInventoryLotFacts(result.tabs["Inventory_Lots"] ?? [], fallback),
-        ),
-        buildIncomingProductionTable(metricContext, incoming.facts),
-        manufacturer.timeline,
-        packaging.table,
-      ],
-      sourceStatuses: [status],
-      warnings: [
-        ...fallbackWarnings,
-        ...(incoming.excludedWithoutExpectedDate
-          ? [`PRODUCTION_ROWS_WITHOUT_EXPECTED_DATE:${incoming.excludedWithoutExpectedDate}`]
-          : []),
-      ],
+      );
+      const depletions = selectExampleFallback(result, "Additional_Depletions", (rows) =>
+        rows.some((row) => {
+          const date = row["movement_date"];
+          return (
+            typeof date === "string" &&
+            date >= value.dataPeriod.startDate &&
+            date <= value.dataPeriod.endDate
+          );
+        }),
+      );
+      const warehouse = selectExampleFallback(result, "Warehouse_Fulfillment", (rows) =>
+        rows.some((row) => {
+          const date = row["shipped_at"];
+          return (
+            typeof date === "string" &&
+            date.slice(0, 10) >= value.dataPeriod.startDate &&
+            date.slice(0, 10) <= value.dataPeriod.endDate
+          );
+        }),
+      );
+      const packagingMaterials = selectExampleFallback(result, "Packaging_Materials");
+      const packagingInventory = selectExampleFallback(result, "Packaging_Inventory");
+      const packagingOrders = selectExampleFallback(result, "Packaging_Orders");
+      const packagingForecast = selectExampleFallback(result, "Packaging_Forecast");
+      const costs = selectExampleFallback(result, "COGS_By_SKU", (rows) =>
+        hasComparableInputCostRows(rows, value.dataPeriod.endDate),
+      );
+      const usedExample = [
+        otif,
+        manufacturerOrders,
+        incomingOrders,
+        depletions,
+        warehouse,
+        packagingMaterials,
+        packagingInventory,
+        packagingOrders,
+        packagingForecast,
+        costs,
+      ].some(({ usedExample: used }) => used);
+      const status = syntheticSourceStatus(result.sourceStatus, usedExample);
+      const fallbackWarnings = syntheticWarnings(result.warnings, usedExample);
+      const metricContext = context(value, status);
+      const combined = toCombinedInventoryFacts(
+        result.tabs["Inventory_Snapshots"] ?? [],
+        result.tabs["Location_Master"] ?? [],
+      );
+      const incoming = toProductionIncomingFacts(incomingOrders.rows);
+      const manufacturer = buildManufacturerOperationsViews(metricContext, manufacturerOrders.rows);
+      const packaging = buildPackagingViews(
+        metricContext,
+        packagingMaterials.rows,
+        packagingInventory.rows,
+        packagingOrders.rows,
+        packagingForecast.rows,
+      );
+      const fallback = (result.sourceStatus.dataAsOf ?? result.sourceStatus.checkedAt).slice(0, 10);
+      // Purely sheet-derived, so it lives here rather than in the Shopify
+      // composite — a provider rate limit must not blank a cost the workbook
+      // can answer on its own.
+      const cogsPerBar = buildCogsPerBarViews(
+        context(value, syntheticSourceStatus(result.sourceStatus, costs.usedExample)),
+        costs.rows,
+        result.tabs["Metric_Targets"] ?? [],
+        selectExampleFallback(result, "SKU_Master").rows,
+        syntheticWarnings(result.warnings, costs.usedExample),
+      );
+      return {
+        metrics: [
+          ...manufacturer.metrics,
+          buildWarehouseAccuracyMetric(metricContext, warehouse.rows),
+          cogsPerBar.metric,
+        ],
+        breakdowns: [
+          buildCombinedInventoryBreakdown(
+            metricContext,
+            combined.facts,
+            combined.completeRequiredLocations,
+          ),
+          buildDepletionsBreakdown(metricContext, toDepletionRecords(depletions.rows)),
+          buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
+          buildInputCostMovementBreakdown(
+            context(value, syntheticSourceStatus(result.sourceStatus, costs.usedExample)),
+            costs.rows,
+            syntheticWarnings(result.warnings, costs.usedExample),
+          ),
+          buildManufacturerOtifBreakdown(
+            context(value, syntheticSourceStatus(result.sourceStatus, otif.usedExample)),
+            otif.rows,
+            syntheticWarnings(result.warnings, otif.usedExample),
+          ),
+          manufacturer.performance,
+          cogsPerBar.trend,
+          packaging.stock,
+          packaging.projection,
+        ],
+        tables: [
+          buildInventoryLotsTable(
+            metricContext,
+            toInventoryLotFacts(result.tabs["Inventory_Lots"] ?? [], fallback),
+          ),
+          buildIncomingProductionTable(metricContext, incoming.facts),
+          manufacturer.timeline,
+          packaging.table,
+        ],
+        sourceStatuses: [status],
+        warnings: [
+          ...fallbackWarnings,
+          ...(incoming.excludedWithoutExpectedDate
+            ? [`PRODUCTION_ROWS_WITHOUT_EXPECTED_DATE:${incoming.excludedWithoutExpectedDate}`]
+            : []),
+        ],
+      };
     };
-  });
+
+  const operations = new SheetsContributor(
+    "sheets-operations",
+    operationsLoader(source, "operations"),
+  );
+  const executive = executiveSource
+    ? new SheetsContributor("sheets-executive", operationsLoader(executiveSource, "executive"))
+    : null;
 
   const product = new SheetsContributor("sheets-product", async (value) => {
     const result = await source.readPageTabs("product", [
@@ -388,5 +417,14 @@ export function createSheetsApiContributors(
     };
   });
 
-  return [customers, operations, product, insights, marketing, growth, financial];
+  return [
+    customers,
+    operations,
+    ...(executive ? [executive] : []),
+    product,
+    insights,
+    marketing,
+    growth,
+    financial,
+  ];
 }

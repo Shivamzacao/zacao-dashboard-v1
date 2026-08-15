@@ -14,6 +14,18 @@ const FIXTURE = path.join(
   "tests/fixtures/manual-workbook/ZACAO_Dashboard_V1_Input_Workbook.xlsx",
 );
 
+/**
+ * Columns the contracts deliberately carry beyond the fixture. The fixture is the
+ * legacy workbook; the new operations workbook inserted week_ending into three
+ * tabs, and the contracts were widened to serve both during the migration.
+ * Everything outside this list must still match the fixture exactly.
+ */
+const INTENTIONAL_ADDITIONS: Readonly<Record<string, readonly string[]>> = {
+  Production_Orders: ["received_units", "week_ending"],
+  Inventory_Snapshots: ["week_ending"],
+  Additional_Depletions: ["week_ending"],
+};
+
 describe("generated manual-workbook contracts", () => {
   it("stays in sync with the fixture workbook's Data_Dictionary (drift guard)", async () => {
     const workbook = new ExcelJS.Workbook();
@@ -35,15 +47,12 @@ describe("generated manual-workbook contracts", () => {
     expect([...dictionaryColumns.keys()]).toEqual([...MANUAL_WORKBOOK_TABS]);
     for (const tab of MANUAL_WORKBOOK_TABS) {
       const fixtureColumns = dictionaryColumns.get(tab) ?? [];
-      const expectedColumns =
-        tab === "Production_Orders"
-          ? fixtureColumns.flatMap((column) =>
-              column === "received_date" ? [column, "received_units"] : [column],
-            )
-          : fixtureColumns;
-      expect(MANUAL_TAB_CONTRACTS[tab].columns.map(({ header }) => header)).toEqual(
-        expectedColumns,
-      );
+      const additions = INTENTIONAL_ADDITIONS[tab] ?? [];
+      const headers = MANUAL_TAB_CONTRACTS[tab].columns.map(({ header }) => header);
+      // Each documented addition must genuinely be present, so the carve-out
+      // cannot mask a column that was dropped.
+      for (const addition of additions) expect(headers).toContain(addition);
+      expect(headers.filter((header) => !additions.includes(header))).toEqual(fixtureColumns);
     }
   });
 
@@ -57,11 +66,17 @@ describe("generated manual-workbook contracts", () => {
     expect(byHeader.get("date")).toMatchObject({ kind: "date", required: true });
     expect(byHeader.get("created_at")).toMatchObject({ kind: "timestamp", required: false });
     expect(byHeader.get("platform")?.enumValues).toContain("meta");
+    // Widened for the new workbook: connector-owned and backend-owned rows carry
+    // their own source_status values alongside the original four.
     expect(byHeader.get("source_status")?.enumValues).toEqual([
       "production",
       "draft",
       "example",
       "invalid",
+      "shopify",
+      "klaviyo",
+      "backend",
+      "backend_pending",
     ]);
 
     const pipeline = MANUAL_TAB_CONTRACTS["Growth_Pipeline"];
@@ -69,7 +84,9 @@ describe("generated manual-workbook contracts", () => {
     expect(probability).toMatchObject({ kind: "percent", required: false });
 
     expect(CONTROLLED_LISTS["dashboard_channel"]).toContain("Unclassified");
+    // Both spellings stay valid: the legacy workbook says "SNAPL 3PL", the new one "SNAPL".
     expect(CONTROLLED_LISTS["warehouse"]).toContain("SNAPL 3PL");
+    expect(CONTROLLED_LISTS["warehouse"]).toContain("SNAPL");
     expect(MANUAL_TAB_CONTRACTS["SKU_Master"].businessKey).toEqual(["sku_id"]);
   });
 });

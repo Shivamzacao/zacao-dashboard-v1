@@ -167,14 +167,12 @@ export const metricCatalog = Object.freeze([
     v1Class: "conditional",
     valueKind: "money",
     sourceKeys: ["google_sheets"],
-    sources: "Fairafric cost records",
-    sourceFields:
-      "effective SKU cost, manufactured units, packaging, freight, landed-cost policy, target cost",
+    sources: "Fairafric cost records and approved per-bar targets",
+    sourceFields: "effective SKU landed cost, active SKU roster, target_landed_cogs_per_bar",
     calculation:
-      "Calculate landed manufacturing cost per sellable bar only from effective approved cost rows and a reconciled freight and packaging policy.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason:
-      "The effective per-bar cost policy, freight treatment, and target cost are not approved.",
+      "Landed cost per bar = production COGS + freight, per the confirmed spec §7.1 and Appendix C.4 build-up. Each effective period carries every active SKU's most recent landed record forward and blends them unweighted, disclosed as COGS_BLENDED_WITHOUT_SKU_MIX because sales mix is unavailable. The target series comes from active target_landed_cogs_per_bar rows and is flagged COGS_TARGET_EQUALS_BASELINE while it remains the C.4 initialisation value rather than an approved target.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "manufacturing.input_cost_movement",

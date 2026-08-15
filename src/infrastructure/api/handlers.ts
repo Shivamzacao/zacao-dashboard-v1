@@ -184,7 +184,8 @@ export const backendApiService = new BackendApiService(
   createBackendApiRuntime({
     shopify: loadShopifyRuntimeSettingsOrNull,
     klaviyo: loadKlaviyoConfigurationOrNull,
-    sheets: loadSheetsApiConfigurationOrNull,
+    sheets: () => loadSheetsApiConfigurationOrNull("dashboard"),
+    executiveSheets: () => loadSheetsApiConfigurationOrNull("executive"),
   }),
   now,
 );

@@ -190,6 +190,156 @@ describe("Operations Intelligence certified calculations", () => {
     expect(views.stockHealth.value).toEqual({ kind: "status", value: "1 of 1 in band" });
   });
 
+  /**
+   * The new operations workbook has no shopify_location_name column and maps only
+   * the 4-pack variant per SKU, while Shopify stocks the 10-pack. These cases pin
+   * the live shape: 2 packs of ZAC-DC-70-4PK plus 58 of ZAC-MC-42-10PK = 588 bars.
+   */
+  describe("reading a workbook without shopify_location_name", () => {
+    const shopifyStock = (sku: string, quantity: number) => ({
+      locationId: "1",
+      locationName: "SNAPL",
+      productTitle: "Bar",
+      variantTitle: "pack",
+      sku,
+      quantityName: "on_hand" as const,
+      quantity,
+      updatedAt: "2026-08-13T00:00:00Z",
+    });
+    const skuMaster = [
+      {
+        sku_id: "SKU-01",
+        canonical_name: "70% Cacao Dark Chocolate",
+        shopify_variant_sku: "ZAC-DC-70-4PK",
+        pack_size_bars: 4,
+        is_active: "yes",
+      },
+      {
+        sku_id: "SKU-02",
+        canonical_name: "42% Cacao Smooth Chocolate",
+        shopify_variant_sku: "ZAC-MC-42-4PK",
+        pack_size_bars: 4,
+        is_active: "yes",
+      },
+    ];
+    // Exactly the new workbook's Location_Master: names only, no provider column.
+    const locationMaster = [
+      { location_id: "LOC-01", location_name: "SNAPL", is_active: "yes" },
+      { location_id: "LOC-02", location_name: "YBYD", is_active: "yes" },
+    ];
+
+    it("joins on location_name and derives the unmapped pack variant", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-DC-70-4PK", 2), shopifyStock("ZAC-MC-42-10PK", 58)],
+        skuMaster,
+        locationMaster,
+        [],
+        [],
+      );
+      // 2 x 4 bars + 58 x 10 bars. Pack size comes from the variant suffix, not
+      // from the 4-pack sibling that supplied the SKU.
+      expect(views.shopify.metric.value).toEqual({ kind: "count", value: 588 });
+      expect(views.shopify.metric.warnings ?? []).not.toContain("UNMAPPED_SHOPIFY_LOCATION:SNAPL");
+    });
+
+    it("never counts a fallback-joined location twice", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-DC-70-4PK", 2)],
+        skuMaster,
+        locationMaster,
+        [
+          // The connector writes SNAPL back into the sheet; counting both the
+          // Shopify quantity and this row would double the same physical bars.
+          { snapshot_at: "2026-08-13", warehouse: "SNAPL", sku: "SKU-01", on_hand: 8 },
+          { snapshot_at: "2026-08-13", warehouse: "YBYD", sku: "SKU-01", on_hand: 6 },
+        ],
+        [],
+      );
+      expect(views.shopify.metric.value).toEqual({ kind: "count", value: 8 });
+      expect(views.combined.metric.value).toEqual({ kind: "quantity", value: 14 });
+    });
+
+    it("reports Shopify-only stock when no external location has ever been counted", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-DC-70-4PK", 2), shopifyStock("ZAC-MC-42-10PK", 58)],
+        skuMaster,
+        [
+          ...locationMaster,
+          // Seeded ready for use but never snapshotted; that is not missing data.
+          { location_id: "LOC-03", location_name: "Amazon FBA", is_active: "yes" },
+          { location_id: "LOC-04", location_name: "TikTok Shop External", is_active: "yes" },
+        ],
+        [],
+        [],
+      );
+      expect(views.combined.metric.value).toEqual({ kind: "quantity", value: 588 });
+    });
+
+    it("anchors the latest snapshot on external locations, not daily connector rows", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-DC-70-4PK", 2)],
+        skuMaster,
+        locationMaster,
+        [
+          // The connector writes SNAPL every day; the team counts YBYD weekly.
+          // Anchoring on the newest row of any kind would strand the YBYD count.
+          { snapshot_at: "2026-08-20", warehouse: "SNAPL", sku: "SKU-01", on_hand: 8 },
+          { snapshot_at: "2026-08-15", warehouse: "YBYD", sku: "SKU-01", on_hand: 6 },
+        ],
+        [],
+      );
+      expect(views.combined.metric.value).toEqual({ kind: "quantity", value: 14 });
+    });
+
+    it("still blocks the total when a counted location misses the latest snapshot", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-DC-70-4PK", 2)],
+        skuMaster,
+        [
+          ...locationMaster,
+          { location_id: "LOC-03", location_name: "Amazon FBA", is_active: "yes" },
+        ],
+        [
+          // Both have history, but only YBYD appears in the newest count.
+          { snapshot_at: "2026-08-08", warehouse: "Amazon FBA", sku: "SKU-01", on_hand: 4 },
+          { snapshot_at: "2026-08-08", warehouse: "YBYD", sku: "SKU-01", on_hand: 6 },
+          { snapshot_at: "2026-08-15", warehouse: "YBYD", sku: "SKU-01", on_hand: 5 },
+        ],
+        [],
+      );
+      expect(views.combined.metric.value).toBeNull();
+    });
+
+    it("leaves an ambiguous pack family unmapped instead of guessing", () => {
+      const views = buildOperationalInventoryViews(
+        context([source("shopify"), source("google_sheets")]),
+        [shopifyStock("ZAC-MC-42-10PK", 58)],
+        [
+          // Two canonical SKUs share the family, so no single sibling wins.
+          ...skuMaster,
+          {
+            sku_id: "SKU-05",
+            canonical_name: "Tigernut",
+            shopify_variant_sku: "ZAC-MC-42-6PK",
+            pack_size_bars: 6,
+            is_active: "yes",
+          },
+        ],
+        locationMaster,
+        [],
+        [],
+      );
+      // Unresolvable, so the metric is unavailable rather than a misleading zero.
+      expect(views.shopify.metric.value).toBeNull();
+      expect(views.shopify.metric.warnings ?? []).toContain("UNMAPPED_SHOPIFY_SKU:ZAC-MC-42-10PK");
+    });
+  });
+
   it("projects four complete packaging months without clamping negative stock", () => {
     const materials = [
       {

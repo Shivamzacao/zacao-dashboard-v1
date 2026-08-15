@@ -356,80 +356,89 @@ export function mapDashboardPageToDisplayData(
             value: numericValue(item.values[1] ?? null),
             secondaryValue: numericValue(item.values[0] ?? null),
           }))
-        : breakdown.metric.key === "finance.rebate_tiers" && breakdown.dimension === "rebate_tiers"
-          ? breakdown.items.map((item) => {
-              const warningNumber = (prefix: string) => {
-                const warning = item.warnings.find((value) => value.startsWith(prefix));
-                return warning ? Number(warning.slice(prefix.length)) : null;
-              };
-              const seriesValues = {
-                qualifyingUnits: warningNumber("QUALIFYING_UNITS:"),
-                baseCogs: warningNumber("BASE_COGS:"),
-                effectiveCogs: warningNumber("EFFECTIVE_COGS:"),
-                nextCogs: warningNumber("NEXT_COGS:"),
-              };
-              return {
-                key: item.key,
-                label: item.label,
-                value: numericValue(item.values[0] ?? null),
-                minValue: warningNumber("MIN_UNITS:"),
-                maxValue: warningNumber("MAX_UNITS:"),
-                status: item.warnings.includes("CURRENT") ? "current" : undefined,
-                seriesValues,
-              };
-            })
-          : ["packaging_material_band", "sku_stock_band"].includes(breakdown.dimension)
+        : // Actual landed cost plus the approved target as the dashed comparison line.
+          breakdown.dimension === "cogs_effective_period"
+          ? breakdown.items.map((item) => ({
+              key: item.key,
+              label: compactPeriodLabel(item.label),
+              value: numericValue(item.values[0] ?? null),
+              secondaryValue: numericValue(item.values[1] ?? null),
+            }))
+          : breakdown.metric.key === "finance.rebate_tiers" &&
+              breakdown.dimension === "rebate_tiers"
             ? breakdown.items.map((item) => {
                 const warningNumber = (prefix: string) => {
                   const warning = item.warnings.find((value) => value.startsWith(prefix));
                   return warning ? Number(warning.slice(prefix.length)) : null;
                 };
+                const seriesValues = {
+                  qualifyingUnits: warningNumber("QUALIFYING_UNITS:"),
+                  baseCogs: warningNumber("BASE_COGS:"),
+                  effectiveCogs: warningNumber("EFFECTIVE_COGS:"),
+                  nextCogs: warningNumber("NEXT_COGS:"),
+                };
                 return {
                   key: item.key,
                   label: item.label,
                   value: numericValue(item.values[0] ?? null),
-                  minValue: warningNumber("IDEAL_MIN:"),
-                  maxValue: warningNumber("IDEAL_MAX:"),
+                  minValue: warningNumber("MIN_UNITS:"),
+                  maxValue: warningNumber("MAX_UNITS:"),
+                  status: item.warnings.includes("CURRENT") ? "current" : undefined,
+                  seriesValues,
                 };
               })
-            : breakdown.dimension === "packaging_month_series"
+            : ["packaging_material_band", "sku_stock_band"].includes(breakdown.dimension)
               ? breakdown.items.map((item) => {
-                  const seriesValues: Record<string, number | null> = {};
-                  item.warnings.forEach((warning, index) => {
-                    if (!warning.startsWith("SERIES:")) return;
-                    const [, , label = ""] = warning.split(":");
-                    const normalized = label.toLowerCase();
-                    const key = normalized.includes("wrapper")
-                      ? "barWrappers"
-                      : normalized.includes("shipper")
-                        ? "shipperBoxes"
-                        : normalized.includes("carton")
-                          ? "cartons"
-                          : null;
-                    if (key) seriesValues[key] = numericValue(item.values[index] ?? null);
-                  });
-                  return {
-                    key: item.key,
-                    label: compactPeriodLabel(item.label),
-                    value: numericValue(item.values[0] ?? null),
-                    seriesValues,
+                  const warningNumber = (prefix: string) => {
+                    const warning = item.warnings.find((value) => value.startsWith(prefix));
+                    return warning ? Number(warning.slice(prefix.length)) : null;
                   };
-                })
-              : breakdown.dimension === "day_hour"
-                ? breakdown.items.map((item) => {
-                    const [day, hour] = item.key.split(":");
-                    return {
-                      key: item.key,
-                      label: hour ?? item.label,
-                      value: numericValue(item.values[0] ?? null),
-                      group: day ?? "",
-                    };
-                  })
-                : breakdown.items.map((item) => ({
+                  return {
                     key: item.key,
                     label: item.label,
                     value: numericValue(item.values[0] ?? null),
-                  }));
+                    minValue: warningNumber("IDEAL_MIN:"),
+                    maxValue: warningNumber("IDEAL_MAX:"),
+                  };
+                })
+              : breakdown.dimension === "packaging_month_series"
+                ? breakdown.items.map((item) => {
+                    const seriesValues: Record<string, number | null> = {};
+                    item.warnings.forEach((warning, index) => {
+                      if (!warning.startsWith("SERIES:")) return;
+                      const [, , label = ""] = warning.split(":");
+                      const normalized = label.toLowerCase();
+                      const key = normalized.includes("wrapper")
+                        ? "barWrappers"
+                        : normalized.includes("shipper")
+                          ? "shipperBoxes"
+                          : normalized.includes("carton")
+                            ? "cartons"
+                            : null;
+                      if (key) seriesValues[key] = numericValue(item.values[index] ?? null);
+                    });
+                    return {
+                      key: item.key,
+                      label: compactPeriodLabel(item.label),
+                      value: numericValue(item.values[0] ?? null),
+                      seriesValues,
+                    };
+                  })
+                : breakdown.dimension === "day_hour"
+                  ? breakdown.items.map((item) => {
+                      const [day, hour] = item.key.split(":");
+                      return {
+                        key: item.key,
+                        label: hour ?? item.label,
+                        value: numericValue(item.values[0] ?? null),
+                        group: day ?? "",
+                      };
+                    })
+                  : breakdown.items.map((item) => ({
+                      key: item.key,
+                      label: item.label,
+                      value: numericValue(item.values[0] ?? null),
+                    }));
   }
 
   const rowsByDataset: Record<string, readonly DisplayTableRow[]> = {};

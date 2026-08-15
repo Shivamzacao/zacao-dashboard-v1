@@ -39,11 +39,47 @@ interface CachedRead {
   readonly dataAsOf: string | null;
 }
 
+const SERIAL_EPOCH_MS = Date.UTC(1899, 11, 30);
+const SERIAL_MIN = 20_000;
+const SERIAL_MAX = 80_000;
+
+/**
+ * Date cells in the new workbook's hidden tabs are not date-formatted, so Sheets
+ * returns the underlying serial number. Convert only inside a plausible calendar
+ * window (roughly 1954–2119) so a genuine quantity is never rewritten as a date.
+ */
+function serialToDateParts(value: unknown): { date: string; time: string } | null {
+  const serial = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(serial) || serial < SERIAL_MIN || serial > SERIAL_MAX) return null;
+  const whole = Math.floor(serial);
+  const date = new Date(SERIAL_EPOCH_MS + whole * 86_400_000).toISOString().slice(0, 10);
+  const seconds = Math.round((serial - whole) * 86_400);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return {
+    date,
+    time: `${pad(Math.floor(seconds / 3_600))}:${pad(Math.floor((seconds % 3_600) / 60))}:${pad(seconds % 60)}`,
+  };
+}
+
+/** Dropdown labels are Title Case in the new workbook; contract enums are snake_case. */
+function foldEnumValue(value: string): string {
+  return value.trim().toLowerCase().replaceAll(/\s+/g, "_");
+}
+
 function normalizeCell(value: unknown, column: ManualColumnContract): string | number | null {
   if (value === null || value === undefined || value === "") return null;
   if (numericKinds.has(column.kind)) {
     const number = typeof value === "number" ? value : Number(value);
     return Number.isFinite(number) ? number : null;
+  }
+  if (column.kind === "date" || column.kind === "timestamp") {
+    const parts = serialToDateParts(value);
+    if (parts) return column.kind === "date" ? parts.date : `${parts.date}T${parts.time}Z`;
+  }
+  // Checkbox columns (is_active) come back as real booleans, not "yes"/"no".
+  if (typeof value === "boolean" && column.enumValues) {
+    const candidate = value ? "yes" : "no";
+    if (column.enumValues.includes(candidate)) return candidate;
   }
   const text = typeof value === "string" ? value.trim() : String(value);
   if (text === "") return null;
@@ -65,8 +101,45 @@ function normalizeCell(value: unknown, column: ManualColumnContract): string | n
     return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
   if (column.kind === "timestamp" && !TIMESTAMP.test(text)) return null;
-  if (column.enumValues && !column.enumValues.includes(text)) return null;
+  if (column.enumValues && !column.enumValues.includes(text)) {
+    const folded = foldEnumValue(text);
+    return column.enumValues.find((allowed) => foldEnumValue(allowed) === folded) ?? null;
+  }
   return text;
+}
+
+/**
+ * Statuses that mark a row as real data. Connector-owned rows (Shopify, Klaviyo,
+ * backend services) are as authoritative as team-entered production rows.
+ */
+const PRODUCTION_LIKE_STATUSES = new Set<string>([
+  PRODUCTION_SOURCE_STATUS,
+  "shopify",
+  "klaviyo",
+  "backend",
+]);
+
+/** Statuses whose rows must never reach the dashboard, drafts included. */
+const IGNORED_ROW_STATUSES = new Set<string>(["draft", "invalid", "backend_pending"]);
+
+/**
+ * Detects a pre-seeded formula row. Hidden tabs ship ~150 scaffolding rows per
+ * tab that already carry a record id, a constant enum such as cost_basis
+ * "landed", provenance, and formula cells that resolve to 0 — so "every cell is
+ * blank" does not identify them. What they never carry is identifying content:
+ * the required dates and amounts. A row missing only *some* of those is a real
+ * data-entry problem and still warns.
+ */
+function isTemplateRow(
+  contract: (typeof MANUAL_TAB_CONTRACTS)[ManualWorkbookTab],
+  normalized: Readonly<Record<string, string | number | boolean | null>>,
+): boolean {
+  const businessKey = new Set<string>(contract.businessKey);
+  const identifying = contract.columns.filter(
+    (column) => column.required && !businessKey.has(column.header) && !column.enumValues,
+  );
+  if (identifying.length === 0) return false;
+  return identifying.every((column) => normalized[column.header] === null);
 }
 
 function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknown[])[]) {
@@ -83,7 +156,12 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
   // the values beneath it are the contract's record identifier.
   if (headers[0] === "" && contract.columns[0]) headers[0] = contract.columns[0].header;
   const headerIndexes = new Map(headers.map((header, index) => [header, index]));
-  const missing = contract.columns.filter((column) => !headerIndexes.has(column.header));
+  // A renamed column (week_start -> week_ending) satisfies its contract through
+  // an alias, so one contract can serve both workbooks during the migration.
+  const columnIndex = (column: ManualColumnContract): number | undefined =>
+    headerIndexes.get(column.header) ??
+    (column.aliases ?? []).map((alias) => headerIndexes.get(alias)).find((i) => i !== undefined);
+  const missing = contract.columns.filter((column) => columnIndex(column) === undefined);
   if (missing.some((column) => column.required)) {
     return {
       rows: [] as SheetRecord[],
@@ -102,18 +180,27 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
     const normalized: Record<string, string | number | boolean | null> = {};
     let valid = true;
     for (const column of contract.columns) {
-      const cellIndex = headerIndexes.get(column.header);
+      const cellIndex = columnIndex(column);
       const value = normalizeCell(cellIndex === undefined ? null : raw[cellIndex], column);
       normalized[column.header] = value;
       if (column.required && value === null) valid = false;
     }
+    const rowStatus = normalized[SOURCE_STATUS_COLUMN];
+    // Rows the workbook has explicitly disowned never reach validation: they are
+    // neither production data nor example fallback, so warning about them would
+    // report a problem the team cannot act on.
+    if (typeof rowStatus === "string" && IGNORED_ROW_STATUSES.has(rowStatus)) continue;
     if (!valid) {
-      warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 1}`);
+      // Hidden tabs are pre-filled with ~150 formula-template rows that carry only
+      // a record id and provenance constants. They are scaffolding, not bad data.
+      if (!isTemplateRow(contract, normalized)) {
+        warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 1}`);
+      }
       continue;
     }
-    const rowStatus = normalized[SOURCE_STATUS_COLUMN];
     const target =
-      rowStatus === null || rowStatus === PRODUCTION_SOURCE_STATUS
+      rowStatus === null ||
+      (typeof rowStatus === "string" && PRODUCTION_LIKE_STATUSES.has(rowStatus))
         ? rows
         : rowStatus === "example"
           ? exampleRows

@@ -91,7 +91,13 @@ export function planOperationsWorkbookMigration(
   );
 
   const extensionHeaders = productionOrders.slice(productionOrdersBaseHeaders.length);
-  const allowedExtensions = new Set<string>(OPERATIONS_PRODUCTION_ORDER_HEADERS);
+  // week_ending is tolerated but never appended: the new operations workbook
+  // carries it, the legacy one does not, and this planner only writes the
+  // headers in OPERATIONS_PRODUCTION_ORDER_HEADERS.
+  const allowedExtensions = new Set<string>([
+    ...OPERATIONS_PRODUCTION_ORDER_HEADERS,
+    "week_ending",
+  ]);
   if (
     new Set(extensionHeaders).size !== extensionHeaders.length ||
     extensionHeaders.some((header) => !allowedExtensions.has(header))

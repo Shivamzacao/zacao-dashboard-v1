@@ -253,3 +253,301 @@ describe("SheetsApiClient direct Google source", () => {
     expect(result.tabs["Inventory_Snapshots"]).toHaveLength(1);
   });
 });
+
+/**
+ * The new operations workbook returns values in shapes the legacy workbook never
+ * used: unformatted date serials, real checkbox booleans, Title Case dropdowns,
+ * connector-owned source_status values, and ~150 pre-seeded formula rows per tab.
+ */
+describe("SheetsApiClient reading the new operations workbook", () => {
+  const executiveWorkbookId = "1RYJFlh6QqzSTz8-0BDxVzqv2ghj1IaRFzF-0pi5ab4w";
+
+  const executiveConfiguration = () =>
+    parseSheetsApiConfiguration({ workbookId: executiveWorkbookId, ...credential }, "executive");
+
+  function executiveFetch(titles: readonly string[], rows: readonly (readonly unknown[])[]) {
+    return vi.fn(async (url: string | URL | Request) => {
+      if (String(url).includes("values:batchGet")) {
+        return Response.json({ valueRanges: [{ values: rows }] });
+      }
+      return Response.json({
+        spreadsheetId: executiveWorkbookId,
+        properties: {
+          title: "ZACAO Weekly Operations Workbook - Final",
+          timeZone: "America/New_York",
+        },
+        sheets: titles.map((title) => ({
+          properties: { title, gridProperties: { rowCount: 500, columnCount: 30 } },
+        })),
+      });
+    });
+  }
+
+  const read = async (tab: string, rows: readonly (readonly unknown[])[]) => {
+    const client = new SheetsApiClient(executiveConfiguration(), {
+      fetch: executiveFetch([tab], rows) as typeof fetch,
+      accessToken: async () => "token",
+    });
+    return client.readPageTabs("executive", [tab]);
+  };
+
+  const inventoryHeaders = [
+    "record_id",
+    "snapshot_at",
+    "week_ending",
+    "warehouse",
+    "sku",
+    "on_hand",
+    "committed",
+    "available",
+    "damaged",
+    "incoming",
+    "source_status",
+    "data_as_of",
+    "created_at",
+    "updated_at",
+    "updated_by",
+    "source_reference",
+    "notes",
+  ];
+
+  it("converts Google date serials and keeps connector-owned rows live", async () => {
+    // The two real rows in the live workbook: Shopify-fed SNAPL stock.
+    const result = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      ["INV-SHOP-1", 46247, 46249, "SNAPL", "SKU-01", 8, 8, 0, 0, 0, "shopify", 46247],
+      ["INV-SHOP-2", 46247, 46249, "SNAPL", "SKU-02", 580, 20, 560, 0, 0, "shopify", 46247],
+    ]);
+
+    expect(result.warnings).toEqual([]);
+    expect(result.tabs["Inventory_Snapshots"]).toHaveLength(2);
+    expect(result.tabs["Inventory_Snapshots"]?.[0]).toMatchObject({
+      snapshot_at: "2026-08-13T00:00:00Z",
+      week_ending: "2026-08-15",
+      data_as_of: "2026-08-13",
+      warehouse: "SNAPL",
+      on_hand: 8,
+    });
+  });
+
+  it("leaves genuine quantities alone when a numeric column looks like a serial", async () => {
+    const result = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      ["INV-1", 46247, 46249, "SNAPL", "SKU-02", 46_223, 0, 46_223, 0, 0, "production", 46247],
+    ]);
+    // on_hand is an integer column, so the serial window must not touch it.
+    expect(result.tabs["Inventory_Snapshots"]?.[0]).toMatchObject({ on_hand: 46_223 });
+  });
+
+  it("folds Title Case dropdowns onto the contract's snake_case enums", async () => {
+    const result = await read("Additional_Depletions", [
+      [
+        "record_id",
+        "movement_date",
+        "week_ending",
+        "warehouse",
+        "sku",
+        "quantity",
+        "reason",
+        "recipient_or_project",
+        "reference",
+        "source_status",
+      ],
+      ["DEP-1", 46247, 46249, "SNAPL", "SKU-01", 12, "Sampling", "Team", "REF-1", "production"],
+    ]);
+    expect(result.warnings).toEqual([]);
+    expect(result.tabs["Additional_Depletions"]?.[0]).toMatchObject({ reason: "sampling" });
+  });
+
+  it("reads checkbox booleans as yes/no enum values", async () => {
+    const result = await read("Location_Master", [
+      ["location_id", "location_name", "location_type", "is_active", "source_status"],
+      ["LOC-01", "SNAPL", "warehouse", true, "shopify"],
+      ["LOC-02", "YBYD", "warehouse", false, "production"],
+    ]);
+    expect(result.tabs["Location_Master"]?.[0]).toMatchObject({ is_active: "yes" });
+    expect(result.tabs["Location_Master"]?.[1]).toMatchObject({ is_active: "no" });
+  });
+
+  it("drops draft and backend_pending rows silently rather than warning", async () => {
+    const result = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      ["INV-1", 46247, 46249, "SNAPL", "SKU-01", 8, 0, 8, 0, 0, "production", 46247],
+      ["INV-2", 46247, 46249, "SNAPL", "SKU-02", 99, 0, 99, 0, 0, "draft", 46247],
+      ["INV-3", 46247, 46249, "SNAPL", "SKU-03", 77, 0, 77, 0, 0, "backend_pending", 46247],
+    ]);
+    // A draft row must never reach the dashboard, and it is not a data problem
+    // the team can act on, so it must not raise a warning either.
+    expect(result.tabs["Inventory_Snapshots"]).toHaveLength(1);
+    expect(result.tabs["Inventory_Snapshots"]?.[0]).toMatchObject({ sku: "SKU-01" });
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("skips pre-seeded formula template rows without flooding warnings", async () => {
+    const result = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      ["INV-1", 46247, 46249, "SNAPL", "SKU-01", 8, 0, 8, 0, 0, "production", 46247],
+      // Scaffolding: identifier and provenance only, no business values.
+      [
+        "INV-2",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "production",
+        "",
+        "",
+        "",
+        "",
+        "Inventory Input!A7",
+      ],
+      [
+        "INV-3",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "production",
+        "",
+        "",
+        "",
+        "",
+        "Inventory Input!A8",
+      ],
+    ]);
+    expect(result.tabs["Inventory_Snapshots"]).toHaveLength(1);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("skips template rows that carry constant enums and zero-valued formulas", async () => {
+    // Verbatim shapes from the live workbook: scaffolding rows are not blank —
+    // they resolve a constant enum and a formula that lands on 0.
+    const inventory = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      [
+        "INV-EXT-1",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        "",
+        0,
+        "production",
+        "",
+        "",
+        "",
+        "",
+        "Inventory Input!A7:N7",
+      ],
+    ]);
+    expect(inventory.tabs["Inventory_Snapshots"]).toHaveLength(0);
+    expect(inventory.warnings).toEqual([]);
+
+    const cogs = await read("COGS_By_SKU", [
+      [
+        "record_id",
+        "sku",
+        "effective_from",
+        "effective_to",
+        "cost_basis",
+        "production_cost_usd",
+        "packaging_usd",
+        "freight_usd",
+        "fulfillment_usd",
+        "total_unit_cost_usd",
+        "source_status",
+        "data_as_of",
+        "created_at",
+        "updated_at",
+        "updated_by",
+        "source_reference",
+        "notes",
+      ],
+      [
+        "COGS-BASE-1",
+        "SKU-01",
+        46_223,
+        "",
+        "landed",
+        1.501,
+        0.09,
+        0.8,
+        0,
+        2.301,
+        "production",
+        46_247,
+      ],
+      [
+        "COGS-PO-1",
+        "",
+        "",
+        "",
+        "landed",
+        "",
+        "",
+        "",
+        0,
+        "",
+        "production",
+        "",
+        "",
+        "",
+        "",
+        "Production Input!A6:R6",
+      ],
+    ]);
+    expect(cogs.tabs["COGS_By_SKU"]).toHaveLength(1);
+    expect(cogs.tabs["COGS_By_SKU"]?.[0]).toMatchObject({
+      sku: "SKU-01",
+      effective_from: "2026-07-20",
+      total_unit_cost_usd: 2.301,
+    });
+    expect(cogs.warnings).toEqual([]);
+  });
+
+  it("still reports a genuinely incomplete row as invalid", async () => {
+    const result = await read("Inventory_Snapshots", [
+      inventoryHeaders,
+      // Real business content but no warehouse: a data-entry problem worth surfacing.
+      ["INV-1", 46247, 46249, "", "SKU-01", 8, 0, 8, 0, 0, "production", 46247],
+    ]);
+    expect(result.tabs["Inventory_Snapshots"]).toHaveLength(0);
+    expect(result.warnings).toEqual(["SHEETS_ROW_INVALID:Inventory_Snapshots:2"]);
+  });
+
+  it("accepts week_ending as the alias for the renamed Sales_Forecast week_start", async () => {
+    const result = await read("Sales_Forecast", [
+      [
+        "record_id",
+        "forecast_version",
+        "week_ending",
+        "sku",
+        "channel",
+        "forecast_units",
+        "forecast_revenue_usd",
+        "status",
+        "source_status",
+      ],
+      ["FC-1", "Backend Sales", 46249, "SKU-01", "DTC (Shopify)", 100, 450, "approved", "backend"],
+    ]);
+    // Without the alias the required header is missing and the whole tab drops.
+    expect(result.warnings).not.toContain("SHEETS_TAB_INVALID:Sales_Forecast");
+    expect(result.tabs["Sales_Forecast"]?.[0]).toMatchObject({
+      week_start: "2026-08-15",
+      forecast_units: 100,
+    });
+  });
+});

@@ -461,6 +461,39 @@ export function buildPackagingViews(
   return { stock, projection, table };
 }
 
+interface SkuPackMapping {
+  readonly sku: string;
+  readonly name: string;
+  readonly pack: number;
+}
+
+const PACK_VARIANT_SKU = /^(.+)-(\d+)PK$/i;
+
+/**
+ * Resolves a pack variant that SKU_Master does not map explicitly, e.g. Shopify
+ * stocks ZAC-MC-42-10PK while the sheet only maps the 4-pack. The family prefix
+ * must resolve to exactly one canonical SKU, and the pack size comes from the
+ * variant's own suffix — so the derived mapping can never silently pick the wrong
+ * product or the wrong bar count. Explicit mappings are tried first and always win.
+ */
+function resolvePackVariantSibling(
+  shopifySku: string,
+  mappings: ReadonlyMap<string, readonly SkuPackMapping[]>,
+): readonly SkuPackMapping[] | undefined {
+  const match = PACK_VARIANT_SKU.exec(shopifySku);
+  const family = match?.[1];
+  const pack = Number(match?.[2]);
+  if (!family || !Number.isInteger(pack) || pack <= 0) return undefined;
+  const siblings = new Map<string, SkuPackMapping>();
+  for (const [candidate, candidateMappings] of mappings) {
+    if (PACK_VARIANT_SKU.exec(candidate)?.[1]?.toLowerCase() !== family.toLowerCase()) continue;
+    for (const mapping of candidateMappings) siblings.set(mapping.sku, mapping);
+  }
+  if (siblings.size !== 1) return undefined;
+  const sibling = [...siblings.values()][0];
+  return sibling ? [{ sku: sibling.sku, name: sibling.name, pack }] : undefined;
+}
+
 export function buildOperationalInventoryViews(
   context: MetricServiceContext,
   shopifyInventory: readonly InventoryFact[],
@@ -488,15 +521,32 @@ export function buildOperationalInventoryViews(
     mappings.set(shopifySku, [...(mappings.get(shopifySku) ?? []), { sku, name, pack }]);
   }
   const activeLocations = locationMaster.filter((row) => text(row, "is_active") !== "no");
+  const shopifyLocationNames = new Set(shopifyInventory.map(({ locationName }) => locationName));
   const shopifyLocationMappings = new Map<string, string[]>();
+  // Locations joined to Shopify by name alone, because the sheet has no explicit
+  // provider column. Tracked so their snapshot rows are not also counted as
+  // external stock, which would double the same physical units.
+  const fallbackMappedLocations = new Set<string>();
   for (const row of activeLocations) {
     const providerName = text(row, "shopify_location_name");
     const location = text(row, "location_name");
-    if (providerName && location) {
+    if (!location) continue;
+    if (providerName) {
       shopifyLocationMappings.set(providerName, [
         ...(shopifyLocationMappings.get(providerName) ?? []),
         location,
       ]);
+      continue;
+    }
+    // The new workbook dropped shopify_location_name. Fall back to the plain
+    // location name, but only where Shopify actually reports one by that name —
+    // otherwise a purely manual location like YBYD looks like a broken join.
+    if (shopifyLocationNames.has(location)) {
+      shopifyLocationMappings.set(location, [
+        ...(shopifyLocationMappings.get(location) ?? []),
+        location,
+      ]);
+      fallbackMappedLocations.add(location);
     }
   }
   const warnings: string[] = [];
@@ -507,7 +557,9 @@ export function buildOperationalInventoryViews(
   >();
   for (const fact of shopifyInventory.filter(({ quantityName }) => quantityName === "on_hand")) {
     if (fact.quantity <= 0) continue;
-    const skuMappings = fact.sku ? mappings.get(fact.sku) : undefined;
+    const skuMappings = fact.sku
+      ? (mappings.get(fact.sku) ?? resolvePackVariantSibling(fact.sku, mappings))
+      : undefined;
     const locations = shopifyLocationMappings.get(fact.locationName);
     if (!skuMappings || skuMappings.length !== 1) {
       warnings.push(`UNMAPPED_SHOPIFY_SKU:${fact.sku ?? "blank"}`);
@@ -567,18 +619,22 @@ export function buildOperationalInventoryViews(
   const nonShopifyLocations = activeLocations
     .filter((row) => !text(row, "shopify_location_name"))
     .map((row) => text(row, "location_name"))
-    .filter((value): value is string => value !== null);
-  const snapshotDates = snapshots
-    .map((row) => text(row, "snapshot_at")?.slice(0, 10) ?? null)
     .filter((value): value is string => value !== null)
-    .sort();
-  const snapshotDate = snapshotDates.at(-1) ?? null;
+    .filter((location) => !fallbackMappedLocations.has(location));
+  // Anchor the latest snapshot on external locations only. Connector-fed SNAPL
+  // rows arrive daily and would otherwise make every weekly manual count look
+  // stale, permanently emptying the external side of the total.
+  const nonShopifySnapshots = snapshots.filter((row) =>
+    nonShopifyLocations.includes(text(row, "warehouse") ?? ""),
+  );
+  const snapshotDate =
+    nonShopifySnapshots
+      .map((row) => text(row, "snapshot_at")?.slice(0, 10) ?? null)
+      .filter((value): value is string => value !== null)
+      .sort()
+      .at(-1) ?? null;
   const nonShopifyRows = snapshotDate
-    ? snapshots.filter(
-        (row) =>
-          text(row, "snapshot_at")?.slice(0, 10) === snapshotDate &&
-          nonShopifyLocations.includes(text(row, "warehouse") ?? ""),
-      )
+    ? nonShopifySnapshots.filter((row) => text(row, "snapshot_at")?.slice(0, 10) === snapshotDate)
     : [];
   const activeSkuIds = new Set(
     activeSkus.map((row) => text(row, "sku_id")).filter((value): value is string => value !== null),
@@ -587,9 +643,18 @@ export function buildOperationalInventoryViews(
     (row) => `${text(row, "warehouse") ?? ""}:${text(row, "sku") ?? ""}`,
   );
   const presentNonShopify = new Set(nonShopifyRows.map((row) => text(row, "warehouse")));
+  // Only locations that have ever been counted are required at the latest date.
+  // A location seeded in Location_Master but never snapshotted is not missing
+  // data, and with no external history at all the Shopify figure stands alone.
+  const locationsWithHistory = new Set(
+    nonShopifySnapshots
+      .map((row) => text(row, "warehouse"))
+      .filter((value): value is string => value !== null),
+  );
   const snapshotComplete =
-    snapshotDate !== null &&
-    nonShopifyLocations.every((location) => presentNonShopify.has(location)) &&
+    nonShopifyLocations
+      .filter((location) => locationsWithHistory.has(location))
+      .every((location) => presentNonShopify.has(location)) &&
     new Set(snapshotKeys).size === snapshotKeys.length &&
     nonShopifyRows.every((row) => {
       const sku = text(row, "sku");
