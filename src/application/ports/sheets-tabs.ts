@@ -16,7 +16,16 @@ export interface SheetsTabReadResult {
 }
 
 export type SheetsDashboardPage =
-  "insights" | "product" | "finance" | "marketing" | "growth" | "operations" | "customers";
+  | "insights"
+  | "product"
+  | "finance"
+  | "marketing"
+  | "growth"
+  | "operations"
+  // Executive Health reads the same operations tabs but from the new workbook, so
+  // it needs its own key to keep the two reads in separate cache entries.
+  | "executive"
+  | "customers";
 
 /** Read-only, server-side source for normalized Google Sheet tab records. */
 export interface SheetsTabDataSource {

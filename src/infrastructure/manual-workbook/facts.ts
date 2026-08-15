@@ -34,21 +34,42 @@ export interface CombinedInventoryMapping {
 }
 
 /**
- * Latest snapshot date only; coverage is complete when every required active
- * warehouse (from Location_Master) appears at that date (ADR-003).
+ * Location_Master is the roster of countable warehouses. Older workbooks predate
+ * a populated master, so the ADR-003 pair stays as a floor — plus "SNAPL", the
+ * new workbook's name for the 3PL the legacy one calls "SNAPL 3PL".
+ */
+const FALLBACK_COUNTABLE_WAREHOUSES = new Set(["SNAPL 3PL", "SNAPL", "YBYD"]);
+
+/**
+ * Latest valid snapshot **per location**, never one global MAX across locations
+ * (spec §5.3): connector-fed locations are written daily while the team counts
+ * external stock weekly, so a shared cut-off would permanently strand whichever
+ * side updates less often. Coverage is complete when every countable location
+ * that has ever reported contributes its own most recent reading.
  */
 export function toCombinedInventoryFacts(
   snapshots: readonly SheetRecord[],
   locationMaster: readonly SheetRecord[],
 ): CombinedInventoryMapping {
-  const requiredNames = new Set(["SNAPL 3PL", "YBYD"]);
+  const activeLocations = new Set(
+    locationMaster.flatMap((record) => {
+      const name = text(record, "location_name");
+      const active = text(record, "is_active");
+      return name && active === "yes" ? [name] : [];
+    }),
+  );
+  const countable = (warehouse: string) =>
+    activeLocations.size > 0
+      ? activeLocations.has(warehouse)
+      : FALLBACK_COUNTABLE_WAREHOUSES.has(warehouse);
+
   const byBusinessKey = new Map<string, CombinedInventoryFact[]>();
   for (const record of snapshots) {
     const snapshotAt = text(record, "snapshot_at");
     const warehouse = text(record, "warehouse");
     const sku = text(record, "sku");
     const onHand = numeric(record, "on_hand");
-    if (!snapshotAt || !warehouse || !sku || onHand === null || !requiredNames.has(warehouse)) {
+    if (!snapshotAt || !warehouse || !sku || onHand === null || !countable(warehouse)) {
       continue;
     }
     const key = `${snapshotAt}:${warehouse}:${sku}`;
@@ -60,25 +81,19 @@ export function toCombinedInventoryFacts(
     const first = duplicates[0];
     return quantities.size === 1 && first ? [first] : [];
   });
-  const latestDate = dated
-    .map(({ asOfDate }) => asOfDate)
-    .sort()
-    .at(-1);
-  const facts = latestDate ? dated.filter(({ asOfDate }) => asOfDate === latestDate) : [];
-
-  const activeLocations = new Set(
-    locationMaster.flatMap((record) => {
-      const name = text(record, "location_name");
-      const active = text(record, "is_active");
-      return name && active === "yes" ? [name] : [];
-    }),
+  const latestByWarehouse = new Map<string, string>();
+  for (const { warehouse, asOfDate } of dated) {
+    const previous = latestByWarehouse.get(warehouse);
+    if (previous === undefined || asOfDate > previous) latestByWarehouse.set(warehouse, asOfDate);
+  }
+  const facts = dated.filter(
+    ({ warehouse, asOfDate }) => latestByWarehouse.get(warehouse) === asOfDate,
   );
-  const requiredWarehouses = [...requiredNames].filter((name) => activeLocations.has(name));
+
   const presentWarehouses = new Set(facts.map(({ warehouse }) => warehouse));
   const completeRequiredLocations =
     facts.length > 0 &&
-    requiredWarehouses.length > 0 &&
-    requiredWarehouses.every((warehouse) => presentWarehouses.has(warehouse));
+    [...latestByWarehouse.keys()].every((warehouse) => presentWarehouses.has(warehouse));
   return { facts, completeRequiredLocations };
 }
 

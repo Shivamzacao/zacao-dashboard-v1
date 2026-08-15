@@ -9,6 +9,24 @@ import {
 } from "@/src/infrastructure/google/config";
 
 export const DEFAULT_DASHBOARD_WORKBOOK_ID = "1vOkSXadR0WAFmUgWUvZmxmOoxVs5fxYkIW3GT2FmjjA";
+export const DEFAULT_EXECUTIVE_WORKBOOK_ID = "1RYJFlh6QqzSTz8-0BDxVzqv2ghj1IaRFzF-0pi5ab4w";
+
+/**
+ * Which allowlisted workbook a configuration is for. The migration runs page by
+ * page, so both workbooks are read at once: "executive" is the new operations
+ * workbook, "dashboard" is the legacy one every unmigrated page still uses.
+ */
+export type SheetsWorkbookVariant = "dashboard" | "executive";
+
+const APPROVED_BY_VARIANT: Readonly<Record<SheetsWorkbookVariant, string>> = {
+  dashboard: APPROVED_GOOGLE_FILE_IDS.dashboardWorkbook,
+  executive: APPROVED_GOOGLE_FILE_IDS.executiveWorkbook,
+};
+
+const DEFAULT_BY_VARIANT: Readonly<Record<SheetsWorkbookVariant, string>> = {
+  dashboard: DEFAULT_DASHBOARD_WORKBOOK_ID,
+  executive: DEFAULT_EXECUTIVE_WORKBOOK_ID,
+};
 
 export interface SheetsApiConfiguration {
   readonly workbookId: string;
@@ -17,21 +35,24 @@ export interface SheetsApiConfiguration {
   readonly rowChunkSize: number;
 }
 
-export function parseSheetsApiConfiguration(input: {
-  readonly workbookId?: string;
-  readonly projectId?: string;
-  readonly clientEmail?: string;
-  readonly privateKey?: string;
-  readonly timeoutMs?: string;
-  readonly rowChunkSize?: string;
-}): SheetsApiConfiguration {
+export function parseSheetsApiConfiguration(
+  input: {
+    readonly workbookId?: string;
+    readonly projectId?: string;
+    readonly clientEmail?: string;
+    readonly privateKey?: string;
+    readonly timeoutMs?: string;
+    readonly rowChunkSize?: string;
+  },
+  variant: SheetsWorkbookVariant = "dashboard",
+): SheetsApiConfiguration {
   const workbookId = z
     .string()
     .trim()
     .min(1)
-    .parse(input.workbookId ?? DEFAULT_DASHBOARD_WORKBOOK_ID);
-  if (workbookId !== APPROVED_GOOGLE_FILE_IDS.dashboardWorkbook) {
-    throw new Error("Configured dashboard workbook ID is not allowlisted");
+    .parse(input.workbookId ?? DEFAULT_BY_VARIANT[variant]);
+  if (workbookId !== APPROVED_BY_VARIANT[variant]) {
+    throw new Error(`Configured ${variant} workbook ID is not allowlisted`);
   }
   const timeoutMs = input.timeoutMs === undefined ? 30_000 : Number(input.timeoutMs);
   const rowChunkSize = input.rowChunkSize === undefined ? 1_000 : Number(input.rowChunkSize);
@@ -53,7 +74,14 @@ export function parseSheetsApiConfiguration(input: {
   };
 }
 
-export function loadSheetsApiConfigurationOrNull(): SheetsApiConfiguration | null {
+const WORKBOOK_ENV_BY_VARIANT: Readonly<Record<SheetsWorkbookVariant, string>> = {
+  dashboard: "GOOGLE_SHEETS_DASHBOARD_WORKBOOK_ID",
+  executive: "GOOGLE_SHEETS_EXECUTIVE_WORKBOOK_ID",
+};
+
+export function loadSheetsApiConfigurationOrNull(
+  variant: SheetsWorkbookVariant = "dashboard",
+): SheetsApiConfiguration | null {
   const credentialValues = [
     process.env["GOOGLE_PROJECT_ID"],
     process.env["GOOGLE_CLIENT_EMAIL"],
@@ -64,26 +92,28 @@ export function loadSheetsApiConfigurationOrNull(): SheetsApiConfiguration | nul
     const value = process.env[name];
     return value === undefined ? {} : { [name]: value };
   };
+  const workbookEnv = WORKBOOK_ENV_BY_VARIANT[variant];
   const values = {
-    ...optional("GOOGLE_SHEETS_DASHBOARD_WORKBOOK_ID"),
+    ...optional(workbookEnv),
     ...optional("GOOGLE_PROJECT_ID"),
     ...optional("GOOGLE_CLIENT_EMAIL"),
     ...optional("GOOGLE_PRIVATE_KEY"),
     ...optional("GOOGLE_SHEETS_REQUEST_TIMEOUT_MS"),
     ...optional("GOOGLE_SHEETS_ROW_CHUNK_SIZE"),
   };
-  return parseSheetsApiConfiguration({
-    ...(values["GOOGLE_SHEETS_DASHBOARD_WORKBOOK_ID"]
-      ? { workbookId: values["GOOGLE_SHEETS_DASHBOARD_WORKBOOK_ID"] }
-      : {}),
-    ...(values["GOOGLE_PROJECT_ID"] ? { projectId: values["GOOGLE_PROJECT_ID"] } : {}),
-    ...(values["GOOGLE_CLIENT_EMAIL"] ? { clientEmail: values["GOOGLE_CLIENT_EMAIL"] } : {}),
-    ...(values["GOOGLE_PRIVATE_KEY"] ? { privateKey: values["GOOGLE_PRIVATE_KEY"] } : {}),
-    ...(values["GOOGLE_SHEETS_REQUEST_TIMEOUT_MS"]
-      ? { timeoutMs: values["GOOGLE_SHEETS_REQUEST_TIMEOUT_MS"] }
-      : {}),
-    ...(values["GOOGLE_SHEETS_ROW_CHUNK_SIZE"]
-      ? { rowChunkSize: values["GOOGLE_SHEETS_ROW_CHUNK_SIZE"] }
-      : {}),
-  });
+  return parseSheetsApiConfiguration(
+    {
+      ...(values[workbookEnv] ? { workbookId: values[workbookEnv] } : {}),
+      ...(values["GOOGLE_PROJECT_ID"] ? { projectId: values["GOOGLE_PROJECT_ID"] } : {}),
+      ...(values["GOOGLE_CLIENT_EMAIL"] ? { clientEmail: values["GOOGLE_CLIENT_EMAIL"] } : {}),
+      ...(values["GOOGLE_PRIVATE_KEY"] ? { privateKey: values["GOOGLE_PRIVATE_KEY"] } : {}),
+      ...(values["GOOGLE_SHEETS_REQUEST_TIMEOUT_MS"]
+        ? { timeoutMs: values["GOOGLE_SHEETS_REQUEST_TIMEOUT_MS"] }
+        : {}),
+      ...(values["GOOGLE_SHEETS_ROW_CHUNK_SIZE"]
+        ? { rowChunkSize: values["GOOGLE_SHEETS_ROW_CHUNK_SIZE"] }
+        : {}),
+    },
+    variant,
+  );
 }

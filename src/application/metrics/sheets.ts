@@ -7,6 +7,7 @@ import {
 } from "@/src/application/view-models";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 import { usdFromDecimalNumber } from "@/src/domain/metrics/calculations";
+import { usd } from "@/src/domain/utilities/money";
 
 import type { ForecastVarianceFact, MetricServiceContext, WeeklyProductUnitsFact } from "./types";
 import { createMetricViewModel } from "./view-model";
@@ -507,6 +508,148 @@ function costPeriodAverages(records: readonly SheetRecord[], date: string) {
         : [];
     }),
   );
+}
+
+/** Landed cost per active SKU, effective at or before `asOf`, most recent wins. */
+function effectiveLandedCostBySku(
+  records: readonly SheetRecord[],
+  activeSkus: ReadonlySet<string>,
+  asOf: string,
+): Map<string, number> {
+  const latest = new Map<string, { date: string; cost: number }>();
+  for (const record of records) {
+    const sku = text(record, "sku");
+    const date = text(record, "effective_from");
+    const cost = numeric(record, "total_unit_cost_usd");
+    if (!sku || !date || cost === null) continue;
+    if (text(record, "cost_basis") !== "landed" || !activeSkus.has(sku) || date > asOf) continue;
+    const previous = latest.get(sku);
+    if (previous === undefined || date > previous.date) latest.set(sku, { date, cost });
+  }
+  return new Map([...latest].map(([sku, { cost }]) => [sku, cost]));
+}
+
+/** Approved per-bar target per SKU, effective at `asOf`. Open-ended periods have no end. */
+function effectiveTargetBySku(
+  targets: readonly SheetRecord[],
+  activeSkus: ReadonlySet<string>,
+  asOf: string,
+): Map<string, number> {
+  const result = new Map<string, number>();
+  for (const record of targets) {
+    const sku = text(record, "scope_value");
+    const value = numeric(record, "target_value");
+    const start = text(record, "period_start");
+    const end = text(record, "period_end");
+    if (!sku || value === null || !start) continue;
+    if (
+      text(record, "metric_key") !== "target_landed_cogs_per_bar" ||
+      text(record, "scope_type") !== "sku" ||
+      text(record, "status") !== "active" ||
+      !activeSkus.has(sku) ||
+      start > asOf ||
+      (end !== null && end < asOf)
+    ) {
+      continue;
+    }
+    result.set(sku, value);
+  }
+  return result;
+}
+
+const mean = (values: readonly number[]): number | null =>
+  values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+/** Per-bar cost in whole cents; sub-cent precision is not representable as USD money. */
+const perBarUsd = (value: number) => usd(Math.round(value * 100));
+
+/**
+ * Landed manufacturing cost per sellable bar against the approved target
+ * (spec §7.1, Appendix C.4). Costs are effective-dated, so each point carries
+ * every active SKU's most recent record forward — a SKU is not dropped from the
+ * basket just because it did not change price that period.
+ *
+ * The blend is unweighted across active SKUs: sales mix is not available to this
+ * metric, so spec §7 requires it be labelled rather than presented as a
+ * mix-weighted cost. Inactive SKUs are excluded so a planned product cannot move
+ * the cost of what ZACAO actually sells.
+ */
+export function buildCogsPerBarViews(
+  context: MetricServiceContext,
+  costRecords: readonly SheetRecord[],
+  targetRecords: readonly SheetRecord[],
+  skuMaster: readonly SheetRecord[],
+  warnings: readonly string[] = [],
+): { readonly metric: MetricViewModel; readonly trend: MetricBreakdownViewModel } {
+  const activeSkus = new Set(
+    skuMaster.flatMap((record) => {
+      const sku = text(record, "sku_id");
+      return sku && text(record, "is_active") !== "no" ? [sku] : [];
+    }),
+  );
+  // A point wherever either side changes, plus the period end so the chart always
+  // carries a "current" reading — targets often take effect after the last cost
+  // record, and without that point the target line would never appear at all.
+  const costDates = costRecords.flatMap((record) => {
+    const date = text(record, "effective_from");
+    const sku = text(record, "sku");
+    return text(record, "cost_basis") === "landed" && date && sku && activeSkus.has(sku)
+      ? [date]
+      : [];
+  });
+  const targetDates = targetRecords.flatMap((record) => {
+    const date = text(record, "period_start");
+    return text(record, "metric_key") === "target_landed_cogs_per_bar" && date ? [date] : [];
+  });
+  const dates = [...new Set([...costDates, ...targetDates, context.dataPeriod.endDate])]
+    .filter((date) => date <= context.dataPeriod.endDate)
+    .sort();
+
+  const points = dates.flatMap((date) => {
+    const actual = mean([...effectiveLandedCostBySku(costRecords, activeSkus, date).values()]);
+    if (actual === null) return [];
+    const target = mean([...effectiveTargetBySku(targetRecords, activeSkus, date).values()]);
+    return [{ date, actual, target }];
+  });
+
+  const latest = points.at(-1) ?? null;
+  const skusInBlend = latest
+    ? effectiveLandedCostBySku(costRecords, activeSkus, latest.date).size
+    : 0;
+  // Appendix C.4: targets were initialised equal to baseline landed cost. A zero
+  // variance is that initialisation, not evidence management approved a target.
+  const targetIsBaseline =
+    latest?.target !== null &&
+    latest !== null &&
+    Math.abs((latest.target ?? 0) - latest.actual) < 0.0005;
+  const resultWarnings = [
+    ...warnings,
+    ...(latest ? ["COGS_BLENDED_WITHOUT_SKU_MIX", `COGS_SKUS_IN_BLEND:${skusInBlend}`] : []),
+    ...(targetIsBaseline ? ["COGS_TARGET_EQUALS_BASELINE"] : []),
+  ];
+
+  const base = metric(
+    context,
+    "manufacturing.cogs_per_bar",
+    latest ? { kind: "money", value: perBarUsd(latest.actual) } : null,
+    resultWarnings,
+  );
+  return {
+    metric: base,
+    trend: metricBreakdownViewModelSchema.parse({
+      metric: base,
+      dimension: "cogs_effective_period",
+      items: points.map(({ date, actual, target }) => ({
+        key: date,
+        label: date,
+        values: [
+          { kind: "money", value: perBarUsd(actual) },
+          ...(target === null ? [] : [{ kind: "money", value: perBarUsd(target) }]),
+        ],
+        warnings: [],
+      })),
+    }),
+  };
 }
 
 export function hasComparableInputCostRows(

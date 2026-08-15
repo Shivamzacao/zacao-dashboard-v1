@@ -409,7 +409,11 @@ describe("createBackendApiRuntime", () => {
 
 describe("LiveBackendApiRuntime", () => {
   it("loads the Sheets contributors required by Executive and Revenue", () => {
-    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-operations");
+    // Executive Health is migrated onto the new workbook via sheets-executive;
+    // sheets-operations stays on the legacy workbook for Operations Intelligence.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-executive");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).not.toContain("sheets-operations");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-operations");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-metrics");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
       "product-sheet-example-metrics",

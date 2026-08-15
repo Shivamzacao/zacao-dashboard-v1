@@ -82,6 +82,41 @@ class DeferredSourceContributor implements DashboardDatasetContributor {
   }
 }
 
+/** Worst state wins, oldest freshness wins, warnings union — never flatter than reality. */
+const SOURCE_STATE_SEVERITY: readonly SourceStatus["state"][] = [
+  "current",
+  "no_activity",
+  "stale",
+  "partial",
+  "invalid",
+  "unavailable",
+  "error",
+  "not_configured",
+];
+
+function mergeSheetStatuses(statuses: readonly SourceStatus[]): SourceStatus {
+  const [first, ...rest] = statuses;
+  if (!first) throw new Error("mergeSheetStatuses requires at least one status");
+  if (rest.length === 0) return first;
+  const severity = (status: SourceStatus) => SOURCE_STATE_SEVERITY.indexOf(status.state);
+  const worst = statuses.reduce((left, right) => (severity(right) > severity(left) ? right : left));
+  const dataAsOf = statuses
+    .map(({ dataAsOf: value }) => value)
+    .filter((value): value is string => value !== null)
+    .sort()
+    .at(0);
+  return {
+    ...worst,
+    dataAsOf: statuses.some(({ dataAsOf: value }) => value === null) ? null : (dataAsOf ?? null),
+    completeness: statuses.every(({ completeness }) => completeness === "complete")
+      ? "complete"
+      : statuses.some(({ completeness }) => completeness === "unknown")
+        ? "unknown"
+        : "partial",
+    warningCodes: [...new Set(statuses.flatMap(({ warningCodes }) => warningCodes))],
+  };
+}
+
 /** Memoized async bootstrap that resets after a failure instead of poisoning. */
 function lazy<T>(factory: () => Promise<T>): () => Promise<T> {
   let pending: Promise<T> | null = null;
@@ -103,9 +138,11 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-sales",
     "shopify-channels",
     "shopify-fulfillment",
-    "sheets-operations",
+    // Executive Health is the first page migrated onto the new operations
+    // workbook; every other section still reads the legacy workbook.
+    "sheets-executive",
     "insights-freshness",
-    "v1-composite-metrics",
+    "v1-composite-executive",
   ],
   "Revenue Intelligence": [
     "shopify-product-units",
@@ -171,6 +208,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
   private readonly shopifyAdapters: (() => Promise<ShopifyAdapters>) | null;
   private readonly klaviyoAdapter: KlaviyoAdapter | null;
   private readonly sheetsSource: SheetsTabDataSource | null;
+  private readonly executiveSheetsSource: SheetsTabDataSource | null;
   private readonly sopInspection: (() => Promise<SopWorkbookInspection>) | null;
 
   constructor(
@@ -179,6 +217,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     dependencies: {
       fetchImplementation?: typeof fetch;
       sheetsConfiguration?: SheetsApiConfiguration | null;
+      executiveSheetsConfiguration?: SheetsApiConfiguration | null;
     } = {},
   ) {
     const now = () => this.clock.now();
@@ -191,6 +230,13 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     const sheetsConfiguration = dependencies.sheetsConfiguration ?? null;
     this.sheetsSource = sheetsConfiguration
       ? new SheetsApiClient(sheetsConfiguration, {
+          ...clientFetch,
+          now: () => this.clock.now(),
+        })
+      : null;
+    const executiveSheetsConfiguration = dependencies.executiveSheetsConfiguration ?? null;
+    this.executiveSheetsSource = executiveSheetsConfiguration
+      ? new SheetsApiClient(executiveSheetsConfiguration, {
           ...clientFetch,
           now: () => this.clock.now(),
         })
@@ -250,11 +296,19 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       new DeferredSourceContributor("deferred-google_drive", "google_drive", now),
     ];
     if (this.sheetsSource) {
-      contributors.push(...createSheetsApiContributors(this.sheetsSource));
+      contributors.push(
+        ...createSheetsApiContributors(this.sheetsSource, this.executiveSheetsSource),
+      );
+      // Executive Health plans sheets-executive unconditionally, so without the
+      // new workbook configured it must still resolve to a truthful deferred state.
+      if (!this.executiveSheetsSource) {
+        contributors.push(new DeferredSourceContributor("sheets-executive", "google_sheets", now));
+      }
     } else {
       contributors.push(
         new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
         new DeferredSourceContributor("sheets-operations", "google_sheets", now),
+        new DeferredSourceContributor("sheets-executive", "google_sheets", now),
         new DeferredSourceContributor("sheets-customers", "google_sheets", now),
         new DeferredSourceContributor("sheets-product", "google_sheets", now),
         new DeferredSourceContributor("sheets-insights", "google_sheets", now),
@@ -279,6 +333,17 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
+          }),
+          // Executive Health's composite tiles (inventory on hand, OTIF, per-bar
+          // COGS) read the new workbook; the shared contributor above keeps the
+          // other sections on the legacy one.
+          createV1CompositeContributor({
+            sheets: this.executiveSheetsSource ?? this.sheetsSource,
+            shopify: this.shopifyAdapters,
+            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+            now,
+            dataset: "v1-composite-executive",
+            page: this.executiveSheetsSource ? "executive" : "operations",
           }),
           createProductSheetMetricsContributor({
             sheets: this.sheetsSource,
@@ -323,6 +388,11 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       contributors.push(
         new DeferredSourceContributor(
           "v1-composite-metrics",
+          this.sheetsSource ? "shopify" : "google_sheets",
+          now,
+        ),
+        new DeferredSourceContributor(
+          "v1-composite-executive",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),
@@ -413,13 +483,19 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           .catch((error: unknown) => klaviyoSourceStatus({ checkedAt: checkedAt(), error }))
       : Promise.resolve(deferredStatus("klaviyo", checkedAt()));
 
-    const sheets: Promise<SourceStatus> = this.sheetsSource
-      ? this.sheetsSource
-          .readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"])
-          .then((result) => result.sourceStatus)
-          .catch(
-            () => this.sheetsSource?.sourceStatus() ?? deferredStatus("google_sheets", checkedAt()),
-          )
+    // Two workbooks are live during the migration, so "Google Sheets" is only as
+    // healthy as the least healthy of them. Reporting just one would attribute a
+    // freshness timestamp to a workbook the reader is not actually looking at.
+    const probeSheet = (source: SheetsTabDataSource): Promise<SourceStatus> =>
+      source
+        .readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"])
+        .then((result) => result.sourceStatus)
+        .catch(() => source.sourceStatus() ?? deferredStatus("google_sheets", checkedAt()));
+    const sheetSources = [this.sheetsSource, this.executiveSheetsSource].filter(
+      (source): source is SheetsTabDataSource => source !== null,
+    );
+    const sheets: Promise<SourceStatus> = sheetSources.length
+      ? Promise.all(sheetSources.map(probeSheet)).then(mergeSheetStatuses)
       : Promise.resolve(deferredStatus("google_sheets", checkedAt()));
 
     const drive: Promise<SourceStatus> = this.sopInspection
@@ -504,14 +580,24 @@ export function createBackendApiRuntime(loaders: {
   shopify: () => ShopifyRuntimeSettings | null;
   klaviyo: () => KlaviyoConfiguration | null;
   sheets?: () => SheetsApiConfiguration | null;
+  executiveSheets?: () => SheetsApiConfiguration | null;
 }): BackendApiRuntime {
   const shopifySettings = safeLoad(loaders.shopify);
   const klaviyoConfiguration = safeLoad(loaders.klaviyo);
   const sheetsConfiguration = loaders.sheets ? safeLoad(loaders.sheets) : null;
-  if (!shopifySettings && !klaviyoConfiguration && !sheetsConfiguration) {
+  const executiveSheetsConfiguration = loaders.executiveSheets
+    ? safeLoad(loaders.executiveSheets)
+    : null;
+  if (
+    !shopifySettings &&
+    !klaviyoConfiguration &&
+    !sheetsConfiguration &&
+    !executiveSheetsConfiguration
+  ) {
     return new DefaultBackendApiRuntime();
   }
   return new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
     sheetsConfiguration,
+    executiveSheetsConfiguration,
   });
 }

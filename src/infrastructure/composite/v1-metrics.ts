@@ -14,7 +14,7 @@ import type {
   DashboardDatasetContributor,
   OrchestrationContext,
 } from "@/src/application/orchestration";
-import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
+import type { SheetsDashboardPage, SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import type { ShopifyAdapterProvider } from "@/src/infrastructure/shopify/contributors";
 import {
@@ -47,15 +47,19 @@ export function createV1CompositeContributor(input: {
   readonly shopify: ShopifyAdapterProvider;
   readonly sourceIdentity: string;
   readonly now: () => Date;
+  /** Distinct dataset name and page key when bound to the new workbook. */
+  readonly dataset?: string;
+  readonly page?: SheetsDashboardPage;
 }): DashboardDatasetContributor {
+  const page = input.page ?? "operations";
   return {
-    dataset: "v1-composite-metrics",
+    dataset: input.dataset ?? "v1-composite-metrics",
     source: "google_sheets",
     sourceIdentity: `v1-composite-${input.sourceIdentity.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`,
     cachePolicy: CACHE,
     async load(context: OrchestrationContext): Promise<DashboardContribution> {
       const [sheets, adapters] = await Promise.all([
-        input.sheets.readPageTabs("operations", [
+        input.sheets.readPageTabs(page, [
           "Inventory_Snapshots",
           "Production_Orders",
           "Sales_Forecast",
@@ -80,11 +84,12 @@ export function createV1CompositeContributor(input: {
         }),
       ]);
       const skuMaster = selectExampleFallback(sheets, "SKU_Master");
+      // A production row with a usable location name is enough. Requiring
+      // shopify_location_name would force synthetic example data on the new
+      // workbook, which does not carry that column at all.
       const locationMaster = selectExampleFallback(sheets, "Location_Master", (rows) =>
         rows.some(
-          (row) =>
-            typeof row["shopify_location_name"] === "string" &&
-            row["shopify_location_name"].trim() !== "",
+          (row) => typeof row["location_name"] === "string" && row["location_name"].trim() !== "",
         ),
       );
       const stockTargets = selectExampleFallback(sheets, "Metric_Targets", (rows) => {
