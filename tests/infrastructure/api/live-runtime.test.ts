@@ -409,12 +409,25 @@ describe("createBackendApiRuntime", () => {
 
 describe("LiveBackendApiRuntime", () => {
   it("loads the Sheets contributors required by Executive and Revenue", () => {
-    // Executive Health is migrated onto the new workbook via sheets-executive;
-    // sheets-operations stays on the legacy workbook for Operations Intelligence.
+    // Executive Health and Revenue Intelligence are migrated onto the new
+    // workbook and share the v1-composite-migrated read; every other section
+    // still points at the legacy datasets.
     expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-executive");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("v1-composite-migrated");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).not.toContain("sheets-operations");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-migrated");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).not.toContain(
+      "v1-composite-metrics",
+    );
+    for (const section of [
+      "Product Intelligence",
+      "Operations Intelligence",
+      "Insights and Data Quality",
+    ] as const) {
+      expect(LIVE_DASHBOARD_SECTION_PLAN[section]).toContain("v1-composite-metrics");
+      expect(LIVE_DASHBOARD_SECTION_PLAN[section]).not.toContain("v1-composite-migrated");
+    }
     expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-operations");
-    expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-metrics");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
       "product-sheet-example-metrics",
     );

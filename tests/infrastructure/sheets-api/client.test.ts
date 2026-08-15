@@ -288,7 +288,7 @@ describe("SheetsApiClient reading the new operations workbook", () => {
       fetch: executiveFetch([tab], rows) as typeof fetch,
       accessToken: async () => "token",
     });
-    return client.readPageTabs("executive", [tab]);
+    return client.readPageTabs("migrated", [tab]);
   };
 
   const inventoryHeaders = [

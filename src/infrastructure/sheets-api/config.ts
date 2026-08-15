@@ -15,6 +15,10 @@ export const DEFAULT_EXECUTIVE_WORKBOOK_ID = "1RYJFlh6QqzSTz8-0BDxVzqv2ghj1IaRFz
  * Which allowlisted workbook a configuration is for. The migration runs page by
  * page, so both workbooks are read at once: "executive" is the new operations
  * workbook, "dashboard" is the legacy one every unmigrated page still uses.
+ *
+ * The "executive" name is kept because it is bound to the deployed
+ * GOOGLE_SHEETS_EXECUTIVE_WORKBOOK_ID environment variable; it now serves every
+ * migrated page, not just Executive Health.
  */
 export type SheetsWorkbookVariant = "dashboard" | "executive";
 

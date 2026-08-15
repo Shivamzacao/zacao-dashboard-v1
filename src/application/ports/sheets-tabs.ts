@@ -22,9 +22,11 @@ export type SheetsDashboardPage =
   | "marketing"
   | "growth"
   | "operations"
-  // Executive Health reads the same operations tabs but from the new workbook, so
-  // it needs its own key to keep the two reads in separate cache entries.
-  | "executive"
+  // Pages already migrated onto the new workbook. They read the same tabs as their
+  // legacy counterparts, so they need a distinct key to keep the two workbooks'
+  // reads in separate cache entries — and sharing one key lets every migrated page
+  // reuse a single cached read.
+  | "migrated"
   | "customers";
 
 /** Read-only, server-side source for normalized Google Sheet tab records. */
