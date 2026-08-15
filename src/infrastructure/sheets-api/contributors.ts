@@ -264,7 +264,7 @@ export function createSheetsApiContributors(
     operationsLoader(source, "operations"),
   );
   const executive = executiveSource
-    ? new SheetsContributor("sheets-executive", operationsLoader(executiveSource, "executive"))
+    ? new SheetsContributor("sheets-executive", operationsLoader(executiveSource, "migrated"))
     : null;
 
   const product = new SheetsContributor("sheets-product", async (value) => {

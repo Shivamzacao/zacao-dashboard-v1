@@ -138,18 +138,20 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-sales",
     "shopify-channels",
     "shopify-fulfillment",
-    // Executive Health is the first page migrated onto the new operations
-    // workbook; every other section still reads the legacy workbook.
+    // Migrated onto the new operations workbook. Sections still listing
+    // v1-composite-metrics / sheets-* read the legacy workbook.
     "sheets-executive",
     "insights-freshness",
-    "v1-composite-executive",
+    "v1-composite-migrated",
   ],
   "Revenue Intelligence": [
     "shopify-product-units",
     "shopify-sales",
     "shopify-purchase-timing",
     "shopify-channels",
-    "v1-composite-metrics",
+    // Migrated: its only sheet dependency is Channel_Mapping, which the composite
+    // reads. Shares the cached read with Executive Health.
+    "v1-composite-migrated",
   ],
   "Customer Intelligence": [
     "shopify-customers",
@@ -342,8 +344,8 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
-            dataset: "v1-composite-executive",
-            page: this.executiveSheetsSource ? "executive" : "operations",
+            dataset: "v1-composite-migrated",
+            page: this.executiveSheetsSource ? "migrated" : "operations",
           }),
           createProductSheetMetricsContributor({
             sheets: this.sheetsSource,
@@ -392,7 +394,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           now,
         ),
         new DeferredSourceContributor(
-          "v1-composite-executive",
+          "v1-composite-migrated",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),
