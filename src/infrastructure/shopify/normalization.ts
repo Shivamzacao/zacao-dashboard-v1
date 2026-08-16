@@ -139,6 +139,8 @@ const providerOrderSchema = z.object({
   tags: z.array(z.string()),
   displayFinancialStatus: z.string().nullable(),
   displayFulfillmentStatus: z.string().nullable(),
+  // Guest checkouts have no customer, so cohort grouping must tolerate null.
+  customer: z.object({ id: z.string() }).nullable().optional(),
   currentSubtotalPriceSet: providerMoneySetSchema,
   currentTotalPriceSet: providerMoneySetSchema,
   currentTotalDiscountsSet: providerMoneySetSchema,
@@ -158,6 +160,7 @@ export function normalizeOrder(value: unknown) {
   return {
     id: normalizeShopifyId(order.id),
     name: order.name,
+    customerId: order.customer ? normalizeShopifyId(order.customer.id) : null,
     createdAt: order.createdAt,
     processedAt: order.processedAt,
     cancelledAt: order.cancelledAt,

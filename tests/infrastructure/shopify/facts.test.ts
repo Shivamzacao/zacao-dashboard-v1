@@ -17,8 +17,9 @@ import {
   parseShopifyQlCount,
   parseShopifyQlMoneyMinorUnits,
   parseShopifyQlRateBasisPoints,
+  mapShopifyLtvRecords,
 } from "@/src/infrastructure/shopify/facts";
-import { normalizeProduct } from "@/src/infrastructure/shopify/normalization";
+import { normalizeOrder, normalizeProduct } from "@/src/infrastructure/shopify/normalization";
 
 // Row shapes mirror live 2026-07 ShopifyQL responses: objects keyed by column
 // name with every value serialized as a decimal string.
@@ -424,5 +425,158 @@ describe("catalog and inventory facts from normalized admin products", () => {
         updatedAt: "2026-08-01T00:00:00Z",
       },
     ]);
+  });
+});
+
+/**
+ * Realized LTV and cohorts moved off the Sales_Actuals tab — whose rows were all
+ * seeded examples — onto real Shopify orders. These pin the projection onto the
+ * record contract the certified LTV validator enforces.
+ */
+describe("Shopify orders projected onto the LTV record contract", () => {
+  const order = (overrides: Record<string, unknown> = {}) => ({
+    id: "gid://shopify/Order/1",
+    name: "#1001",
+    createdAt: "2026-03-02T15:00:00Z",
+    processedAt: null,
+    cancelledAt: null,
+    test: false,
+    currencyCode: "USD",
+    sourceName: "web",
+    tags: [],
+    displayFinancialStatus: "PAID",
+    displayFulfillmentStatus: "FULFILLED",
+    customer: { id: "gid://shopify/Customer/9" },
+    currentSubtotalPriceSet: { shopMoney: { amount: "100.00", currencyCode: "USD" } },
+    currentTotalPriceSet: { shopMoney: { amount: "110.00", currencyCode: "USD" } },
+    currentTotalDiscountsSet: { shopMoney: { amount: "0.00", currencyCode: "USD" } },
+    currentShippingPriceSet: { shopMoney: { amount: "8.00", currencyCode: "USD" } },
+    currentTotalTaxSet: { shopMoney: { amount: "2.00", currencyCode: "USD" } },
+    totalRefundedSet: { shopMoney: { amount: "0.00", currencyCode: "USD" } },
+    netPaymentSet: { shopMoney: { amount: "110.00", currencyCode: "USD" } },
+    refunds: [],
+    fulfillments: [],
+    ...overrides,
+  });
+  const map = (...raw: Record<string, unknown>[]) =>
+    mapShopifyLtvRecords(
+      raw.map((value) => normalizeOrder(value)),
+      "2026-08-16",
+    );
+
+  it("reconciles net to gross minus refunds and cancellations", () => {
+    // The validator rejects a row outright when this arithmetic disagrees.
+    const [record] = map(
+      order({
+        displayFinancialStatus: "PARTIALLY_REFUNDED",
+        totalRefundedSet: { shopMoney: { amount: "15.00", currencyCode: "USD" } },
+      }),
+    );
+    expect(record).toMatchObject({
+      order_id: "gid://shopify/Order/1",
+      customer_id: "gid://shopify/Customer/9",
+      gross_product_sales_usd: 100,
+      refunds_returns_usd: 15,
+      cancellations_usd: 0,
+      net_product_revenue_usd: 85,
+      order_status: "partially_refunded",
+      currency: "USD",
+      is_test: "no",
+    });
+  });
+
+  it("excludes shipping and tax from merchandise revenue", () => {
+    // Subtotal is the merchandise basis; total would smuggle $8 shipping and $2 tax in.
+    expect(map(order())[0]).toMatchObject({ gross_product_sales_usd: 100 });
+  });
+
+  it("zeroes a cancelled order rather than counting revenue that never happened", () => {
+    const [record] = map(order({ cancelledAt: "2026-03-05T10:00:00Z" }));
+    expect(record).toMatchObject({
+      order_status: "cancelled",
+      cancellations_usd: 100,
+      net_product_revenue_usd: 0,
+    });
+  });
+
+  it("derives first_order_date per customer across the whole history", () => {
+    // The regression this guards: a period-scoped read would relabel a
+    // long-standing customer as new because their earliest order is absent.
+    const records = map(
+      order({ id: "gid://shopify/Order/2", createdAt: "2026-07-06T12:00:00Z" }),
+      order({ id: "gid://shopify/Order/1", createdAt: "2025-09-14T12:00:00Z" }),
+      order({
+        id: "gid://shopify/Order/3",
+        createdAt: "2026-07-08T12:00:00Z",
+        customer: { id: "gid://shopify/Customer/42" },
+      }),
+    );
+    const byOrder = new Map(records.map((record) => [record["order_id"], record]));
+    const first = (id: string) => byOrder.get(`gid://shopify/Order/${id}`)?.["first_order_date"];
+    expect(first("2")).toBe("2025-09-14");
+    expect(first("1")).toBe("2025-09-14");
+    // A genuinely new customer keeps their own first order date.
+    expect(first("3")).toBe("2026-07-08");
+  });
+
+  it("dates the cohort from the first qualifying order, not the first order", () => {
+    // Spec §5.4 defines the cohort by the first *qualifying* order. Counting a
+    // cancelled first purchase here would make first_order_date disagree with the
+    // validator's own earliest-qualifying check, which discards the customer
+    // entirely — losing real revenue rather than just mislabelling it.
+    const records = map(
+      order({
+        id: "gid://shopify/Order/1",
+        createdAt: "2025-09-14T12:00:00Z",
+        cancelledAt: "2025-09-15T12:00:00Z",
+      }),
+      order({ id: "gid://shopify/Order/2", createdAt: "2026-01-20T12:00:00Z" }),
+    );
+    const paid = records.find((record) => record["order_id"] === "gid://shopify/Order/2");
+    expect(paid?.["first_order_date"]).toBe("2026-01-20");
+    // The cancelled row keeps the same date so the per-customer set stays consistent.
+    const cancelled = records.find((record) => record["order_id"] === "gid://shopify/Order/1");
+    expect(cancelled?.["first_order_date"]).toBe("2026-01-20");
+  });
+
+  it("falls back to a single shared date when a customer has no qualifying order", () => {
+    const records = map(
+      order({
+        id: "gid://shopify/Order/1",
+        createdAt: "2025-09-14T12:00:00Z",
+        displayFinancialStatus: "REFUNDED",
+      }),
+      order({
+        id: "gid://shopify/Order/2",
+        createdAt: "2026-01-20T12:00:00Z",
+        displayFinancialStatus: "REFUNDED",
+      }),
+    );
+    // Differing dates here would trip the consistency check and drop the customer.
+    expect(new Set(records.map((record) => record["first_order_date"]))).toEqual(
+      new Set(["2025-09-14"]),
+    );
+  });
+
+  it("resolves the order date in New York, not UTC", () => {
+    // 01:30Z on the 3rd is still the 2nd in New York; the reporting week depends on it.
+    expect(map(order({ createdAt: "2026-03-03T01:30:00Z" }))[0]).toMatchObject({
+      order_date: "2026-03-02",
+    });
+  });
+
+  it("prefers processedAt over createdAt when the provider supplies it", () => {
+    expect(map(order({ processedAt: "2026-04-01T15:00:00Z" }))[0]).toMatchObject({
+      order_date: "2026-04-01",
+    });
+  });
+
+  it("flags test orders and drops guest checkouts that have no customer", () => {
+    expect(map(order({ test: true }))[0]).toMatchObject({ is_test: "yes" });
+    expect(map(order({ customer: null }))).toEqual([]);
+  });
+
+  it("omits an unmapped financial status instead of guessing a revenue state", () => {
+    expect(map(order({ displayFinancialStatus: "SOMETHING_NEW" }))).toEqual([]);
   });
 });

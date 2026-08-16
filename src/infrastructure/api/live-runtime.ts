@@ -35,6 +35,7 @@ import { createSheetsApiContributors } from "@/src/infrastructure/sheets-api/con
 import { SheetsApiClient } from "@/src/infrastructure/sheets-api/client";
 import type { SheetsApiConfiguration } from "@/src/infrastructure/sheets-api/config";
 import { createV1CompositeContributor } from "@/src/infrastructure/composite/v1-metrics";
+import { createCustomerLtvContributor } from "@/src/infrastructure/composite/customer-ltv-metrics";
 import { createProductSheetMetricsContributor } from "@/src/infrastructure/composite/product-metrics";
 import { createMarketingCompositeContributor } from "@/src/infrastructure/composite/marketing-metrics";
 import { createGrowthCompositeContributor } from "@/src/infrastructure/composite/growth-metrics";
@@ -158,7 +159,10 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-funnel",
     "shopify-session-engagement",
     "shopify-customer-city",
-    "sheets-customers",
+    // Realized LTV, cohorts and active customers come from Shopify orders. The
+    // Sales_Actuals tab they used to read held only seeded example rows, so the
+    // page reported fabricated customer value.
+    "shopify-customer-ltv",
     "klaviyo-performance",
     "klaviyo-profiles",
   ],
@@ -327,6 +331,15 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
           now,
         }),
+        // Sourced from Shopify orders, so it needs no workbook. The sheet is only
+        // consulted for Channel_Mapping when a channel filter is applied.
+        createCustomerLtvContributor({
+          sheets: this.executiveSheetsSource ?? this.sheetsSource,
+          shopify: this.shopifyAdapters,
+          sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
+          now,
+          ...(this.executiveSheetsSource ? { page: "migrated" as const } : {}),
+        }),
       );
       if (this.sheetsSource) {
         contributors.push(
@@ -370,6 +383,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
     } else {
       contributors.push(
         new DeferredSourceContributor("shopify-customers", "shopify", now),
+        new DeferredSourceContributor("shopify-customer-ltv", "shopify", now),
         new DeferredSourceContributor("shopify-funnel", "shopify", now),
         new DeferredSourceContributor("shopify-session-engagement", "shopify", now),
         new DeferredSourceContributor("shopify-traffic-attribution", "shopify", now),
