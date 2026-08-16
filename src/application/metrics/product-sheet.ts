@@ -179,14 +179,17 @@ export function buildProductWeeksCoverMetric(
   warnings: readonly string[] = [],
 ): MetricViewModel {
   const byShopifySku = skuMappings(mappings);
+  // Same pack-variant resolution as the inventory breakdown: the ten-pack carries
+  // most of the sellable stock and is not mapped in SKU_Master, so an explicit-only
+  // lookup leaves availableBars at zero and the metric permanently unavailable.
   const availableBars = inventory.reduce((sum, fact) => {
     if (fact.quantityName !== "available" || !fact.sku) return sum;
-    const mapping = byShopifySku.get(fact.sku);
+    const mapping = resolveInventoryMapping(fact.sku, byShopifySku);
     return mapping ? sum + fact.quantity * mapping.packSizeBars : sum;
   }, 0);
   const soldBars = trailingUnits.reduce((sum, fact) => {
     if (!fact.merchandise || !fact.sku) return sum;
-    const mapping = byShopifySku.get(fact.sku);
+    const mapping = resolveInventoryMapping(fact.sku, byShopifySku);
     return mapping ? sum + fact.units * mapping.packSizeBars : sum;
   }, 0);
   return metric(
