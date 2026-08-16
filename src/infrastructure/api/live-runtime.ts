@@ -384,7 +384,10 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             now,
           }),
           createMarketingCompositeContributor({
-            sheets: this.sheetsSource,
+            // Marketing Intelligence is migrated onto the new workbook. Growth's
+            // composite below stays on the legacy one.
+            sheets: this.executiveSheetsSource ?? this.sheetsSource,
+            ...(this.executiveSheetsSource ? { page: "migrated" as const } : {}),
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,

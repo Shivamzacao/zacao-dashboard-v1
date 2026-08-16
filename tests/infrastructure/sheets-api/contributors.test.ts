@@ -889,3 +889,69 @@ describe("Growth on the migrated workbook", () => {
     expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 });
+
+class RecordingSource implements SheetsTabDataSource {
+  readonly calls: { page: string; tabs: readonly string[] }[] = [];
+
+  sourceStatus() {
+    return sourceStatus;
+  }
+
+  async readPageTabs(
+    page: Parameters<SheetsTabDataSource["readPageTabs"]>[0],
+    tabNames: readonly string[],
+  ): Promise<SheetsTabReadResult> {
+    this.calls.push({ page, tabs: tabNames });
+    return {
+      tabs: Object.fromEntries(tabNames.map((tab) => [tab, []])),
+      exampleTabs: Object.fromEntries(tabNames.map((tab) => [tab, []])),
+      sourceStatus,
+      warnings: [],
+    };
+  }
+}
+
+describe("Marketing Intelligence workbook routing", () => {
+  const load = async (dataset: string) => {
+    const legacy = new RecordingSource();
+    const migrated = new RecordingSource();
+    const found = createSheetsApiContributors(legacy, migrated).find(
+      (entry) => entry.dataset === dataset,
+    );
+    if (!found) throw new Error(`Missing contributor ${dataset}`);
+    await found.load(context);
+    return { legacy, migrated };
+  };
+
+  it("reads the marketing tabs from the new workbook", async () => {
+    const { legacy, migrated } = await load("sheets-marketing");
+    expect(migrated.calls).toEqual([
+      {
+        page: "migrated",
+        tabs: ["Marketing_Spend", "Social_Metrics", "Social_Channel_Performance"],
+      },
+    ]);
+    expect(legacy.calls).toEqual([]);
+  });
+
+  // Growth shares Social_Metrics and Growth_Pipeline with Marketing. It migrated first
+  // (#64), so both pages must now resolve those tabs against the same workbook — a split
+  // would have the two pages reporting different follower totals from one tab.
+  it("resolves the tabs it shares with Growth against the same workbook", async () => {
+    const { legacy, migrated } = await load("sheets-growth");
+    expect(migrated.calls.map((call) => call.page)).toEqual(["migrated"]);
+    expect(migrated.calls[0]?.tabs).toContain("Social_Metrics");
+    expect(migrated.calls[0]?.tabs).toContain("Growth_Pipeline");
+    expect(legacy.calls).toEqual([]);
+  });
+
+  it("falls back to the legacy workbook when the new one is not configured", async () => {
+    const legacy = new RecordingSource();
+    const found = createSheetsApiContributors(legacy).find(
+      (entry) => entry.dataset === "sheets-marketing",
+    );
+    if (!found) throw new Error("Missing contributor sheets-marketing");
+    await found.load(context);
+    expect(legacy.calls.map((call) => call.page)).toEqual(["marketing"]);
+  });
+});

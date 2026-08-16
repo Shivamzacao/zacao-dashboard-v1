@@ -545,6 +545,81 @@ describe("SheetsApiClient reading the new operations workbook", () => {
     expect(result.warnings).toEqual(["SHEETS_ROW_INVALID:Inventory_Snapshots:2"]);
   });
 
+  const channelHeaders = [
+    "record_id",
+    "period_start",
+    "period_end",
+    "platform",
+    "account",
+    "mentions",
+    "audience_reach",
+    "attributed_net_sales_usd",
+    "attribution_source",
+    "source_status",
+    "data_as_of",
+    "created_at",
+    "updated_at",
+    "updated_by",
+    "source_reference",
+    "notes",
+  ];
+
+  it("treats a required column that never varies as provenance, not identifying content", async () => {
+    // Social_Channel_Performance ships ~600 scaffolding rows carrying a constant
+    // account and attribution source and nothing else. Both are contract-required,
+    // so without the constant rule every one of them warns.
+    const result = await read("Social_Channel_Performance", [
+      channelHeaders,
+      ["CH-SHOP-1", "", "", "", "ZACAO", "", "", "", "Shopify sales channel", "shopify"],
+      ["CH-SHOP-2", "", "", "", "ZACAO", "", "", "", "Shopify sales channel", "shopify"],
+      // Pre-populated week calendar: a date but still no payload. Genuinely
+      // incomplete rather than scaffolding, so this one is still worth surfacing.
+      ["CH-SHOP-3", 46249, "", "", "ZACAO", "", "", "", "Shopify sales channel", "shopify"],
+    ]);
+    expect(result.tabs["Social_Channel_Performance"]).toHaveLength(0);
+    expect(result.warnings).toEqual(["SHEETS_ROW_INVALID:Social_Channel_Performance:4"]);
+  });
+
+  it("still warns when a required column varies, so real omissions are not hidden", async () => {
+    const result = await read("Social_Channel_Performance", [
+      channelHeaders,
+      ["CH-1", "", "", "", "ZACAO", "", "", "", "Shopify sales channel", "shopify"],
+      // A second account means the column identifies the row after all.
+      ["CH-2", "", "", "", "ZACAO Wholesale", "", "", "", "Shopify sales channel", "shopify"],
+    ]);
+    expect(result.tabs["Social_Channel_Performance"]).toHaveLength(0);
+    expect(result.warnings).toEqual([
+      "SHEETS_ROW_INVALID:Social_Channel_Performance:2",
+      "SHEETS_ROW_INVALID:Social_Channel_Performance:3",
+    ]);
+  });
+
+  it("keeps reading a fully populated row on a tab with constant columns", async () => {
+    const result = await read("Social_Channel_Performance", [
+      channelHeaders,
+      ["CH-SHOP-1", "", "", "", "ZACAO", "", "", "", "Shopify sales channel", "shopify"],
+      [
+        "CH-SHOP-2",
+        46242,
+        46249,
+        "Instagram",
+        "ZACAO",
+        12,
+        3400,
+        250.5,
+        "Shopify sales channel",
+        "shopify",
+      ],
+    ]);
+    expect(result.tabs["Social_Channel_Performance"]).toHaveLength(1);
+    expect(result.tabs["Social_Channel_Performance"]?.[0]).toMatchObject({
+      platform: "instagram",
+      mentions: 12,
+      audience_reach: 3400,
+    });
+    expect(result.warnings).toEqual([]);
+  });
+
   it("accepts week_ending as the alias for the renamed Sales_Forecast week_start", async () => {
     const result = await read("Sales_Forecast", [
       [

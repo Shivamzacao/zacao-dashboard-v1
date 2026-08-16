@@ -323,8 +323,12 @@ export function createSheetsApiContributors(
     };
   });
 
+  // Marketing Intelligence is migrated. Growth still reads Social_Metrics and
+  // Growth_Pipeline from the legacy workbook and is deliberately left alone.
+  const marketingSource = executiveSource ?? source;
+  const marketingPage: SheetsDashboardPage = executiveSource ? "migrated" : "marketing";
   const marketing = new SheetsContributor("sheets-marketing", async (value) => {
-    const result = await source.readPageTabs("marketing", [
+    const result = await marketingSource.readPageTabs(marketingPage, [
       "Marketing_Spend",
       "Social_Metrics",
       "Social_Channel_Performance",

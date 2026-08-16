@@ -123,20 +123,63 @@ const PRODUCTION_LIKE_STATUSES = new Set<string>([
 const IGNORED_ROW_STATUSES = new Set<string>(["draft", "invalid", "backend_pending"]);
 
 /**
+ * Required *label* columns that hold the same value on every row of the tab.
+ *
+ * Scaffolding carries provenance constants beyond the enums: Social_Channel_-
+ * Performance pre-fills `account` "ZACAO" and `attribution_source` "Shopify
+ * sales channel" on all 599 rows. Both are contract-required, so without this
+ * they read as identifying content and 599 empty rows become 599 warnings. A
+ * label that never varies identifies nothing.
+ *
+ * Restricted to text columns on purpose. A date or an amount is a measurement,
+ * and on a short tab one happens to be "constant" simply because a single row
+ * carries it — exempting those would let a genuinely incomplete row pass as
+ * scaffolding.
+ */
+function constantColumnHeaders(
+  contract: (typeof MANUAL_TAB_CONTRACTS)[ManualWorkbookTab],
+  values: readonly (readonly unknown[])[],
+  columnIndex: (column: ManualColumnContract) => number | undefined,
+): ReadonlySet<string> {
+  const tracked = contract.columns
+    .filter((column) => column.required && column.kind === "text")
+    .map((column) => ({
+      header: column.header,
+      index: columnIndex(column),
+      seen: new Set<string>(),
+    }));
+  for (let index = 1; index < values.length; index += 1) {
+    const raw = values[index] ?? [];
+    if (raw.every((cell) => cell === null || cell === undefined || cell === "")) continue;
+    for (const column of tracked) {
+      const cell = column.index === undefined ? null : raw[column.index];
+      const text = cell === null || cell === undefined ? "" : String(cell).trim();
+      if (text !== "") column.seen.add(text);
+    }
+  }
+  return new Set(tracked.filter((column) => column.seen.size === 1).map((column) => column.header));
+}
+
+/**
  * Detects a pre-seeded formula row. Hidden tabs ship ~150 scaffolding rows per
  * tab that already carry a record id, a constant enum such as cost_basis
  * "landed", provenance, and formula cells that resolve to 0 — so "every cell is
  * blank" does not identify them. What they never carry is identifying content:
- * the required dates and amounts. A row missing only *some* of those is a real
- * data-entry problem and still warns.
+ * the required dates and amounts that vary from row to row. A row missing only
+ * *some* of those is a real data-entry problem and still warns.
  */
 function isTemplateRow(
   contract: (typeof MANUAL_TAB_CONTRACTS)[ManualWorkbookTab],
   normalized: Readonly<Record<string, string | number | boolean | null>>,
+  constantHeaders: ReadonlySet<string>,
 ): boolean {
   const businessKey = new Set<string>(contract.businessKey);
   const identifying = contract.columns.filter(
-    (column) => column.required && !businessKey.has(column.header) && !column.enumValues,
+    (column) =>
+      column.required &&
+      !businessKey.has(column.header) &&
+      !column.enumValues &&
+      !constantHeaders.has(column.header),
   );
   if (identifying.length === 0) return false;
   return identifying.every((column) => normalized[column.header] === null);
@@ -169,6 +212,7 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
       warnings: [`SHEETS_TAB_INVALID:${tab}`],
     };
   }
+  const constantHeaders = constantColumnHeaders(contract, values, columnIndex);
   const rows: SheetRecord[] = [];
   const exampleRows: SheetRecord[] = [];
   const warnings: string[] = [];
@@ -193,7 +237,7 @@ function normalizeRows(tab: ManualWorkbookTab, values: readonly (readonly unknow
     if (!valid) {
       // Hidden tabs are pre-filled with ~150 formula-template rows that carry only
       // a record id and provenance constants. They are scaffolding, not bad data.
-      if (!isTemplateRow(contract, normalized)) {
+      if (!isTemplateRow(contract, normalized, constantHeaders)) {
         warnings.push(`SHEETS_ROW_INVALID:${tab}:${index + 1}`);
       }
       continue;

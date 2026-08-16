@@ -1211,6 +1211,12 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
           "x",
           "facebook",
           "pinterest",
+          // The new workbook writes a fifth "All Social" row per week: a rollup
+          // of the four platform rows above it, not a platform. Accepted so the
+          // structure is not reported as 52 invalid rows a load. It cannot reach
+          // a total — every consumer sums an explicit instagram/tiktok/youtube
+          // whitelist (marketing.ts, growth.ts) rather than every row present.
+          "all_social",
           "other",
           // The new workbook emits one "All Social" row per week alongside the
           // per-platform rows. It carries the reach/impressions/engagements totals,
