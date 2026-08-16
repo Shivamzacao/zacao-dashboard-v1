@@ -139,8 +139,10 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-sales",
     "shopify-channels",
     "shopify-fulfillment",
-    // Migrated onto the new operations workbook. Sections still listing
-    // v1-composite-metrics / sheets-* read the legacy workbook.
+    // Migrated onto the new operations workbook. Marketing and Growth are the only
+    // sections left on the legacy one; their tabs are absent or empty in the new
+    // workbook, so the plan entry is the record of which workbook a section reads —
+    // except where a dataset kept its name (sheets-financial, sheets-insights).
     "sheets-migrated",
     "insights-freshness",
     "v1-composite-migrated",
@@ -198,6 +200,10 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
   // holds three of its five tabs. Finance_Actuals and Cash_Position are absent there,
   // so expenses and cash position blank until ZACAO adds them.
   "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
+  // Migrated. The legacy SKU_Master and Channel_Mapping hold only example rows, so the
+  // data-quality tiles reported on a two-SKU placeholder catalogue; the new workbook has
+  // the real five. sheets-insights keeps its name but reads the new workbook too — see
+  // contributors.ts. This leaves v1-composite-metrics referenced by no section.
   "Insights and Data Quality": [
     "shopify-history",
     "shopify-catalog-inventory",
@@ -205,7 +211,7 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "klaviyo-readiness",
     "insights-freshness",
     "sheets-insights",
-    "v1-composite-metrics",
+    "v1-composite-migrated",
   ],
 };
 

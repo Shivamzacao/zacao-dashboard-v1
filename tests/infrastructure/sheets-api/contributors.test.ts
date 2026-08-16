@@ -741,3 +741,74 @@ describe("Financial on the migrated workbook", () => {
     expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 });
+
+/**
+ * Insights and Data Quality is migrated. Both of its tabs exist in the new workbook,
+ * so unlike Financial nothing blanks. The dataset keeps its name, which means these
+ * assertions are the only thing recording which workbook it reads.
+ */
+describe("Insights on the migrated workbook", () => {
+  const tabs = {
+    Inventory_Snapshots: [
+      {
+        record_id: "INV-1",
+        snapshot_at: "2026-08-13",
+        warehouse: "SNAPL",
+        sku: "SKU-01",
+        on_hand: 100,
+        source_status: "production",
+      },
+    ],
+    Metric_Targets: [
+      {
+        record_id: "TGT-1",
+        metric_key: "inventory.stock_min",
+        period_start: "2026-07-01",
+        target_value: 400,
+        scope_type: "sku",
+        scope_value: "SKU-01",
+        status: "active",
+        source_status: "production",
+      },
+    ],
+  };
+
+  it("reads the new workbook, never the legacy one, when both are configured", async () => {
+    const legacy = new FakeSource(tabs);
+    const migrated = new FakeSource(tabs);
+
+    await migratedContributor(legacy, migrated, "sheets-insights").load(context);
+
+    expect(legacy.pagesRead).toEqual([]);
+    // The page key stays "insights" rather than becoming "migrated": the freshness
+    // probe reads these same two tabs under that key, and the cache key is
+    // `page:sortedTabs`, so sharing it saves a duplicate fetch of the same range.
+    expect(migrated.pagesRead).toEqual(["insights"]);
+  });
+
+  it("falls back to the legacy workbook when the new one is not configured", async () => {
+    const legacy = new FakeSource(tabs);
+
+    await contributor(legacy, "sheets-insights").load(context);
+
+    expect(legacy.pagesRead).toEqual(["insights"]);
+  });
+
+  it("leaves the low-inventory alert unconfigured regardless of the data it is given", async () => {
+    const contribution = await migratedContributor(
+      new FakeSource({}),
+      new FakeSource(tabs),
+      "sheets-insights",
+    ).load(context);
+
+    // buildLowInventoryBreakdown discards both arguments — the alert is a Phase 2 stub,
+    // so a blank tile here is not a migration regression and no sheet data will fix it.
+    const alert = contribution.breakdowns?.find(
+      ({ metric }) => metric.key === "alerts.low_inventory",
+    );
+    expect(alert?.metric.value).toBeNull();
+    expect(alert?.metric.warnings).toContain("PHASE_2_NOT_CONFIGURED");
+    expect(alert?.items).toEqual([]);
+    expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+});

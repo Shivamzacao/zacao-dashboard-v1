@@ -299,8 +299,16 @@ export function createSheetsApiContributors(
     };
   });
 
+  // Insights and Data Quality is migrated; the new workbook holds both of its tabs.
+  // The page key stays "insights" rather than "migrated" on purpose: the freshness
+  // probe reads the same two tabs under that key from both workbooks, so keeping it
+  // shares one cached read instead of fetching them twice.
+  const insightsSource = executiveSource ?? source;
   const insights = new SheetsContributor("sheets-insights", async (value) => {
-    const result = await source.readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"]);
+    const result = await insightsSource.readPageTabs("insights", [
+      "Inventory_Snapshots",
+      "Metric_Targets",
+    ]);
     const metricContext = context(value, result.sourceStatus);
     return {
       breakdowns: [

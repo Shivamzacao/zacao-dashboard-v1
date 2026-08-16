@@ -439,15 +439,17 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).not.toContain(
       "v1-composite-metrics",
     );
-    // Insights, Marketing and Growth are the sections still on the legacy workbook.
-    // Financial keeps the sheets-financial name but reads the new one, so the plan
-    // entry cannot show its migration — contributors.test.ts asserts that routing.
+    // Marketing and Growth are the only sections still on the legacy workbook.
+    // Financial and Insights keep their sheets-* names but read the new one, so the
+    // plan entry cannot show that half of it — contributors.test.ts asserts the routing.
     expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).toContain(
-      "v1-composite-metrics",
-    );
-    expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).not.toContain(
       "v1-composite-migrated",
     );
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).not.toContain(
+      "v1-composite-metrics",
+    );
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Marketing Intelligence"]).toContain("sheets-marketing");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Growth Intelligence"]).toContain("sheets-growth");
     // Customer Intelligence no longer reads a sheet for LTV: the Sales_Actuals tab
     // held only seeded example rows, so it now sources from Shopify orders.
     expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).toContain("shopify-customer-ltv");
@@ -455,9 +457,13 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
       "product-composite-metrics",
     );
-    // sheets-operations is now referenced by no section at all.
+    // sheets-operations and v1-composite-metrics are referenced by no section at all.
+    // Both stay registered with their deferred fallbacks; removing a dataset is a
+    // separate decision, and this loop is what keeps a section from quietly adopting
+    // one again and reading the legacy workbook without anyone noticing.
     for (const section of Object.values(LIVE_DASHBOARD_SECTION_PLAN)) {
       expect(section).not.toContain("sheets-operations");
+      expect(section).not.toContain("v1-composite-metrics");
     }
   });
 
