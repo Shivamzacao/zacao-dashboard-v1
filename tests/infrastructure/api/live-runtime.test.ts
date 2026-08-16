@@ -419,11 +419,16 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).not.toContain(
       "v1-composite-metrics",
     );
-    for (const section of [
-      "Product Intelligence",
-      "Operations Intelligence",
-      "Insights and Data Quality",
-    ] as const) {
+    // Product Intelligence joins the migrated composite; the new workbook also
+    // carries the correct SKU-to-variant mapping the legacy workbook had swapped.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain("v1-composite-migrated");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
+      "product-composite-metrics",
+    );
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).not.toContain(
+      "v1-composite-metrics",
+    );
+    for (const section of ["Operations Intelligence", "Insights and Data Quality"] as const) {
       expect(LIVE_DASHBOARD_SECTION_PLAN[section]).toContain("v1-composite-metrics");
       expect(LIVE_DASHBOARD_SECTION_PLAN[section]).not.toContain("v1-composite-migrated");
     }
@@ -433,7 +438,7 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).not.toContain("sheets-customers");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-operations");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
-      "product-sheet-example-metrics",
+      "product-composite-metrics",
     );
   });
 

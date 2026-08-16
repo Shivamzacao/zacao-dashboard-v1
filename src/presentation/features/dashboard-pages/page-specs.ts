@@ -467,7 +467,10 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         {
           title: "Per-bar COGS versus target",
           description: "Landed manufacturing cost per bar against the approved target.",
-          metricKey: "manufacturing.cogs_trend",
+          // Was manufacturing.cogs_trend, which no contributor emits. The KPI above
+          // already uses this key, and its builder returns actual-and-target by
+          // effective period — exactly what the chart needs.
+          metricKey: "manufacturing.cogs_per_bar",
           sourceLabel: "Fairafric",
           kind: "line",
           series: [

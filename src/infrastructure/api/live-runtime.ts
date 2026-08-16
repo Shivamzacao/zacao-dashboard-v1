@@ -169,9 +169,12 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
   "Product Intelligence": [
     "shopify-product-units",
     "shopify-catalog-inventory",
+    // Migrated: SKU_Master, COGS_By_SKU, Inventory_Snapshots, Production_Orders and
+    // Metric_Targets all come from the new workbook, which also carries the correct
+    // SKU-to-variant mapping the legacy workbook had swapped.
     "sheets-product",
-    "v1-composite-metrics",
-    "product-sheet-example-metrics",
+    "v1-composite-migrated",
+    "product-composite-metrics",
   ],
   "Operations Intelligence": [
     "shopify-catalog-inventory",
@@ -361,7 +364,9 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             page: this.executiveSheetsSource ? "migrated" : "operations",
           }),
           createProductSheetMetricsContributor({
-            sheets: this.sheetsSource,
+            // Product Intelligence is migrated onto the new workbook.
+            sheets: this.executiveSheetsSource ?? this.sheetsSource,
+            ...(this.executiveSheetsSource ? { page: "migrated" as const } : {}),
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
@@ -413,7 +418,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           now,
         ),
         new DeferredSourceContributor(
-          "product-sheet-example-metrics",
+          "product-composite-metrics",
           this.sheetsSource ? "shopify" : "google_sheets",
           now,
         ),

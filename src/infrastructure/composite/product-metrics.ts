@@ -1,4 +1,5 @@
 import {
+  buildCogsPerBarViews,
   buildProductInventoryBreakdown,
   buildProductSellThroughMetric,
   buildProductSkuMarginViews,
@@ -13,7 +14,7 @@ import type {
   DashboardDatasetContributor,
   OrchestrationContext,
 } from "@/src/application/orchestration";
-import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
+import type { SheetsDashboardPage, SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import type { ShopifyAdapterProvider } from "@/src/infrastructure/shopify/contributors";
 import {
@@ -53,20 +54,26 @@ export function createProductSheetMetricsContributor(input: {
   readonly shopify: ShopifyAdapterProvider;
   readonly sourceIdentity: string;
   readonly now: () => Date;
+  /** Page key for the read cache; "migrated" binds this to the new workbook. */
+  readonly page?: SheetsDashboardPage;
 }): DashboardDatasetContributor {
+  const page = input.page ?? "product";
   return {
-    dataset: "product-sheet-example-metrics",
+    // Not example data: this is the product composite. The former
+    // "product-sheet-example-metrics" name implied its output was synthetic.
+    dataset: "product-composite-metrics",
     source: "google_sheets",
     sourceIdentity: `product-sheet-${input.sourceIdentity.replaceAll(/[^A-Za-z0-9._-]/g, "-")}`,
     cachePolicy: CACHE,
     async load(context: OrchestrationContext): Promise<DashboardContribution> {
       const [sheets, adapters] = await Promise.all([
-        input.sheets.readPageTabs("product", [
+        input.sheets.readPageTabs(page, [
           "Inventory_Snapshots",
           "Production_Orders",
           "Sales_Forecast",
           "SKU_Master",
           "COGS_By_SKU",
+          "Metric_Targets",
         ]),
         input.shopify(),
       ]);
@@ -130,6 +137,17 @@ export function createProductSheetMetricsContributor(input: {
         warnings,
       });
 
+      // Landed cost per bar and its target series. Product Intelligence shows both
+      // the KPI and the chart, but no dataset on this page emitted the metric, so
+      // the chart rendered blocked beside a working KPI.
+      const cogsPerBar = buildCogsPerBarViews(
+        metricContext,
+        costs.rows,
+        sheets.tabs["Metric_Targets"] ?? [],
+        mapping.rows,
+        warnings,
+      );
+
       return {
         metrics: [
           buildProductWeeksCoverMetric(
@@ -146,10 +164,12 @@ export function createProductSheetMetricsContributor(input: {
             mapWeeklyProductUnitsFacts(weekly.rows),
             mapping.rows,
           ),
+          cogsPerBar.metric,
         ],
         breakdowns: [
           buildProductInventoryBreakdown(metricContext, inventory, mapping.rows, warnings),
           margin.breakdown,
+          cogsPerBar.trend,
         ],
         tables: [margin.table],
         sourceStatuses: statuses,

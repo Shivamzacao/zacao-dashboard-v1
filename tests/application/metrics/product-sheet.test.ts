@@ -4,6 +4,7 @@ import {
   buildProductInventoryBreakdown,
   buildProductSkuMarginViews,
   buildProductWeeksCoverMetric,
+  hasProductSkuMappings,
 } from "@/src/application/metrics";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 
@@ -180,5 +181,88 @@ describe("Product Sheet-backed metrics", () => {
         status: "Demo cost; target unavailable",
       },
     ]);
+  });
+});
+
+/**
+ * The legacy workbook files 42% Cacao under SKU-01 and 70% Cacao under SKU-02 — the
+ * reverse of the approved product master, and on example rows. Each name is paired
+ * with its own correct variant, so inventory *labels* looked right; what crossed was
+ * the sku_id join key, so COGS, targets and margin attached to the wrong product.
+ * These pin the new workbook's mapping, which matches the product master.
+ */
+describe("canonical SKU to Shopify variant mapping", () => {
+  const newWorkbookSkuMaster: SheetRecord[] = [
+    {
+      sku_id: "SKU-01",
+      canonical_name: "70% Cacao Dark Chocolate",
+      shopify_variant_sku: "ZAC-DC-70-4PK",
+      pack_size_bars: 4,
+      is_active: "yes",
+    },
+    {
+      sku_id: "SKU-02",
+      canonical_name: "42% Cacao Smooth Chocolate",
+      shopify_variant_sku: "ZAC-MC-42-4PK",
+      pack_size_bars: 4,
+      is_active: "yes",
+    },
+  ];
+
+  it("files each chocolate under the sku_id the product master assigns it", () => {
+    const fact = (sku: string, quantity: number) => ({
+      locationId: "L1",
+      locationName: "SNAPL",
+      productTitle: "Bar",
+      variantTitle: "Pack",
+      sku,
+      quantityName: "on_hand",
+      quantity,
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+    const views = buildProductInventoryBreakdown(
+      context,
+      [fact("ZAC-DC-70-4PK", 2), fact("ZAC-MC-42-4PK", 145)],
+      newWorkbookSkuMaster,
+    );
+    const bySku = new Map(views.items.map((item) => [item.label, item.values[0]]));
+    // 2 packs x 4 bars of the 70%, 145 x 4 of the 42% — not the other way round.
+    expect(bySku.get("70% Cacao Dark Chocolate")).toMatchObject({ value: 8 });
+    expect(bySku.get("42% Cacao Smooth Chocolate")).toMatchObject({ value: 580 });
+  });
+
+  it("counts an unmapped pack variant through its mapped sibling", () => {
+    // SKU_Master maps only ZAC-MC-42-4PK, but the store stocks the ten-pack.
+    // Treating it as unknown dropped 580 bars from the total.
+    const fact = (sku: string, quantity: number) => ({
+      locationId: "L1",
+      locationName: "SNAPL",
+      productTitle: "Bar",
+      variantTitle: "Pack",
+      sku,
+      quantityName: "on_hand",
+      quantity,
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+    const views = buildProductInventoryBreakdown(
+      context,
+      [fact("ZAC-DC-70-4PK", 2), fact("ZAC-MC-42-10PK", 58)],
+      newWorkbookSkuMaster,
+    );
+    const bySku = new Map(views.items.map((item) => [item.label, item.values[0]]));
+    // Pack size comes from the variant's own suffix: 58 x 10, not 58 x 4.
+    expect(bySku.get("42% Cacao Smooth Chocolate")).toMatchObject({ value: 580 });
+    expect(bySku.get("70% Cacao Dark Chocolate")).toMatchObject({ value: 8 });
+    expect(views.metric.warnings).not.toContain("UNMAPPED_SHOPIFY_SKU:ZAC-MC-42-10PK");
+  });
+
+  it("treats the mapping as usable only when a variant sku is present", () => {
+    expect(hasProductSkuMappings(newWorkbookSkuMaster)).toBe(true);
+    // SKU-03..05 are real rows with no Shopify product yet; they must not count.
+    expect(
+      hasProductSkuMappings([
+        { sku_id: "SKU-03", canonical_name: "80% Fleur de Sel", pack_size_bars: 4 },
+      ]),
+    ).toBe(false);
   });
 });
