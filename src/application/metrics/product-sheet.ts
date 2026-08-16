@@ -7,6 +7,8 @@ import {
 } from "@/src/application/view-models";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 
+import { resolvePackVariantSibling } from "./pack-variants";
+
 import type {
   InventoryFact,
   MetricServiceContext,
@@ -106,6 +108,23 @@ export function hasApplicableProductLandedCosts(
   });
 }
 
+/** Explicit mapping first; otherwise derive the pack variant from a mapped sibling. */
+function resolveInventoryMapping(
+  shopifySku: string,
+  byShopifySku: ReadonlyMap<string, SkuMapping>,
+): SkuMapping | undefined {
+  const explicit = byShopifySku.get(shopifySku);
+  if (explicit) return explicit;
+  const derived = resolvePackVariantSibling(
+    shopifySku,
+    byShopifySku.keys(),
+    (candidate) => byShopifySku.get(candidate)?.canonicalSku ?? null,
+  );
+  if (!derived) return undefined;
+  const sibling = byShopifySku.get(derived.siblingShopifySku);
+  return sibling ? { ...sibling, shopifySku, packSizeBars: derived.packSizeBars } : undefined;
+}
+
 export function buildProductInventoryBreakdown(
   context: MetricServiceContext,
   inventory: readonly InventoryFact[],
@@ -116,7 +135,9 @@ export function buildProductInventoryBreakdown(
   const grouped = new Map<string, { label: string; bars: number }>();
   const unmapped = new Set<string>();
   for (const fact of inventory.filter(({ quantityName }) => quantityName === "on_hand")) {
-    const mapping = fact.sku ? byShopifySku.get(fact.sku) : undefined;
+    // SKU_Master maps the four-pack only, so an unmapped pack variant of the same
+    // product resolves through its sibling rather than dropping its stock.
+    const mapping = fact.sku ? resolveInventoryMapping(fact.sku, byShopifySku) : undefined;
     if (!mapping) {
       unmapped.add(fact.sku ?? "blank");
       continue;

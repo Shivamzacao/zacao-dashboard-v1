@@ -23,6 +23,17 @@ import { dashboardRoutes } from "@/src/presentation/shell/routes";
 afterEach(cleanup);
 
 describe("F3 dashboard pages", () => {
+  it("keeps the Product COGS chart on the same metric as its KPI", () => {
+    // These describe one quantity — landed cost per bar against target. The chart
+    // previously pointed at manufacturing.cogs_trend, which no contributor emits,
+    // so it rendered blocked directly beneath a KPI that was working.
+    const products = dashboardPageSpecs.products;
+    const kpiKeys = products.kpis.map((kpi) => (typeof kpi === "string" ? kpi : kpi.metricKey));
+    const cogsChart = products.charts.find(({ title }) => title === "Per-bar COGS versus target");
+    expect(cogsChart?.metricKey).toBe("manufacturing.cogs_per_bar");
+    expect(kpiKeys).toContain(cogsChart?.metricKey);
+  });
+
   it("maps every page element to an approved B7 metric and drill-down contract", () => {
     const metrics = new Set(metricCatalog.map(({ key }) => key));
     const datasets = new Set(drilldownCatalog.map(({ dataset }) => dataset));

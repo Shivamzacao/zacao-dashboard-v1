@@ -267,8 +267,12 @@ export function createSheetsApiContributors(
     ? new SheetsContributor("sheets-executive", operationsLoader(executiveSource, "migrated"))
     : null;
 
+  // Product Intelligence is migrated, so this binds to the new workbook when it is
+  // configured and falls back to the legacy one otherwise.
+  const productSource = executiveSource ?? source;
+  const productPage: SheetsDashboardPage = executiveSource ? "migrated" : "product";
   const product = new SheetsContributor("sheets-product", async (value) => {
-    const result = await source.readPageTabs("product", [
+    const result = await productSource.readPageTabs(productPage, [
       "Inventory_Snapshots",
       "COGS_By_SKU",
       "SKU_Master",
