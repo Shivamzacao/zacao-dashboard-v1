@@ -259,12 +259,16 @@ export function createSheetsApiContributors(
       };
     };
 
+  // Kept for any section still on the legacy workbook. Nothing references it now
+  // that Operations Intelligence is migrated; removing a dataset is a separate call.
   const operations = new SheetsContributor(
     "sheets-operations",
     operationsLoader(source, "operations"),
   );
-  const executive = executiveSource
-    ? new SheetsContributor("sheets-executive", operationsLoader(executiveSource, "migrated"))
+  // Named for the workbook it reads, not a page: Executive Health and Operations
+  // Intelligence both use it and share one cached read.
+  const migrated = executiveSource
+    ? new SheetsContributor("sheets-migrated", operationsLoader(executiveSource, "migrated"))
     : null;
 
   // Product Intelligence is migrated, so this binds to the new workbook when it is
@@ -424,7 +428,7 @@ export function createSheetsApiContributors(
   return [
     customers,
     operations,
-    ...(executive ? [executive] : []),
+    ...(migrated ? [migrated] : []),
     product,
     insights,
     marketing,

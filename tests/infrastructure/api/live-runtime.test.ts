@@ -412,9 +412,14 @@ describe("LiveBackendApiRuntime", () => {
     // Executive Health and Revenue Intelligence are migrated onto the new
     // workbook and share the v1-composite-migrated read; every other section
     // still points at the legacy datasets.
-    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-executive");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("sheets-migrated");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).toContain("v1-composite-migrated");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Executive Health"]).not.toContain("sheets-operations");
+    // Operations Intelligence shares both migrated datasets with Executive Health.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-migrated");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).not.toContain(
+      "sheets-operations",
+    );
     expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).toContain("v1-composite-migrated");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Revenue Intelligence"]).not.toContain(
       "v1-composite-metrics",
@@ -428,18 +433,30 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).not.toContain(
       "v1-composite-metrics",
     );
-    for (const section of ["Operations Intelligence", "Insights and Data Quality"] as const) {
-      expect(LIVE_DASHBOARD_SECTION_PLAN[section]).toContain("v1-composite-metrics");
-      expect(LIVE_DASHBOARD_SECTION_PLAN[section]).not.toContain("v1-composite-migrated");
-    }
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain(
+      "v1-composite-migrated",
+    );
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).not.toContain(
+      "v1-composite-metrics",
+    );
+    // Insights is the last section still on the legacy workbook.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).toContain(
+      "v1-composite-metrics",
+    );
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).not.toContain(
+      "v1-composite-migrated",
+    );
     // Customer Intelligence no longer reads a sheet for LTV: the Sales_Actuals tab
     // held only seeded example rows, so it now sources from Shopify orders.
     expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).toContain("shopify-customer-ltv");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).not.toContain("sheets-customers");
-    expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-operations");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
       "product-composite-metrics",
     );
+    // sheets-operations is now referenced by no section at all.
+    for (const section of Object.values(LIVE_DASHBOARD_SECTION_PLAN)) {
+      expect(section).not.toContain("sheets-operations");
+    }
   });
 
   it("serves certifiable Shopify values while blocked metrics stay null", async () => {
