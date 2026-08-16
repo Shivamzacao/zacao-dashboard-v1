@@ -391,8 +391,14 @@ export function createSheetsApiContributors(
     };
   });
 
+  // Financial Intelligence is migrated for the three tabs the new workbook holds.
+  // Finance_Actuals and Cash_Position do not exist there yet; they stay in the request
+  // list so their absence degrades their own tiles as SHEETS_TAB_MISSING, and so the
+  // day they are added costs no code change.
+  const financialSource = executiveSource ?? source;
+  const financialPage: SheetsDashboardPage = executiveSource ? "migrated" : "finance";
   const financial = new SheetsContributor("sheets-financial", async (value) => {
-    const result = await source.readPageTabs("finance", [
+    const result = await financialSource.readPageTabs(financialPage, [
       "Finance_Actuals",
       "Cash_Position",
       "Inventory_Snapshots",
