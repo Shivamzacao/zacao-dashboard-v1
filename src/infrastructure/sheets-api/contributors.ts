@@ -354,8 +354,13 @@ export function createSheetsApiContributors(
     };
   });
 
+  // Growth Intelligence reads the new workbook, where the four growth tabs are hidden
+  // mirrors of the team's visible input tabs. They are empty until the team enters BD
+  // data, which blanks tiles rather than invalidating them.
+  const growthSource = executiveSource ?? source;
+  const growthPage: SheetsDashboardPage = executiveSource ? "migrated" : "growth";
   const growth = new SheetsContributor("sheets-growth", async (value) => {
-    const result = await source.readPageTabs("growth", [
+    const result = await growthSource.readPageTabs(growthPage, [
       "Growth_Pipeline",
       "Social_Metrics",
       "Metric_Targets",

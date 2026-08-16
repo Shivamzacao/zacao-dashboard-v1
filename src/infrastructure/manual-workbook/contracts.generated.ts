@@ -1212,6 +1212,10 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
           "facebook",
           "pinterest",
           "other",
+          // The new workbook emits one "All Social" row per week alongside the
+          // per-platform rows. It carries the reach/impressions/engagements totals,
+          // which Marketing Input records once for the week rather than per platform.
+          "all_social",
         ],
       },
       { header: "account", kind: "text", required: true },
@@ -1406,7 +1410,10 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
         header: "collaboration_lifecycle",
         kind: "text",
         required: false,
-        enumValues: ["scheduled", "in_production", "live", "completed", "cancelled"],
+        // "planned" is the new workbook's dropdown wording for "scheduled". Both are
+        // outside ACTIVE_COLLAB_LIFECYCLES, so accepting it changes no metric — it only
+        // stops the value being discarded and the collaboration row losing its status.
+        enumValues: ["scheduled", "planned", "in_production", "live", "completed", "cancelled"],
       },
       { header: "collaboration_start_date", kind: "date", required: false },
       { header: "launch_date", kind: "date", required: false },

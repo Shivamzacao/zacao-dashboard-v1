@@ -812,3 +812,80 @@ describe("Insights on the migrated workbook", () => {
     expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 });
+
+/**
+ * Growth Intelligence is migrated. Its four BD tabs exist in the new workbook as hidden
+ * mirrors of the team's input tabs but hold no rows yet, so the steady state for a while
+ * is "present and empty". That must blank the tiles it feeds, not invalidate the page —
+ * and it must never be reported as disclosed demo data, which is what the legacy workbook
+ * was serving here (all 6 investors and all 6 grants were DUMMY_TEST_DATA).
+ */
+describe("Growth on the migrated workbook", () => {
+  const emptyBdTabs = {
+    Growth_Pipeline: [],
+    Investor_Pipeline: [],
+    Grants: [],
+    Metric_Targets: [],
+    Social_Metrics: [
+      {
+        record_id: "SOC-1-Instagram",
+        snapshot_date: "2026-08-10",
+        platform: "instagram",
+        account: "ZACAO",
+        followers: 12_480,
+        source_status: "production",
+      },
+    ],
+  };
+
+  it("reads the new workbook, never the legacy one, when both are configured", async () => {
+    const legacy = new FakeSource(emptyBdTabs);
+    const migrated = new FakeSource(emptyBdTabs);
+
+    await migratedContributor(legacy, migrated, "sheets-growth").load(context);
+
+    expect(migrated.pagesRead).toEqual(["migrated"]);
+    expect(legacy.pagesRead).toEqual([]);
+  });
+
+  it("falls back to the legacy workbook when the new one is not configured", async () => {
+    const legacy = new FakeSource(emptyBdTabs);
+
+    await contributor(legacy, "sheets-growth").load(context);
+
+    expect(legacy.pagesRead).toEqual(["growth"]);
+  });
+
+  it("still publishes social performance when every BD tab is empty", async () => {
+    const contribution = await migratedContributor(
+      new FakeSource({}),
+      new FakeSource(emptyBdTabs),
+      "sheets-growth",
+    ).load(context);
+
+    expect(
+      contribution.metrics?.find((metric) => metric.key === "social.performance")?.value,
+    ).toEqual({ kind: "count", value: 12_480 });
+  });
+
+  it("blanks the pipeline, investor and grant tiles rather than inventing zeroes", async () => {
+    const contribution = await migratedContributor(
+      new FakeSource({}),
+      new FakeSource(emptyBdTabs),
+      "sheets-growth",
+    ).load(context);
+
+    for (const key of [
+      "growth.open_pipeline_value",
+      "growth.weighted_pipeline",
+      "investors.count",
+      "grants.secured",
+    ]) {
+      expect(contribution.metrics?.find((metric) => metric.key === key)?.value).toBeNull();
+    }
+
+    // Empty tabs are missing data, not disclosed demo data. The legacy workbook reached
+    // this page through the example fallback; the new one must not.
+    expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+});
