@@ -51,6 +51,9 @@ export const ORDERS_QUERY = `
       nodes {
         id name createdAt processedAt cancelledAt test currencyCode sourceName tags
         displayFinancialStatus displayFulfillmentStatus
+        # Identity only — never a name, email or phone. Cohorts need a stable key
+        # to group by, and every rendered output is an aggregate.
+        customer { id }
         currentSubtotalPriceSet { shopMoney { amount currencyCode } }
         currentTotalPriceSet { shopMoney { amount currencyCode } }
         currentTotalDiscountsSet { shopMoney { amount currencyCode } }

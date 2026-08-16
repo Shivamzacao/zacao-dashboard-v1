@@ -427,6 +427,10 @@ describe("LiveBackendApiRuntime", () => {
       expect(LIVE_DASHBOARD_SECTION_PLAN[section]).toContain("v1-composite-metrics");
       expect(LIVE_DASHBOARD_SECTION_PLAN[section]).not.toContain("v1-composite-migrated");
     }
+    // Customer Intelligence no longer reads a sheet for LTV: the Sales_Actuals tab
+    // held only seeded example rows, so it now sources from Shopify orders.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).toContain("shopify-customer-ltv");
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Customer Intelligence"]).not.toContain("sheets-customers");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).toContain("sheets-operations");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Product Intelligence"]).toContain(
       "product-sheet-example-metrics",

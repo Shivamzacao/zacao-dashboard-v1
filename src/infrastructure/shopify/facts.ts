@@ -23,7 +23,7 @@ import type {
 import { BLANK_PRODUCT_TITLE } from "@/src/application/metrics/sku-labels";
 import { ratioToBasisPoints } from "@/src/domain/utilities/money";
 
-import type { normalizeProduct } from "./normalization";
+import type { normalizeOrder, normalizeProduct } from "./normalization";
 
 type ShopifyQlRow = Readonly<Record<string, unknown>>;
 type NormalizedProduct = ReturnType<typeof normalizeProduct>;
@@ -456,4 +456,116 @@ export function mapInventoryFacts(
       );
     }),
   );
+}
+
+/**
+ * Shopify financial statuses folded onto the Sales_Actuals contract. Anything
+ * unmapped is left out rather than guessed, so the LTV validator rejects it as
+ * an unsupported status instead of silently counting it as revenue.
+ */
+/** Statuses the LTV calculation treats as revenue-bearing (mirrors QUALIFYING_STATUSES). */
+const QUALIFYING_LTV_STATUSES = new Set(["paid", "confirmed", "partially_refunded"]);
+
+const ORDER_STATUS_BY_FINANCIAL_STATUS: Readonly<Record<string, string>> = {
+  PAID: "paid",
+  PARTIALLY_REFUNDED: "partially_refunded",
+  REFUNDED: "refunded",
+  AUTHORIZED: "confirmed",
+  PARTIALLY_PAID: "confirmed",
+  PENDING: "unpaid",
+  EXPIRED: "unpaid",
+  VOIDED: "cancelled",
+};
+
+/** New York calendar date for an instant — the reporting boundary in spec §2. */
+function reportingDate(instant: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(instant));
+}
+
+const dollars = (money: { readonly minorUnits: number }) => money.minorUnits / 100;
+
+type NormalizedOrder = ReturnType<typeof normalizeOrder>;
+
+/**
+ * Projects Shopify orders onto the Sales_Actuals record contract so the certified
+ * realized-LTV and active-customer calculations can run against the provider that
+ * actually owns commerce actuals (spec §3), rather than a manually maintained tab.
+ *
+ * `first_order_date` is derived across every order supplied, so callers must pass
+ * a customer's full history — a period-scoped read would relabel long-standing
+ * customers as new and trip the validator's inconsistent-first-order check.
+ *
+ * Customer ids stay server-side: every rendered output is an aggregate.
+ */
+export function mapShopifyLtvRecords(
+  orders: readonly NormalizedOrder[],
+  dataAsOf: string,
+): readonly Readonly<Record<string, string | number>>[] {
+  const eligible = orders.filter((order) => order.customerId !== null);
+  // Spec §5.4 defines the cohort by the first *qualifying* order, and the LTV
+  // validator drops a customer whose stated first order is not their earliest
+  // qualifying one. Counting a cancelled or zero-value first purchase here would
+  // therefore discard that customer's entire history.
+  const firstQualifying = new Map<string, string>();
+  const firstAny = new Map<string, string>();
+  for (const order of eligible) {
+    const customerId = order.customerId as string;
+    const date = reportingDate(order.processedAt ?? order.createdAt);
+    const earlier = (map: Map<string, string>) => {
+      const previous = map.get(customerId);
+      if (previous === undefined || date < previous) map.set(customerId, date);
+    };
+    earlier(firstAny);
+    const status = order.cancelledAt
+      ? "cancelled"
+      : ORDER_STATUS_BY_FINANCIAL_STATUS[order.financialStatus ?? ""];
+    if (status && QUALIFYING_LTV_STATUSES.has(status) && !order.test && dollars(order.subtotal) > 0)
+      earlier(firstQualifying);
+  }
+  // A customer with no qualifying order still needs one consistent date across
+  // all their rows, or the consistency check drops them for a different reason.
+  const firstOrderDate = (customerId: string) =>
+    firstQualifying.get(customerId) ?? firstAny.get(customerId);
+
+  return eligible.flatMap((order) => {
+    const customerId = order.customerId as string;
+    const status = order.cancelledAt
+      ? "cancelled"
+      : ORDER_STATUS_BY_FINANCIAL_STATUS[order.financialStatus ?? ""];
+    if (!status) return [];
+    const orderDate = reportingDate(order.processedAt ?? order.createdAt);
+    // Merchandise only: subtotal already excludes shipping and tax, and Shopify
+    // reports it net of discounts, so discounts are not deducted a second time.
+    const gross = dollars(order.subtotal);
+    const refunds = dollars(order.refunded);
+    // A cancelled order contributes its own value as the cancellation, leaving
+    // net at zero rather than counting revenue that never happened.
+    const cancellations = order.cancelledAt ? Math.max(0, gross - refunds) : 0;
+    const net = gross - refunds - cancellations;
+    return [
+      {
+        order_id: order.id,
+        customer_id: customerId,
+        order_date: orderDate,
+        first_order_date: firstOrderDate(customerId) ?? orderDate,
+        gross_product_sales_usd: gross,
+        discounts_usd: 0,
+        refunds_returns_usd: refunds,
+        cancellations_usd: cancellations,
+        net_product_revenue_usd: net,
+        order_status: status,
+        acquisition_channel: order.sourceName,
+        currency: "USD",
+        is_test: order.test ? "yes" : "no",
+        // Required by the validator: the freshness stamp the sheet contract
+        // carried per row. Here it is the moment the provider was read.
+        data_as_of: dataAsOf,
+      },
+    ];
+  });
 }
