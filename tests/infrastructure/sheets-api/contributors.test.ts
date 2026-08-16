@@ -34,6 +34,9 @@ const context = {
 };
 
 class FakeSource implements SheetsTabDataSource {
+  /** Pages this source was actually asked for, so routing can be asserted. */
+  readonly pagesRead: Parameters<SheetsTabDataSource["readPageTabs"]>[0][] = [];
+
   constructor(
     private readonly records: Readonly<Record<string, readonly SheetRecord[]>>,
     private readonly examples: Readonly<Record<string, readonly SheetRecord[]>> = {},
@@ -44,9 +47,10 @@ class FakeSource implements SheetsTabDataSource {
   }
 
   async readPageTabs(
-    _page: Parameters<SheetsTabDataSource["readPageTabs"]>[0],
+    page: Parameters<SheetsTabDataSource["readPageTabs"]>[0],
     tabNames: readonly string[],
   ): Promise<SheetsTabReadResult> {
+    this.pagesRead.push(page);
     return {
       tabs: Object.fromEntries(tabNames.map((tab) => [tab, this.records[tab] ?? []])),
       exampleTabs: Object.fromEntries(tabNames.map((tab) => [tab, this.examples[tab] ?? []])),
@@ -58,6 +62,19 @@ class FakeSource implements SheetsTabDataSource {
 
 function contributor(source: SheetsTabDataSource, dataset: string) {
   const found = createSheetsApiContributors(source).find((entry) => entry.dataset === dataset);
+  if (!found) throw new Error(`Missing contributor ${dataset}`);
+  return found;
+}
+
+/** Both workbooks configured, as they are in production while the migration runs. */
+function migratedContributor(
+  legacy: SheetsTabDataSource,
+  migrated: SheetsTabDataSource,
+  dataset: string,
+) {
+  const found = createSheetsApiContributors(legacy, migrated).find(
+    (entry) => entry.dataset === dataset,
+  );
   if (!found) throw new Error(`Missing contributor ${dataset}`);
   return found;
 }
@@ -623,6 +640,104 @@ describe("Operations on a workbook with tabs still absent", () => {
     expect(lots?.rows ?? []).toEqual([]);
 
     // Absent tabs must not be reported as disclosed demo rows.
+    expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+});
+
+/**
+ * Financial Intelligence is migrated for the three tabs the new workbook holds.
+ * Finance_Actuals and Cash_Position are still absent there, so this is the steady
+ * state until ZACAO adds them: two tiles blank, three serving richer data than the
+ * legacy workbook ever did.
+ */
+describe("Financial on the migrated workbook", () => {
+  const presentTabs = {
+    Inventory_Snapshots: [
+      {
+        record_id: "INV-1",
+        snapshot_at: "2026-08-13",
+        warehouse: "SNAPL",
+        sku: "SKU-01",
+        on_hand: 100,
+        source_status: "production",
+      },
+    ],
+    COGS_By_SKU: [
+      {
+        record_id: "COGS-1",
+        sku: "SKU-01",
+        effective_from: "2026-07-20",
+        cost_basis: "landed",
+        total_unit_cost_usd: 2.301,
+        source_status: "production",
+      },
+    ],
+    Production_Orders: [
+      {
+        record_id: "PO-1",
+        po_number: "PO-2001",
+        sku: "SKU-01",
+        units: 5000,
+        unit_cost_usd: 1.43,
+        source_status: "production",
+      },
+    ],
+    // Finance_Actuals and Cash_Position are absent, exactly as the new workbook has them.
+  };
+
+  it("reads the new workbook, never the legacy one, when both are configured", async () => {
+    const legacy = new FakeSource(presentTabs);
+    const migrated = new FakeSource(presentTabs);
+
+    await migratedContributor(legacy, migrated, "sheets-financial").load(context);
+
+    expect(migrated.pagesRead).toEqual(["migrated"]);
+    expect(legacy.pagesRead).toEqual([]);
+  });
+
+  it("falls back to the legacy workbook when the new one is not configured", async () => {
+    const legacy = new FakeSource(presentTabs);
+
+    await contributor(legacy, "sheets-financial").load(context);
+
+    expect(legacy.pagesRead).toEqual(["finance"]);
+  });
+
+  it("still values inventory and production exposure from the tabs that are present", async () => {
+    const contribution = await migratedContributor(
+      new FakeSource({}),
+      new FakeSource(presentTabs),
+      "sheets-financial",
+    ).load(context);
+
+    // 100 bars x $2.301 landed.
+    expect(contribution.metrics?.find((metric) => metric.key === "inventory.value")?.value).toEqual(
+      { kind: "money", value: { currency: "USD", minorUnits: 23_010 } },
+    );
+
+    // 5,000 units x $1.43, no freight column on the row.
+    expect(
+      contribution.breakdowns?.find((entry) => entry.metric.key === "production.cost_payment")
+        ?.metric.value,
+    ).toEqual({ kind: "money", value: { currency: "USD", minorUnits: 715_000 } });
+  });
+
+  it("blanks expenses and cash position rather than reporting them as zero", async () => {
+    const contribution = await migratedContributor(
+      new FakeSource({}),
+      new FakeSource(presentTabs),
+      "sheets-financial",
+    ).load(context);
+
+    for (const key of ["finance.actual_expenses", "finance.cash_position"]) {
+      expect(contribution.metrics?.find((metric) => metric.key === key)?.value).toBeNull();
+    }
+    expect(
+      contribution.breakdowns?.find((entry) => entry.metric.key === "finance.expense_composition")
+        ?.metric.value,
+    ).toBeNull();
+
+    // An absent tab is missing data, not disclosed demo data.
     expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
   });
 });

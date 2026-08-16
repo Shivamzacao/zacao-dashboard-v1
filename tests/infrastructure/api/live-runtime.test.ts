@@ -439,7 +439,9 @@ describe("LiveBackendApiRuntime", () => {
     expect(LIVE_DASHBOARD_SECTION_PLAN["Operations Intelligence"]).not.toContain(
       "v1-composite-metrics",
     );
-    // Insights is the last section still on the legacy workbook.
+    // Insights, Marketing and Growth are the sections still on the legacy workbook.
+    // Financial keeps the sheets-financial name but reads the new one, so the plan
+    // entry cannot show its migration — contributors.test.ts asserts that routing.
     expect(LIVE_DASHBOARD_SECTION_PLAN["Insights and Data Quality"]).toContain(
       "v1-composite-metrics",
     );

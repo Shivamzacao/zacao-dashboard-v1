@@ -194,6 +194,9 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "marketing-composite-metrics",
   ],
   "Growth Intelligence": ["sheets-growth", "growth-composite-metrics"],
+  // Migrated: sheets-financial keeps its name but now reads the new workbook, which
+  // holds three of its five tabs. Finance_Actuals and Cash_Position are absent there,
+  // so expenses and cash position blank until ZACAO adds them.
   "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
   "Insights and Data Quality": [
     "shopify-history",
