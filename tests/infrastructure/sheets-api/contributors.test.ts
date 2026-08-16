@@ -542,3 +542,87 @@ describe("Sheets API contributors", () => {
     ).toEqual({ kind: "money", value: { currency: "USD", minorUnits: 29_000 } });
   });
 });
+
+/**
+ * Operations Intelligence reads the new workbook, which is missing six of the tabs
+ * the loader requests (Inventory_Lots, Warehouse_Fulfillment and four Packaging_*).
+ * That is the steady state for a while, so the page must degrade tile by tile
+ * rather than collapse.
+ */
+describe("Operations on a workbook with tabs still absent", () => {
+  const withPresentTabsOnly = () =>
+    new FakeSource({
+      Inventory_Snapshots: [
+        {
+          record_id: "INV-1",
+          snapshot_at: "2026-08-15",
+          warehouse: "YBYD",
+          sku: "SKU-01",
+          on_hand: 240,
+          source_status: "production",
+        },
+      ],
+      Location_Master: [{ location_id: "LOC-02", location_name: "YBYD", is_active: "yes" }],
+      Production_Orders: [
+        {
+          record_id: "PO-1",
+          po_number: "PO-2001",
+          sku: "SKU-01",
+          units: 5000,
+          supplier: "Fairafric",
+          order_date: "2026-03-02",
+          expected_date: "2026-03-30",
+          received_date: "2026-03-28",
+          received_units: 5000,
+          accepted_units: 5000,
+          confirmed_date: "2026-02-10",
+          status: "received",
+          unit_cost_usd: 1.43,
+          source_status: "production",
+        },
+      ],
+      // Inventory_Lots, Warehouse_Fulfillment and the Packaging_* tabs are absent,
+      // exactly as the new workbook has them today.
+    });
+
+  it("still produces the metrics its present tabs support", async () => {
+    const contribution = await contributor(withPresentTabsOnly(), "sheets-operations").load(
+      context,
+    );
+
+    // Manufacturer views come from Production_Orders, which is present.
+    const otif = contribution.breakdowns?.find(
+      (entry) => entry.metric.key === "operations.manufacturer_otif",
+    );
+    expect(otif?.metric.value).toEqual({ kind: "rate_basis_points", value: 10_000 });
+
+    // Combined inventory comes from Inventory_Snapshots + Location_Master.
+    const combined = contribution.breakdowns?.find(
+      (entry) => entry.metric.key === "inventory.combined",
+    );
+    expect(combined?.items.map((item) => item.key)).toContain("YBYD:SKU-01");
+  });
+
+  it("blanks only the tiles whose tabs are absent, and never invents a zero", async () => {
+    const contribution = await contributor(withPresentTabsOnly(), "sheets-operations").load(
+      context,
+    );
+
+    const warehouse = contribution.metrics?.find(
+      (metric) => metric.key === "operations.warehouse_on_time_accuracy",
+    );
+    expect(warehouse?.value).toBeNull();
+
+    const packagingStock = contribution.breakdowns?.find(
+      (entry) => entry.metric.key === "inventory.packaging_stock",
+    );
+    expect(packagingStock?.metric.value).toBeNull();
+    expect(packagingStock?.items ?? []).toEqual([]);
+
+    const lots = contribution.tables?.find((entry) => entry.metric.key === "inventory.lots");
+    expect(lots?.rows ?? []).toEqual([]);
+
+    // Absent tabs must not be reported as disclosed demo rows.
+    expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+});

@@ -141,7 +141,7 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-fulfillment",
     // Migrated onto the new operations workbook. Sections still listing
     // v1-composite-metrics / sheets-* read the legacy workbook.
-    "sheets-executive",
+    "sheets-migrated",
     "insights-freshness",
     "v1-composite-migrated",
   ],
@@ -180,8 +180,10 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-catalog-inventory",
     "shopify-refund-rate",
     "shopify-fulfillment",
-    "sheets-operations",
-    "v1-composite-metrics",
+    // Migrated: shares the new workbook's cached read with Executive Health.
+    // The six tabs the new workbook lacks degrade their own tiles, not the page.
+    "sheets-migrated",
+    "v1-composite-migrated",
     "deferred-google_drive",
   ],
   "Marketing Intelligence": [
@@ -308,16 +310,17 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       contributors.push(
         ...createSheetsApiContributors(this.sheetsSource, this.executiveSheetsSource),
       );
-      // Executive Health plans sheets-executive unconditionally, so without the
-      // new workbook configured it must still resolve to a truthful deferred state.
+      // Executive Health and Operations Intelligence plan sheets-migrated
+      // unconditionally, so without the new workbook configured it must still
+      // resolve to a truthful deferred state.
       if (!this.executiveSheetsSource) {
-        contributors.push(new DeferredSourceContributor("sheets-executive", "google_sheets", now));
+        contributors.push(new DeferredSourceContributor("sheets-migrated", "google_sheets", now));
       }
     } else {
       contributors.push(
         new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
         new DeferredSourceContributor("sheets-operations", "google_sheets", now),
-        new DeferredSourceContributor("sheets-executive", "google_sheets", now),
+        new DeferredSourceContributor("sheets-migrated", "google_sheets", now),
         new DeferredSourceContributor("sheets-customers", "google_sheets", now),
         new DeferredSourceContributor("sheets-product", "google_sheets", now),
         new DeferredSourceContributor("sheets-insights", "google_sheets", now),
