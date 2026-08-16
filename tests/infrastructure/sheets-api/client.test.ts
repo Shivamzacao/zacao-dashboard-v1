@@ -359,6 +359,23 @@ describe("SheetsApiClient reading the new operations workbook", () => {
     expect(result.tabs["Additional_Depletions"]?.[0]).toMatchObject({ reason: "sampling" });
   });
 
+  it("accepts the new workbook's weekly All Social aggregate row", async () => {
+    // Marketing Input records reach/impressions/engagements once per week rather than
+    // per platform, so Social_Metrics emits four follower rows plus one "All Social" row
+    // carrying those totals. Before the enum was widened this row failed its required
+    // platform column, costing a SHEETS_ROW_INVALID warning for every week in the sheet.
+    const result = await read("Social_Metrics", [
+      ["record_id", "snapshot_date", "platform", "account", "followers", "reach", "source_status"],
+      ["SOC-1-Instagram", 46249, "Instagram", "ZACAO", 12_480, "", "production"],
+      ["SOC-1-All Social", 46249, "All Social", "ZACAO", "", 96_000, "production"],
+    ]);
+    expect(result.warnings).toEqual([]);
+    expect(result.tabs["Social_Metrics"]?.[1]).toMatchObject({
+      platform: "all_social",
+      reach: 96_000,
+    });
+  });
+
   it("reads checkbox booleans as yes/no enum values", async () => {
     const result = await read("Location_Master", [
       ["location_id", "location_name", "location_type", "is_active", "source_status"],

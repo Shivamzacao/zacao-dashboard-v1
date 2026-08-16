@@ -390,7 +390,9 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             now,
           }),
           createGrowthCompositeContributor({
-            sheets: this.sheetsSource,
+            // Growth Intelligence is migrated onto the new workbook.
+            sheets: this.executiveSheetsSource ?? this.sheetsSource,
+            ...(this.executiveSheetsSource ? { page: "migrated" as const } : {}),
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
