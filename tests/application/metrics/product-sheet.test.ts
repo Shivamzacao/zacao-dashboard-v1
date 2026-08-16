@@ -256,6 +256,38 @@ describe("canonical SKU to Shopify variant mapping", () => {
     expect(views.metric.warnings).not.toContain("UNMAPPED_SHOPIFY_SKU:ZAC-MC-42-10PK");
   });
 
+  it("covers weeks of cover from the same pack-variant resolution", () => {
+    // Sellable stock sits almost entirely on the unmapped ten-pack, so an
+    // explicit-only lookup left availableBars at zero and the KPI permanently
+    // "data pending" — the same defect as the inventory breakdown, one function over.
+    const stock = (sku: string, quantity: number) => ({
+      locationId: "L1",
+      locationName: "SNAPL",
+      productTitle: "Bar",
+      variantTitle: "Pack",
+      sku,
+      quantityName: "available",
+      quantity,
+      updatedAt: "2026-08-13T00:00:00.000Z",
+    });
+    const sold = (sku: string, units: number) => ({
+      period: "trailing-28-days",
+      product: "Bar",
+      variant: "Pack",
+      sku,
+      merchandise: true,
+      units,
+    });
+    const metric = buildProductWeeksCoverMetric(
+      context,
+      [stock("ZAC-MC-42-10PK", 56)],
+      [sold("ZAC-MC-42-10PK", 7)],
+      newWorkbookSkuMaster,
+    );
+    // 560 available bars over 70 sold in 28 days = 8 weeks of cover.
+    expect(metric.value).toEqual({ kind: "quantity", value: 32 });
+  });
+
   it("treats the mapping as usable only when a variant sku is present", () => {
     expect(hasProductSkuMappings(newWorkbookSkuMaster)).toBe(true);
     // SKU-03..05 are real rows with no Shopify product yet; they must not count.
