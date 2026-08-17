@@ -19,11 +19,24 @@ const FIXTURE = path.join(
  * legacy workbook; the new operations workbook inserted week_ending into three
  * tabs, and the contracts were widened to serve both during the migration.
  * Everything outside this list must still match the fixture exactly.
+ *
+ * Marketing_Spend carries seven. Declaring them is what widens the read window to
+ * column X, which is how source_status becomes visible at all — with a 17-column
+ * contract it fell outside the request and every row read as production.
  */
 const INTENTIONAL_ADDITIONS: Readonly<Record<string, readonly string[]>> = {
   Production_Orders: ["received_units", "week_ending"],
   Inventory_Snapshots: ["week_ending"],
   Additional_Depletions: ["week_ending"],
+  Marketing_Spend: [
+    "week_ending",
+    "new_customers_acquired",
+    "attributed_revenue_usd",
+    "cpc_usd",
+    "cpa_usd",
+    "cac_usd",
+    "roas",
+  ],
 };
 
 describe("generated manual-workbook contracts", () => {

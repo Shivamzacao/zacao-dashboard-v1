@@ -17,6 +17,7 @@ import {
   buildLowInventoryBreakdown,
   buildMarketingSpendMetric,
   buildMarketingSpendMonthlyBreakdown,
+  buildPaidCacMetric,
   buildSocialMarketingViews,
   buildManufacturerOtifBreakdown,
   buildManufacturerOperationsViews,
@@ -318,6 +319,7 @@ export function createSheetsApiContributors(
           metricContext,
           toMarketingSpendRecords(result.tabs["Marketing_Spend"] ?? []),
         ),
+        buildPaidCacMetric(metricContext, result.tabs["Marketing_Spend"] ?? []),
         social.followers,
       ],
       breakdowns: [

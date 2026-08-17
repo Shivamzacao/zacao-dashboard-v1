@@ -281,6 +281,11 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         "customers.active",
         "customers.realized_ltv",
         {
+          metricKey: "customers.ltv_90d",
+          sourceLabel: "Shopify",
+          valuePresentation: "full",
+        },
+        {
           metricKey: "engagement.time_on_site",
           label: "Time on site",
           sourceLabel: "Shopify",
@@ -704,6 +709,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         { metricKey: "klaviyo.email_open_rate", sourceLabel: "Klaviyo" },
         { metricKey: "klaviyo.email_click_rate", sourceLabel: "Klaviyo" },
         { metricKey: "klaviyo.attributed_revenue", sourceLabel: "Klaviyo" },
+        { metricKey: "marketing.paid_cac", sourceLabel: "Google Sheets" },
         { metricKey: "social.followers_total", sourceLabel: "Google Sheets" },
         { metricKey: "collabs.active", sourceLabel: "Google Sheets" },
         { metricKey: "ambassadors.active", sourceLabel: "Google Sheets" },

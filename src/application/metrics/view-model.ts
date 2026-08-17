@@ -162,11 +162,19 @@ export function createMetricViewModel(input: {
       definitionVersion: "1.0",
       implementationStatus: definition.status,
       value: null,
-      readiness: readiness("no_activity", "No genuine activity in the selected period.", warnings),
+      readiness: readiness(
+        "no_activity",
+        input.dataPendingReason ?? "No genuine activity in the selected period.",
+        warnings,
+      ),
       dataPeriod: input.dataPeriod,
       sources: [...input.sources],
       warnings,
-      unavailableReason: null,
+      // A caller that knows *why* the value is absent is more accurate than the
+      // generic sentence: paid spend with no attributed-customer count is not the
+      // same as no campaigns having run, and reading it as the latter is a
+      // materially wrong conclusion.
+      unavailableReason: input.dataPendingReason ?? null,
     };
   }
 

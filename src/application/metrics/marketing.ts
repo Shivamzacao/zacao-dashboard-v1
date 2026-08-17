@@ -42,6 +42,7 @@ function metric(
   metricKey: string,
   value: Parameters<typeof createMetricViewModel>[0]["value"],
   warnings: readonly string[] = [],
+  dataPendingReason?: string,
 ): MetricViewModel {
   return createMetricViewModel({
     metricKey,
@@ -50,6 +51,7 @@ function metric(
     sources: context.sourceStatuses,
     value,
     warnings,
+    ...(dataPendingReason ? { dataPendingReason } : {}),
   });
 }
 
@@ -127,6 +129,63 @@ export function buildMarketingSpendMonthlyBreakdown(
         warnings: [],
       })),
   });
+}
+
+/**
+ * Paid CAC: paid media spend divided by the first-time customers the ad platforms
+ * attribute to it (spec §C.2).
+ *
+ * Scoped to paid media on purpose. A blended company CAC would need a deduplicated
+ * new-customer population across Shopify and the true external channels, which no
+ * source supplies yet, and publishing a paid numerator over a whole-company
+ * denominator would flatter the number by every organic customer.
+ *
+ * `conversions` is never the denominator even though it is the fuller column: a
+ * conversion counts repeat buyers, so it answers a different question.
+ */
+export function buildPaidCacMetric(
+  context: MetricServiceContext,
+  rows: readonly SheetRecord[],
+): MetricViewModel {
+  const applicable = rows.filter((row) => inDateRange(text(row, "date"), context));
+  let spendMinorUnits = 0;
+  let customers = 0;
+  let uncountedSpend = false;
+  for (const row of applicable) {
+    const spend = number(row, "spend_usd");
+    const acquired = number(row, "new_customers_acquired");
+    if (spend === null) continue;
+    // A campaign with spend but no attributed-customer count leaves both sides
+    // alone. Adding its spend to the numerator while its customers are unknown
+    // would charge it to other campaigns' customers and understate the cost.
+    if (acquired === null || acquired <= 0) {
+      uncountedSpend = true;
+      continue;
+    }
+    spendMinorUnits += Math.round(spend * 100);
+    customers += acquired;
+  }
+  const warnings = [
+    // The denominator is whatever the ad platform reported, under whichever
+    // attribution model and window that platform used. Never presented as
+    // Shopify-verified acquisition.
+    "PAID_CAC_PLATFORM_REPORTED",
+    ...(uncountedSpend ? ["PAID_CAC_SPEND_COVERAGE_PARTIAL"] : []),
+  ];
+  return metric(
+    context,
+    "marketing.paid_cac",
+    customers === 0 ? null : { kind: "money", value: usd(Math.round(spendMinorUnits / customers)) },
+    warnings,
+    customers > 0
+      ? undefined
+      : uncountedSpend
+        ? // Spend ran but no campaign reported attributed first-time customers.
+          // Saying "no activity" here would read as "no campaigns ran", which is
+          // the opposite of what happened.
+          "Paid campaigns ran, but none reported attributed first-time customers."
+        : "No paid campaign spend in the selected period.",
+  );
 }
 
 export function buildSocialMarketingViews(

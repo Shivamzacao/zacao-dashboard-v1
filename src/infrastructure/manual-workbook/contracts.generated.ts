@@ -1190,6 +1190,23 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
       { header: "updated_by", kind: "text", required: false },
       { header: "source_reference", kind: "text", required: false },
       { header: "notes", kind: "text", required: false },
+      // The new workbook's Marketing_Spend is seven columns wider than the legacy
+      // one. Declaring them matters beyond the extra fields: the read window is
+      // `columnName(columns.length)`, so a 17-column contract stopped at Q and left
+      // source_status (R) and data_as_of (S) unread — every row then looked like
+      // production and the workbook's own `example` demo rows shipped as real spend.
+      // All optional, so the legacy workbook resolves them to null unchanged.
+      { header: "week_ending", kind: "date", required: false },
+      // Paid Media's attributed first-time customers: the only CAC denominator the
+      // workbook collects. `conversions` above is not a substitute (spec §C.2).
+      { header: "new_customers_acquired", kind: "integer", required: false },
+      { header: "attributed_revenue_usd", kind: "usd", required: false },
+      // Sheet-side conveniences. They use IFERROR(..., 0), so a blank numerator
+      // reads as a real 0 — never surface them as metrics; recompute instead.
+      { header: "cpc_usd", kind: "decimal", required: false },
+      { header: "cpa_usd", kind: "decimal", required: false },
+      { header: "cac_usd", kind: "decimal", required: false },
+      { header: "roas", kind: "decimal", required: false },
     ],
   },
   Social_Metrics: {
@@ -1218,10 +1235,6 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
           // whitelist (marketing.ts, growth.ts) rather than every row present.
           "all_social",
           "other",
-          // The new workbook emits one "All Social" row per week alongside the
-          // per-platform rows. It carries the reach/impressions/engagements totals,
-          // which Marketing Input records once for the week rather than per platform.
-          "all_social",
         ],
       },
       { header: "account", kind: "text", required: true },

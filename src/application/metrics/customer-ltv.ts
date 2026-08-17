@@ -453,13 +453,54 @@ function metricSources(
   );
 }
 
+/**
+ * Smallest matured cohort a 90-day LTV may be published from.
+ *
+ * The metric exists to be divided by acquisition cost, and at this store's volume a
+ * mean over a handful of customers swings tens of percent when one person reorders.
+ * A ratio that unstable is worse than an absent one, so below the floor the value is
+ * withheld rather than shown with a caveat. Between the floor and COHORT_THIN the
+ * value publishes but still carries the warning.
+ */
+const LTV_90D_MIN_CUSTOMERS = 30;
+const LTV_90D_THIN_CUSTOMERS = 100;
+
+/** Shopify order history replaced the Sales_Actuals tab this once read (PR #65). */
+const NO_ELIGIBLE_ROWS = "Shopify order history has no runtime-eligible rows.";
+
+/**
+ * Customer-weighted mean of the 90-day cohort LTVs that `calculateRealizedLtv`
+ * already produced. Only cohorts whose 90-day window has fully elapsed count, and
+ * they are weighted by cohort size so a small young cohort cannot outvote a large
+ * one — a plain mean of cohort means would do exactly that.
+ */
+function ltv90dFromCohorts(cohorts: RealizedLtvResult["cohorts"]): {
+  readonly minorUnits: number | null;
+  readonly customers: number;
+} {
+  const matured = cohorts.filter(
+    (cohort) => cohort.maturity["90d"] && cohort.ltvMinorUnits["90d"] !== null,
+  );
+  const customers = matured.reduce((total, cohort) => total + cohort.customerCount, 0);
+  if (customers === 0) return { minorUnits: null, customers: 0 };
+  const revenue = matured.reduce(
+    (total, cohort) => total + (cohort.ltvMinorUnits["90d"] ?? 0) * cohort.customerCount,
+    0,
+  );
+  return { minorUnits: Math.round(revenue / customers), customers };
+}
+
 export function buildRealizedLtvViews(input: {
   readonly context: MetricServiceContext;
   readonly records: readonly SheetRecord[];
   readonly channelMapping: readonly SheetRecord[];
   readonly channels: readonly string[];
   readonly sourceWarnings?: readonly string[];
-}): { readonly metric: MetricViewModel; readonly cohorts: MetricTableViewModel } {
+}): {
+  readonly metric: MetricViewModel;
+  readonly ltv90d: MetricViewModel;
+  readonly cohorts: MetricTableViewModel;
+} {
   const missing = input.records.length === 0;
   const result = calculateRealizedLtv({
     records: input.records,
@@ -506,7 +547,7 @@ export function buildRealizedLtvViews(input: {
         ? null
         : { kind: "money", value: { currency: "USD", minorUnits: result.headlineMinorUnits } },
     warnings: warningCodes,
-    ...(missing ? { dataPendingReason: "Sales_Actuals has no runtime-eligible rows." } : {}),
+    ...(missing ? { dataPendingReason: NO_ELIGIBLE_ROWS } : {}),
   });
   const cohortMetric = createMetricViewModel({
     metricKey: "customers.realized_ltv_cohorts",
@@ -518,10 +559,42 @@ export function buildRealizedLtvViews(input: {
         ? null
         : { kind: "money", value: { currency: "USD", minorUnits: result.headlineMinorUnits ?? 0 } },
     warnings: warningCodes,
-    ...(missing ? { dataPendingReason: "Sales_Actuals has no runtime-eligible rows." } : {}),
+    ...(missing ? { dataPendingReason: NO_ELIGIBLE_ROWS } : {}),
+  });
+  const ltv90dResult = ltv90dFromCohorts(result.cohorts);
+  const ltv90dThin = ltv90dResult.customers < LTV_90D_THIN_CUSTOMERS;
+  const ltv90dPublishable =
+    ltv90dResult.minorUnits !== null && ltv90dResult.customers >= LTV_90D_MIN_CUSTOMERS;
+  const ltv90dWarnings = [
+    ...warningCodes,
+    ...(ltv90dPublishable && !ltv90dThin ? [] : ["LTV_COHORT_INSUFFICIENT_90D"]),
+  ];
+  const ltv90d = createMetricViewModel({
+    metricKey: "customers.ltv_90d",
+    environment: input.context.environment,
+    dataPeriod: input.context.dataPeriod,
+    // A thin-but-publishable base is genuinely partial data, so the source says so
+    // rather than leaving the warning as the only signal.
+    sources: metricSources(
+      input.context,
+      invalid ? "invalid" : ltv90dPublishable && ltv90dThin ? "partial" : null,
+      ltv90dWarnings,
+    ),
+    value: ltv90dPublishable
+      ? { kind: "money", value: { currency: "USD", minorUnits: ltv90dResult.minorUnits ?? 0 } }
+      : null,
+    warnings: ltv90dWarnings,
+    ...(ltv90dPublishable
+      ? {}
+      : {
+          dataPendingReason: missing
+            ? NO_ELIGIBLE_ROWS
+            : `Matured 90-day cohorts cover ${ltv90dResult.customers} customers; ${LTV_90D_MIN_CUSTOMERS} are required.`,
+        }),
   });
   return {
     metric,
+    ltv90d,
     cohorts: metricTableViewModelSchema.parse({
       metric: cohortMetric,
       columns: [
