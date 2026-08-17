@@ -411,7 +411,9 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         {
           metricKey: "products.cogs_flags",
           label: "SKUs above COGS target",
-          sourceLabel: "Shopify + Fairafric",
+          // Both sides are workbook cost data, same as the COGS-per-bar card beneath it.
+          // Shopify contributes nothing here, so claiming it overstated the sourcing.
+          sourceLabel: "Fairafric",
           valuePresentation: "full",
         },
         {

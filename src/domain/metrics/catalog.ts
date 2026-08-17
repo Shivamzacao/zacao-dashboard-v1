@@ -769,12 +769,14 @@ export const metricCatalog = Object.freeze([
     sections: ["Product Intelligence"],
     v1Class: "conditional",
     valueKind: "count",
-    sourceKeys: ["shopify", "google_sheets"],
-    sources: "Approved landed SKU costs and Metric_Targets",
-    sourceFields: "effective landed cost per bar and approved SKU target",
-    calculation: "Count active canonical SKUs whose effective landed cost per bar exceeds target.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Approved per-SKU COGS targets are absent.",
+    // Both sides are workbook-derived; Shopify contributes to neither.
+    sourceKeys: ["google_sheets"],
+    sources: "Google Sheets COGS_By_SKU, Metric_Targets and SKU_Master",
+    sourceFields: "effective landed cost per bar, target_landed_cogs_per_bar, is_active",
+    calculation:
+      "Count active canonical SKUs whose effective landed cost per bar exceeds their approved target for the period. Only SKUs with both an effective cost and an approved target are compared; one without a target is excluded and disclosed rather than counted as on-target. Targets were initialised equal to landed cost, so a zero count is flagged COGS_TARGET_EQUALS_BASELINE and is not evidence an approved goal was met.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "inventory.sku_stock",

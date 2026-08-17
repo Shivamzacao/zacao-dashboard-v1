@@ -165,6 +165,10 @@ export function createProductSheetMetricsContributor(input: {
             mapping.rows,
           ),
           cogsPerBar.metric,
+          // Same three tabs, so the SKU-versus-target count rides along. Only pushed
+          // here: products.cogs_flags is catalogued on Product Intelligence alone, and
+          // the sheets-migrated caller of buildCogsPerBarViews serves other sections.
+          cogsPerBar.flags,
         ],
         breakdowns: [
           buildProductInventoryBreakdown(metricContext, inventory, mapping.rows, warnings),

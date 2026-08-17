@@ -300,6 +300,132 @@ describe("COGS per bar", () => {
     expect(views.metric.value).toBeNull();
     expect(views.trend.items).toEqual([]);
   });
+
+  describe("SKUs above COGS target", () => {
+    it("counts only the SKUs whose landed cost exceeds their own target", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.45), cost("SKU-02", "2026-07-06", 2.4)],
+        [target("SKU-01", 2.301), target("SKU-02", 2.494)],
+        skuMaster,
+      );
+
+      // SKU-01 is over its target, SKU-02 is under. A blended mean of the two would sit
+      // near target and hide both, which is why this compares per SKU.
+      expect(views.flags.value).toEqual({ kind: "count", value: 1 });
+      expect(views.flags.warnings).toContain("COGS_FLAGS_SKUS_COMPARED:2");
+    });
+
+    it("reads zero and discloses the baseline when targets equal cost", () => {
+      // The live workbook's state: every target was initialised to that SKU's landed
+      // cost, so a zero here is the initialisation and must not read as a goal met.
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.301), cost("SKU-02", "2026-07-06", 2.494)],
+        [target("SKU-01", 2.301), target("SKU-02", 2.494)],
+        skuMaster,
+      );
+
+      expect(views.flags.value).toEqual({ kind: "count", value: 0 });
+      expect(views.flags.warnings).toContain("COGS_TARGET_EQUALS_BASELINE");
+    });
+
+    it("does not flag a SKU sitting a fraction of a cent above its target", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.3011), cost("SKU-02", "2026-07-06", 2.494)],
+        [target("SKU-01", 2.301), target("SKU-02", 2.494)],
+        skuMaster,
+      );
+
+      // Float noise on an initialised-equal target is not a cost overrun.
+      expect(views.flags.value).toEqual({ kind: "count", value: 0 });
+    });
+
+    it("ignores an inactive SKU even when its cost is over target", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.301), cost("SKU-03", "2026-07-06", 9.99)],
+        [target("SKU-01", 2.301), target("SKU-03", 2.567)],
+        skuMaster,
+      );
+
+      // SKU-03 is is_active "no" — a planned product cannot flag what ZACAO sells.
+      expect(views.flags.value).toEqual({ kind: "count", value: 0 });
+      expect(views.flags.warnings).toContain("COGS_FLAGS_SKUS_COMPARED:1");
+    });
+
+    it("excludes and discloses a costed SKU that has no approved target", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.301), cost("SKU-02", "2026-07-06", 2.494)],
+        [target("SKU-01", 2.301)],
+        skuMaster,
+      );
+
+      // Unmeasured is not on target, so SKU-02 is left out rather than counted as a pass.
+      expect(views.flags.value).toEqual({ kind: "count", value: 0 });
+      expect(views.flags.warnings).toContain("COGS_FLAGS_SKUS_WITHOUT_TARGET:1");
+      expect(views.flags.warnings).toContain("COGS_FLAGS_SKUS_COMPARED:1");
+    });
+
+    it("withholds rather than reporting zero when no target applies at all", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.301), cost("SKU-02", "2026-07-06", 2.494)],
+        [],
+        skuMaster,
+      );
+
+      expect(views.flags.value).toBeNull();
+      expect(views.flags.unavailableReason).toBe(
+        "No active SKU has both an effective landed cost and an approved target for this period.",
+      );
+    });
+
+    it("discloses a target set on the pre-DEC-020 basis that omits packaging", () => {
+      // The live workbook's exact shape: the target equals the STORED total_unit_cost_usd
+      // (2.301), which omits packaging, while landed cost is recomputed from components
+      // (1.501 + 0.090 + 0.800 = 2.391). The SKU reads as over target by exactly its
+      // packaging cost, which is a basis mismatch rather than costs having risen.
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.391, 0.09)],
+        [target("SKU-01", 2.301)],
+        [{ sku_id: "SKU-01", is_active: "yes" }],
+      );
+
+      expect(views.flags.value).toEqual({ kind: "count", value: 1 });
+      expect(views.flags.warnings).toContain("COGS_TARGET_PREDATES_LANDED_BASIS:1");
+    });
+
+    it("does not claim a stale basis when the target differs from the stored total", () => {
+      // Genuine cost drift: the target is not the stored total, so the overrun is real.
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 2.5, 0.09)],
+        [target("SKU-01", 2.1)],
+        [{ sku_id: "SKU-01", is_active: "yes" }],
+      );
+
+      expect(views.flags.value).toEqual({ kind: "count", value: 1 });
+      expect(views.flags.warnings.some((w) => w.startsWith("COGS_TARGET_PREDATES_LANDED_BASIS"))).toBe(
+        false,
+      );
+    });
+
+    it("ignores a target whose period ended before the reporting period", () => {
+      const views = buildCogsPerBarViews(
+        metricContext,
+        [cost("SKU-01", "2026-07-06", 9.99)],
+        [{ ...target("SKU-01", 2.301), period_end: "2026-06-30" }],
+        skuMaster,
+      );
+
+      // The only target expired, so the overrun cannot be judged against anything.
+      expect(views.flags.value).toBeNull();
+    });
+  });
 });
 
 describe("COGS per bar target timing", () => {
