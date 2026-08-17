@@ -118,6 +118,10 @@ function Chart({
     // spec.description, and passing it here printed the sentence twice.
     data,
     state,
+    // Say why the chart is blank. KPI cards have always passed this through;
+    // charts and tables did not, so a blocked panel showed generic "data has
+    // not arrived" copy even when the blocker was a rule awaiting approval.
+    stateDescription: stateReason(metric, fixture),
     // A declared unit from the data producer wins: some charts plot values in
     // a different unit than their headline metric (funnel counts under a
     // conversion-rate metric).
@@ -156,6 +160,14 @@ function Chart({
     timeline: <TimelineChartView {...props} />,
     tiers: <RebateTierChartView {...props} />,
   }[spec.kind];
+  // A chart that plots data under a disclosed limitation showed nothing but a
+  // CSS class to say so, which is invisible to a reader. Charts have no
+  // equivalent of the KPI card's state label, so the caveat is rendered as a
+  // note beside the plot — the same treatment tables give a coverage note.
+  const caveat =
+    data?.length && (state === "partial" || state === "stale")
+      ? (fixture.stateReasons?.[spec.metricKey] ?? null)
+      : null;
   return (
     <ChartCard
       title={spec.title}
@@ -163,6 +175,12 @@ function Chart({
       eyebrow={spec.eyebrow ?? metricDisplayLabel(metric)}
       actions={<SourceBadge label={metricSourceLabel(metric, spec.sourceLabel)} />}
     >
+      {caveat ? (
+        <p className="table-coverage-note" role="note">
+          <span aria-hidden="true">!</span>
+          {caveat}
+        </p>
+      ) : null}
       {view}
     </ChartCard>
   );
@@ -234,6 +252,7 @@ function TableCard({
         rows={rows}
         rowKey={(row) => JSON.stringify(row)}
         state={tableState}
+        stateDescription={stateReason(metric, fixture)}
         page={0}
         pageSize={10}
         totalRows={rows.length}

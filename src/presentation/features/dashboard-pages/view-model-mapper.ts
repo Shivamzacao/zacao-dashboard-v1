@@ -248,7 +248,12 @@ export function mapDashboardPageToDisplayData(
     states[metric.key] = displayStateFor(metric);
     if (metric.value !== null) {
       currentValues[metric.key] = metric.value;
-    } else {
+    }
+    // Capture the reason whenever readiness is not clean, value or no value. It
+    // used to be recorded only for blank metrics, so a metric that produced a
+    // number under a disclosed limitation — a provisional margin, a stale
+    // source — rendered the number with the caveat nowhere on screen.
+    if (metric.value === null || metric.readiness.state !== "current") {
       const reason = metric.unavailableReason ?? metric.readiness.message;
       if (reason) stateReasons[metric.key] = reason;
     }

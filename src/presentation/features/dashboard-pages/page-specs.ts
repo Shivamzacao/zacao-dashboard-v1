@@ -265,7 +265,7 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
           title: "Channel performance",
           description: "Revenue, orders, margin, and average order value by channel.",
           coverageNote:
-            "Margin is unavailable until landed COGS, channel-fee, and commission rules are approved. Revenue, orders, and AOV remain certified.",
+            "Margin is provisional: only the TikTok Shop fee is approved, every other channel uses a placeholder rate, and COGS is a blended per-bar estimate. Revenue, orders, and AOV remain certified.",
           metricKey: "revenue.channel_mix",
           sourceLabel: "Shopify + Google Sheets",
           dataset: "channel-performance",

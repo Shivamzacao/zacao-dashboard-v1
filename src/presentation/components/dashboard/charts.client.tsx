@@ -62,6 +62,12 @@ export interface BaseChartProps {
   readonly summary?: string;
   readonly data: readonly ChartDatum[] | null;
   readonly state?: DisplayState;
+  /**
+   * Why this chart has nothing to plot. Without it the surface falls back to
+   * generic copy that blames missing source data, which misdirects the reader
+   * whenever the real blocker is an unapproved business rule.
+   */
+  readonly stateDescription?: string | undefined;
   readonly height?: number;
   readonly legend?: readonly LegendItem[];
   readonly valueFormat?: ChartValueFormat;
@@ -76,6 +82,7 @@ function ChartFrame({
   summary,
   data,
   state = "current",
+  stateDescription,
   height = 260,
   legend,
   valueFormat = "count",
@@ -132,7 +139,10 @@ function ChartFrame({
           />
         </>
       ) : (
-        <StateSurface state={dataState === "current" ? "empty" : dataState} />
+        <StateSurface
+          state={dataState === "current" ? "empty" : dataState}
+          description={stateDescription}
+        />
       )}
     </div>
   );

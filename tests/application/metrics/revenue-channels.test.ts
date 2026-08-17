@@ -101,7 +101,9 @@ describe("Revenue Intelligence channel taxonomy", () => {
       revenueMinorUnits: 100_00,
       orders: 2,
       averageOrderValueMinorUnits: 5_500,
-      marginBasisPoints: null,
+      // Was null while channel fees had no source. Now derived from the channel
+      // economics table, and disclosed as provisional on the metric itself.
+      marginBasisPoints: 5284,
     });
   });
 
@@ -171,7 +173,10 @@ describe("Revenue Intelligence channel taxonomy", () => {
       revenueMinorUnits: 30_00,
       orders: 3,
       averageOrderValueMinorUnits: null,
-      marginBasisPoints: null,
+      // Negative, and deliberately not clamped: three $10 orders each carry $7.96
+      // of fulfillment, so they genuinely lose money. Flooring this at zero would
+      // hide exactly the problem the metric exists to surface.
+      marginBasisPoints: -1323,
     });
   });
 });

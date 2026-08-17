@@ -150,6 +150,15 @@ const providerOrderSchema = z.object({
   netPaymentSet: providerMoneySetSchema,
   refunds: z.array(providerRefundSchema),
   fulfillments: z.array(providerFulfillmentSchema),
+  // The orders query has always requested line items; nothing parsed them, so
+  // they were silently dropped. Optional because older fixtures build orders
+  // without them, and an absent block must stay distinguishable from a genuine
+  // zero-quantity order.
+  lineItems: z
+    .object({
+      nodes: z.array(z.object({ currentQuantity: z.number().int().nonnegative() })),
+    })
+    .optional(),
 });
 
 export function normalizeOrder(value: unknown) {
@@ -169,6 +178,12 @@ export function normalizeOrder(value: unknown) {
     tags: order.tags,
     financialStatus: order.displayFinancialStatus,
     fulfillmentStatus: order.displayFulfillmentStatus,
+    // Units on the order after edits and refunds, or null when the provider
+    // payload carried no line items at all. Never 0 for "unknown" — a real
+    // zero-unit order and an unfetched one are different facts.
+    quantity: order.lineItems
+      ? order.lineItems.nodes.reduce((total, item) => total + item.currentQuantity, 0)
+      : null,
     subtotal: normalizeShopifyMoneySet(order.currentSubtotalPriceSet),
     total: normalizeShopifyMoneySet(order.currentTotalPriceSet),
     discounts: normalizeShopifyMoneySet(order.currentTotalDiscountsSet),
