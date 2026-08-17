@@ -79,60 +79,11 @@ function migratedContributor(
   return found;
 }
 
+// The two sheets-customers cases that lived here are gone with the contributor. Their
+// coverage was not lost: the builders keep eight cases in
+// tests/application/metrics/customer-ltv.test.ts, and the example-fallback wiring they
+// also exercised is covered in example-fallback.test.ts.
 describe("Sheets API contributors", () => {
-  it("uses disclosed example customer rows only when production rows are absent", async () => {
-    const source = new FakeSource(
-      {},
-      {
-        Sales_Actuals: [
-          {
-            order_id: "DEMO-1",
-            customer_id: "DUMMY-CUSTOMER",
-            order_date: "2026-08-05",
-            first_order_date: "2026-08-05",
-            gross_product_sales_usd: 120,
-            discounts_usd: 0,
-            refunds_returns_usd: 0,
-            cancellations_usd: 0,
-            net_product_revenue_usd: 120,
-            order_status: "paid",
-            acquisition_channel: "Online Store",
-            currency: "USD",
-            is_test: "no",
-            data_as_of: "2026-08-10",
-            source_status: "example",
-          },
-        ],
-        Channel_Mapping: [
-          {
-            source_system: "shopify",
-            source_channel_or_name: "Online Store",
-            dashboard_channel: "DTC — Site",
-            effective_from: "2025-01-01",
-            status: "active",
-            source_status: "example",
-          },
-        ],
-      },
-    );
-
-    const result = await contributor(source, "sheets-customers").load(context);
-
-    expect(result.metrics?.find(({ key }) => key === "customers.active")?.value).toEqual({
-      kind: "count",
-      value: 1,
-    });
-    expect(result.metrics?.find(({ key }) => key === "customers.realized_ltv")?.value).toEqual({
-      kind: "money",
-      value: { currency: "USD", minorUnits: 12_000 },
-    });
-    expect(result.sourceStatuses?.[0]).toMatchObject({
-      state: "partial",
-      completeness: "partial",
-    });
-    expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
-  });
-
   it("uses disclosed example receiving and cost history for otherwise pending metrics", async () => {
     const source = new FakeSource(
       { Production_Orders: [{ po_number: "OPEN-1", status: "open" }] },
@@ -176,7 +127,7 @@ describe("Sheets API contributors", () => {
       },
     );
 
-    const result = await contributor(source, "sheets-operations").load(context);
+    const result = await contributor(source, "sheets-migrated").load(context);
 
     expect(
       result.breakdowns?.find(({ metric }) => metric.key === "operations.manufacturer_otif")?.metric
@@ -269,7 +220,7 @@ describe("Sheets API contributors", () => {
       },
     );
 
-    const result = await contributor(source, "sheets-operations").load(context);
+    const result = await contributor(source, "sheets-migrated").load(context);
 
     expect(
       result.metrics?.find(({ key }) => key === "operations.manufacturer_lead_time")?.value,
@@ -315,75 +266,6 @@ describe("Sheets API contributors", () => {
       value: 0,
     });
     expect(result.warnings).toContain("SYNTHETIC_EXAMPLE_DATA");
-  });
-
-  it("publishes Realized LTV and aggregate PII-free cohort rows", async () => {
-    const source = new FakeSource({
-      Sales_Actuals: [
-        {
-          order_id: "O-1",
-          customer_id: "C-PRIVATE",
-          order_date: "2026-01-05",
-          first_order_date: "2026-01-05",
-          gross_product_sales_usd: 100,
-          discounts_usd: 10,
-          refunds_returns_usd: 0,
-          cancellations_usd: 0,
-          net_product_revenue_usd: 90,
-          order_status: "paid",
-          acquisition_channel: "Online Store",
-          currency: "USD",
-          is_test: "no",
-          data_as_of: "2026-08-10",
-        },
-        {
-          order_id: "O-2",
-          customer_id: "C-PRIVATE",
-          order_date: "2026-01-25",
-          first_order_date: "2026-01-05",
-          gross_product_sales_usd: 50,
-          discounts_usd: 0,
-          refunds_returns_usd: 0,
-          cancellations_usd: 0,
-          net_product_revenue_usd: 50,
-          order_status: "paid",
-          acquisition_channel: "Online Store",
-          currency: "USD",
-          is_test: "no",
-          data_as_of: "2026-08-10",
-        },
-      ],
-      Channel_Mapping: [
-        {
-          source_channel_or_name: "Online Store",
-          dashboard_channel: "DTC (Shopify)",
-          effective_from: "2025-01-01",
-          status: "active",
-        },
-      ],
-    });
-
-    const result = await contributor(source, "sheets-customers").load(context);
-    expect(result.metrics?.find(({ key }) => key === "customers.realized_ltv")?.value).toEqual({
-      kind: "money",
-      value: { currency: "USD", minorUnits: 14_000 },
-    });
-    expect(result.metrics?.find(({ key }) => key === "customers.active")?.value).toEqual({
-      kind: "count",
-      value: 0,
-    });
-    const cohorts = result.tables?.find(
-      ({ metric }) => metric.key === "customers.realized_ltv_cohorts",
-    );
-    expect(cohorts?.rows).toEqual([
-      expect.objectContaining({
-        cohortMonth: "2026-01",
-        customerCount: 1,
-        ltv30dMinorUnits: 14_000,
-        lifetimeLtvMinorUnits: 14_000,
-      }),
-    ]);
-    expect(JSON.stringify(cohorts?.rows)).not.toContain("C-PRIVATE");
   });
 
   it("values latest on-hand inventory while keeping low inventory in Phase 2", async () => {
@@ -485,7 +367,7 @@ describe("Sheets API contributors", () => {
         },
       ],
     });
-    const result = await contributor(source, "sheets-operations").load(context);
+    const result = await contributor(source, "sheets-migrated").load(context);
     expect(
       result.breakdowns?.find(({ metric }) => metric.key === "inventory.combined")?.metric.value,
     ).toEqual({ kind: "quantity", value: 1_240 });
@@ -531,7 +413,7 @@ describe("Sheets API contributors", () => {
         },
       ],
     });
-    const result = await contributor(source, "sheets-operations").load(context);
+    const result = await contributor(source, "sheets-migrated").load(context);
     const incoming = result.tables?.find(({ metric }) => metric.key === "production.incoming");
     expect(incoming?.metric.value).toEqual({ kind: "quantity", value: 500 });
     expect(incoming?.rows[0]).toMatchObject({ expectedArrivalDate: null });
@@ -603,9 +485,7 @@ describe("Operations on a workbook with tabs still absent", () => {
     });
 
   it("still produces the metrics its present tabs support", async () => {
-    const contribution = await contributor(withPresentTabsOnly(), "sheets-operations").load(
-      context,
-    );
+    const contribution = await contributor(withPresentTabsOnly(), "sheets-migrated").load(context);
 
     // Manufacturer views come from Production_Orders, which is present.
     const otif = contribution.breakdowns?.find(
@@ -621,9 +501,7 @@ describe("Operations on a workbook with tabs still absent", () => {
   });
 
   it("blanks only the tiles whose tabs are absent, and never invents a zero", async () => {
-    const contribution = await contributor(withPresentTabsOnly(), "sheets-operations").load(
-      context,
-    );
+    const contribution = await contributor(withPresentTabsOnly(), "sheets-migrated").load(context);
 
     const warehouse = contribution.metrics?.find(
       (metric) => metric.key === "operations.warehouse_on_time_accuracy",
@@ -887,5 +765,97 @@ describe("Growth on the migrated workbook", () => {
     // Empty tabs are missing data, not disclosed demo data. The legacy workbook reached
     // this page through the example fallback; the new one must not.
     expect(contribution.warnings ?? []).not.toContain("SYNTHETIC_EXAMPLE_DATA");
+  });
+});
+
+class RecordingSource implements SheetsTabDataSource {
+  readonly calls: { page: string; tabs: readonly string[] }[] = [];
+
+  sourceStatus() {
+    return sourceStatus;
+  }
+
+  async readPageTabs(
+    page: Parameters<SheetsTabDataSource["readPageTabs"]>[0],
+    tabNames: readonly string[],
+  ): Promise<SheetsTabReadResult> {
+    this.calls.push({ page, tabs: tabNames });
+    return {
+      tabs: Object.fromEntries(tabNames.map((tab) => [tab, []])),
+      exampleTabs: Object.fromEntries(tabNames.map((tab) => [tab, []])),
+      sourceStatus,
+      warnings: [],
+    };
+  }
+}
+
+describe("Marketing Intelligence workbook routing", () => {
+  const load = async (dataset: string) => {
+    const legacy = new RecordingSource();
+    const migrated = new RecordingSource();
+    const found = createSheetsApiContributors(legacy, migrated).find(
+      (entry) => entry.dataset === dataset,
+    );
+    if (!found) throw new Error(`Missing contributor ${dataset}`);
+    await found.load(context);
+    return { legacy, migrated };
+  };
+
+  it("reads the marketing tabs from the new workbook", async () => {
+    const { legacy, migrated } = await load("sheets-marketing");
+    expect(migrated.calls).toEqual([
+      {
+        page: "migrated",
+        tabs: ["Marketing_Spend", "Social_Metrics", "Social_Channel_Performance"],
+      },
+    ]);
+    expect(legacy.calls).toEqual([]);
+  });
+
+  // Growth shares Social_Metrics and Growth_Pipeline with Marketing. It migrated first
+  // (#64), so both pages must now resolve those tabs against the same workbook — a split
+  // would have the two pages reporting different follower totals from one tab.
+  it("resolves the tabs it shares with Growth against the same workbook", async () => {
+    const { legacy, migrated } = await load("sheets-growth");
+    expect(migrated.calls.map((call) => call.page)).toEqual(["migrated"]);
+    expect(migrated.calls[0]?.tabs).toContain("Social_Metrics");
+    expect(migrated.calls[0]?.tabs).toContain("Growth_Pipeline");
+    expect(legacy.calls).toEqual([]);
+  });
+
+  it("falls back to the legacy workbook when the new one is not configured", async () => {
+    const legacy = new RecordingSource();
+    const found = createSheetsApiContributors(legacy).find(
+      (entry) => entry.dataset === "sheets-marketing",
+    );
+    if (!found) throw new Error("Missing contributor sheets-marketing");
+    await found.load(context);
+    expect(legacy.calls.map((call) => call.page)).toEqual(["marketing"]);
+  });
+});
+
+/**
+ * Marketing was the last page bound to the legacy workbook, so this is the assertion the
+ * whole migration reduces to: with both workbooks configured, nothing reads the old one.
+ * Asserted across every contributor at once rather than per page, because the failure it
+ * guards against is a single new contributor quietly taking `source`.
+ */
+describe("Legacy workbook", () => {
+  it("is never read by any contributor when the new workbook is configured", async () => {
+    const legacy = new RecordingSource();
+    const migrated = new RecordingSource();
+
+    for (const entry of createSheetsApiContributors(legacy, migrated)) {
+      await entry.load(context);
+    }
+
+    expect(legacy.calls).toEqual([]);
+    expect(migrated.calls.length).toBeGreaterThan(0);
+    // Cache keys are `page:sortedTabs`. Most contributors share "migrated"; sheets-insights
+    // keeps "insights" on purpose, because the freshness probe reads the same two tabs
+    // under that key and sharing it saves a duplicate fetch of the same range.
+    expect(new Set(migrated.calls.map((call) => call.page))).toEqual(
+      new Set(["migrated", "insights"]),
+    );
   });
 });

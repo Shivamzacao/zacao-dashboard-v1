@@ -8,7 +8,7 @@ import type {
   DashboardDatasetContributor,
   OrchestrationContext,
 } from "@/src/application/orchestration";
-import type { SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
+import type { SheetsDashboardPage, SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import type { ShopifyAdapterProvider } from "@/src/infrastructure/shopify/contributors";
 import {
@@ -35,7 +35,9 @@ export function createMarketingCompositeContributor(input: {
   readonly shopify: ShopifyAdapterProvider;
   readonly sourceIdentity: string;
   readonly now: () => Date;
+  readonly page?: SheetsDashboardPage;
 }): DashboardDatasetContributor {
+  const page = input.page ?? "marketing";
   return {
     dataset: "marketing-composite-metrics",
     source: "google_sheets",
@@ -43,7 +45,7 @@ export function createMarketingCompositeContributor(input: {
     cachePolicy: CACHE,
     async load(context: OrchestrationContext): Promise<DashboardContribution> {
       const [sheets, adapters] = await Promise.all([
-        input.sheets.readPageTabs("marketing", ["Affiliate_Ambassador_Perf", "Growth_Pipeline"]),
+        input.sheets.readPageTabs(page, ["Affiliate_Ambassador_Perf", "Growth_Pipeline"]),
         input.shopify(),
       ]);
       const [sessions, sales] = await Promise.all([

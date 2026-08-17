@@ -322,15 +322,10 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       // Executive Health and Operations Intelligence plan sheets-migrated
       // unconditionally, so without the new workbook configured it must still
       // resolve to a truthful deferred state.
-      if (!this.executiveSheetsSource) {
-        contributors.push(new DeferredSourceContributor("sheets-migrated", "google_sheets", now));
-      }
     } else {
       contributors.push(
         new DeferredSourceContributor("deferred-google_sheets", "google_sheets", now),
-        new DeferredSourceContributor("sheets-operations", "google_sheets", now),
         new DeferredSourceContributor("sheets-migrated", "google_sheets", now),
-        new DeferredSourceContributor("sheets-customers", "google_sheets", now),
         new DeferredSourceContributor("sheets-product", "google_sheets", now),
         new DeferredSourceContributor("sheets-insights", "google_sheets", now),
         new DeferredSourceContributor("sheets-marketing", "google_sheets", now),
@@ -358,15 +353,9 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       );
       if (this.sheetsSource) {
         contributors.push(
-          createV1CompositeContributor({
-            sheets: this.sheetsSource,
-            shopify: this.shopifyAdapters,
-            sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
-            now,
-          }),
-          // Executive Health's composite tiles (inventory on hand, OTIF, per-bar
-          // COGS) read the new workbook; the shared contributor above keeps the
-          // other sections on the legacy one.
+          // Every section reads the new workbook, so there is one composite, not two.
+          // The legacy-bound v1-composite-metrics that used to sit alongside this was
+          // referenced by no section once Insights migrated.
           createV1CompositeContributor({
             sheets: this.executiveSheetsSource ?? this.sheetsSource,
             shopify: this.shopifyAdapters,
@@ -384,7 +373,10 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
             now,
           }),
           createMarketingCompositeContributor({
-            sheets: this.sheetsSource,
+            // Marketing Intelligence is migrated onto the new workbook. Growth's
+            // composite below stays on the legacy one.
+            sheets: this.executiveSheetsSource ?? this.sheetsSource,
+            ...(this.executiveSheetsSource ? { page: "migrated" as const } : {}),
             shopify: this.shopifyAdapters,
             sourceIdentity: shopifySettings?.storeDomain ?? "shopify",
             now,
@@ -518,15 +510,17 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
           .catch((error: unknown) => klaviyoSourceStatus({ checkedAt: checkedAt(), error }))
       : Promise.resolve(deferredStatus("klaviyo", checkedAt()));
 
-    // Two workbooks are live during the migration, so "Google Sheets" is only as
-    // healthy as the least healthy of them. Reporting just one would attribute a
-    // freshness timestamp to a workbook the reader is not actually looking at.
+    // Probe the workbook the reader is actually looking at. Both were probed while the
+    // migration ran and "Google Sheets" meant the worse of the two; now that every
+    // section reads the new workbook, including the legacy one would attribute a
+    // freshness timestamp to a workbook no page reads. It stays as the fallback for the
+    // deployment where the new workbook is not configured.
     const probeSheet = (source: SheetsTabDataSource): Promise<SourceStatus> =>
       source
         .readPageTabs("insights", ["Inventory_Snapshots", "Metric_Targets"])
         .then((result) => result.sourceStatus)
         .catch(() => source.sourceStatus() ?? deferredStatus("google_sheets", checkedAt()));
-    const sheetSources = [this.sheetsSource, this.executiveSheetsSource].filter(
+    const sheetSources = [this.executiveSheetsSource ?? this.sheetsSource].filter(
       (source): source is SheetsTabDataSource => source !== null,
     );
     const sheets: Promise<SourceStatus> = sheetSources.length
