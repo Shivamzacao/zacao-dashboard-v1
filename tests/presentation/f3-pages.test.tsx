@@ -186,11 +186,11 @@ describe("F3 dashboard pages", () => {
     render(<DashboardPageView spec={customers} fixture={f3CustomerPageFixtureData} />);
     expect(screen.getAllByRole("article")).toHaveLength(10);
     expect(screen.getByLabelText("Time on site: 3m 12s")).toBeTruthy();
-    // One, not two: marketing.cac now carries the approved Blended CAC rule (DEC-019),
-    // leaving marketing.ltv_cac as the only gated metric on this page. The CAC card
-    // reads "No activity" here because the fixture supplies no value, matching how
-    // marketing.paid_cac already behaves.
-    expect(screen.getAllByText("Business rule required")).toHaveLength(1);
+    // None: marketing.cac carries the approved Blended CAC rule (DEC-019) and
+    // marketing.ltv_cac the approved ratio (DEC-021), so no metric on this page is
+    // rule-blocked any more. Both cards read "No activity" here because the fixture
+    // supplies no values, matching how marketing.paid_cac already behaves.
+    expect(screen.queryByText("Business rule required")).toBeNull();
     expect(screen.queryByRole("heading", { name: "Customer geography" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Customers by city" })).toBeTruthy();
     expect(screen.getAllByText(/reporting-period filters do not apply/)).toHaveLength(2);
@@ -426,13 +426,16 @@ describe("F3 dashboard pages", () => {
     ).toHaveLength(9);
     expect(screen.getByLabelText("Actual operating expenses: $35,700.00")).toBeTruthy();
     expect(screen.getByLabelText("Cash position: $248,000.00")).toBeTruthy();
-    // Three, not four: contribution margin by channel also appears on this page
-    // and is no longer rule-blocked now that the channel fee table exists.
-    expect(screen.getAllByText("Business rule required")).toHaveLength(3);
+    // Two, not three: DEC-020 activated Effective COGS per bar, leaving only the
+    // rebate tiles rule-blocked. Contribution margin by channel also appears on this
+    // page and is no longer rule-blocked now that the channel fee table exists.
+    expect(screen.getAllByText("Business rule required")).toHaveLength(2);
     expect(screen.getAllByText("Data pending")).toHaveLength(3);
     expect(screen.getAllByText("Actual").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Plan").length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText("Source: Fairafric")).toHaveLength(3);
+    // Effective COGS per bar now reads from the workbook, so only the two genuinely
+    // Fairafric-sourced rebate tiles still carry that label.
+    expect(screen.getAllByText("Source: Fairafric")).toHaveLength(2);
     expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
   });
 

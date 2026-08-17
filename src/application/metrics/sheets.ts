@@ -493,6 +493,61 @@ function subtractMonths(date: string, months: number): string {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * Landed cost per bar rebuilt from its components (DEC-020). The stored
+ * `total_unit_cost_usd` is deliberately ignored: every production `COGS_By_SKU`
+ * row omits `packaging_usd` from it, so the stored total understates landed cost
+ * by the packaging amount. Each component is counted exactly once.
+ */
+export function landedCostPerBar(record: SheetRecord): number | null {
+  const production = numeric(record, "production_cost_usd");
+  if (production === null) return null;
+  return (
+    production +
+    (numeric(record, "packaging_usd") ?? 0) +
+    (numeric(record, "freight_usd") ?? 0) +
+    (numeric(record, "fulfillment_usd") ?? 0) +
+    (numeric(record, "duties_insurance_receiving_usd") ?? 0)
+  );
+}
+
+/** True once duties are actually carried, so the disclosure can stop firing on its own. */
+export function capturesDutiesAndInsurance(records: readonly SheetRecord[]): boolean {
+  return records.some((record) => numeric(record, "duties_insurance_receiving_usd") !== null);
+}
+
+/** The synthetic total is recomputed; every other component is read as stored. */
+const componentValue = (record: SheetRecord, key: string): number | null =>
+  key === "total_unit_cost_usd" ? landedCostPerBar(record) : numeric(record, key);
+
+/**
+ * The landed row for `sku` effective at `asOf` — latest `effective_from` at or
+ * before it, and not already expired. Open-ended periods never expire.
+ */
+export function effectiveLandedRow(
+  records: readonly SheetRecord[],
+  sku: string,
+  asOf: string,
+): SheetRecord | null {
+  return (
+    records
+      .filter((record) => {
+        const from = text(record, "effective_from");
+        const to = text(record, "effective_to");
+        return (
+          text(record, "sku") === sku &&
+          text(record, "cost_basis") === "landed" &&
+          from !== null &&
+          from <= asOf &&
+          (!to || to >= asOf)
+        );
+      })
+      .sort((left, right) =>
+        (text(right, "effective_from") ?? "").localeCompare(text(left, "effective_from") ?? ""),
+      )[0] ?? null
+  );
+}
+
 function costPeriodAverages(records: readonly SheetRecord[], date: string) {
   const rows = records.filter(
     (record) => text(record, "effective_from") === date && text(record, "cost_basis") === "landed",
@@ -500,7 +555,7 @@ function costPeriodAverages(records: readonly SheetRecord[], date: string) {
   return new Map(
     COST_COMPONENTS.flatMap(([key]) => {
       const values = rows.flatMap((record) => {
-        const value = numeric(record, key);
+        const value = componentValue(record, key);
         return value === null ? [] : [value];
       });
       return values.length
@@ -510,23 +565,29 @@ function costPeriodAverages(records: readonly SheetRecord[], date: string) {
   );
 }
 
-/** Landed cost per active SKU, effective at or before `asOf`, most recent wins. */
+/**
+ * Landed cost per active SKU, effective at `asOf`. Expired rows are excluded —
+ * an `effective_to` in the past means the cost no longer applies, and reading it
+ * anyway was the source of a same-tab disagreement with the product metrics.
+ */
 function effectiveLandedCostBySku(
   records: readonly SheetRecord[],
   activeSkus: ReadonlySet<string>,
   asOf: string,
 ): Map<string, number> {
-  const latest = new Map<string, { date: string; cost: number }>();
-  for (const record of records) {
-    const sku = text(record, "sku");
-    const date = text(record, "effective_from");
-    const cost = numeric(record, "total_unit_cost_usd");
-    if (!sku || !date || cost === null) continue;
-    if (text(record, "cost_basis") !== "landed" || !activeSkus.has(sku) || date > asOf) continue;
-    const previous = latest.get(sku);
-    if (previous === undefined || date > previous.date) latest.set(sku, { date, cost });
-  }
-  return new Map([...latest].map(([sku, { cost }]) => [sku, cost]));
+  const skus = new Set(
+    records.flatMap((record) => {
+      const sku = text(record, "sku");
+      return sku && activeSkus.has(sku) ? [sku] : [];
+    }),
+  );
+  return new Map(
+    [...skus].flatMap((sku) => {
+      const row = effectiveLandedRow(records, sku, asOf);
+      const cost = row ? landedCostPerBar(row) : null;
+      return cost === null ? [] : ([[sku, cost]] as const);
+    }),
+  );
 }
 
 /** Approved per-bar target per SKU, effective at `asOf`. Open-ended periods have no end. */
@@ -650,6 +711,117 @@ export function buildCogsPerBarViews(
       })),
     }),
   };
+}
+
+/**
+ * Yield factor for a purchase order: the cost of everything received, spread over
+ * only the bars that were accepted as saleable (DEC-020). Rejected bars are not
+ * sellable, so absorbing them into the denominator would understate cost per bar.
+ * Originally ordered units are never the basis.
+ */
+function acceptedYieldFactor(order: SheetRecord): number | null {
+  const received = numeric(order, "received_units");
+  const accepted = numeric(order, "accepted_units");
+  if (received === null || accepted === null) return null;
+  if (accepted <= 0 || received < accepted) return null;
+  return received / accepted;
+}
+
+/**
+ * Effective COGS per bar: the weighted-average landed cost of the bars actually on
+ * hand, less the recognised Fairafric rebate.
+ *
+ * No signed Fairafric volume-rebate agreement exists, so the recognised rebate is
+ * $0 and effective COGS equals gross landed COGS (DEC-020). The dashboard will not
+ * improve margin with an unconfirmed discount, so this is an identity rather than a
+ * placeholder — when an agreement is approved the subtraction becomes real and the
+ * rebate metrics activate separately.
+ *
+ * Each lot is costed from the SKU landed cost effective at its goods-received date,
+ * so a later purchase order never retroactively restates the cost of stock already
+ * received. A lot that resolves to its purchase order is adjusted for accepted
+ * yield; one that cannot is carried at the unadjusted SKU cost and disclosed as
+ * estimated rather than dropped.
+ */
+export function buildEffectiveCogsMetric(
+  context: MetricServiceContext,
+  costRecords: readonly SheetRecord[],
+  lotRecords: readonly SheetRecord[],
+  productionRecords: readonly SheetRecord[],
+  warnings: readonly string[] = [],
+): MetricViewModel {
+  const ordersByPo = new Map(
+    productionRecords.flatMap((record) => {
+      const po = text(record, "po_number");
+      return po ? ([[po, record]] as const) : [];
+    }),
+  );
+
+  let weighted = 0;
+  let bars = 0;
+  let estimatedLots = 0;
+  let unresolvedLots = 0;
+
+  for (const lot of lotRecords) {
+    const remaining = numeric(lot, "quantity_remaining");
+    const sku = text(lot, "sku");
+    if (!sku || remaining === null || remaining <= 0) continue;
+
+    // Cost is fixed at the date the bars were received, not the reporting date.
+    const asOf = text(lot, "received_date") ?? text(lot, "production_date") ?? null;
+    const row = asOf ? effectiveLandedRow(costRecords, sku, asOf) : null;
+    const base = row ? landedCostPerBar(row) : null;
+    if (base === null) {
+      unresolvedLots += 1;
+      continue;
+    }
+
+    const po = text(lot, "po_number");
+    const order = po ? ordersByPo.get(po) : undefined;
+    const factor = order ? acceptedYieldFactor(order) : null;
+    if (factor === null) estimatedLots += 1;
+
+    weighted += remaining * base * (factor ?? 1);
+    bars += remaining;
+  }
+
+  const grossPerBar = bars > 0 ? weighted / bars : null;
+  // Recognised rebate is $0 until an agreement is approved, so effective === gross.
+  const effectivePerBar = grossPerBar;
+
+  const resultWarnings = [
+    ...warnings,
+    "REBATE_NOT_RECOGNISED_NO_APPROVED_AGREEMENT",
+    "COGS_LANDED_COST_RECOMPUTED_FROM_COMPONENTS",
+    ...(capturesDutiesAndInsurance(costRecords)
+      ? []
+      : ["COGS_DUTIES_INSURANCE_RECEIVING_NOT_CAPTURED"]),
+    ...(bars > 0 ? [`COGS_LOTS_IN_AVERAGE:${bars}`] : []),
+    ...(estimatedLots > 0 ? [`COGS_ESTIMATED_LOTS:${estimatedLots}`] : []),
+    ...(unresolvedLots > 0 ? [`COGS_LOT_COST_UNRESOLVED:${unresolvedLots}`] : []),
+  ];
+
+  return metric(
+    context,
+    "finance.effective_cogs",
+    effectivePerBar === null ? null : { kind: "money", value: perBarUsd(effectivePerBar) },
+    resultWarnings,
+  );
+}
+
+/** Effective COGS needs at least one on-hand lot whose SKU has an effective landed cost. */
+export function hasCostableInventoryLots(
+  lotRecords: readonly SheetRecord[],
+  costRecords: readonly SheetRecord[],
+): boolean {
+  return lotRecords.some((lot) => {
+    const sku = text(lot, "sku");
+    const remaining = numeric(lot, "quantity_remaining");
+    const asOf = text(lot, "received_date") ?? text(lot, "production_date");
+    if (!sku || remaining === null || remaining <= 0 || !asOf) return false;
+    const row = effectiveLandedRow(costRecords, sku, asOf);
+    return row !== null && landedCostPerBar(row) !== null;
+  });
 }
 
 export function hasComparableInputCostRows(

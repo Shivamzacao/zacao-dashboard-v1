@@ -1111,7 +1111,9 @@ export const dashboardPageSpecs: Readonly<Record<DashboardSlug, DashboardPageSpe
         {
           metricKey: "finance.effective_cogs",
           label: "Effective COGS per bar",
-          sourceLabel: "Fairafric",
+          // Computed from the workbook, not supplied by Fairafric. The rebate tiles below
+          // keep the Fairafric label because Fairafric is genuinely their missing source.
+          sourceLabel: "Google Sheets",
         },
         {
           metricKey: "finance.rebate_tier",

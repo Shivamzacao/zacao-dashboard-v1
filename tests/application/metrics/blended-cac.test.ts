@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { buildBlendedCacMetric } from "@/src/application/metrics/blended-cac";
+import {
+  buildBlendedCacMetric,
+  buildPaidAcquisitionViews,
+} from "@/src/application/metrics/blended-cac";
+import { createMetricViewModel } from "@/src/application/metrics/view-model";
+import { usd } from "@/src/domain/utilities/money";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 
-import { context, source } from "./fixtures";
+import { PERIOD, context, source } from "./fixtures";
 
 const combinedContext = () => context([source("google_sheets"), source("shopify")]);
 
@@ -210,5 +215,118 @@ describe("Paid-Media Blended CAC", () => {
 
     expect(metric.value).toBeNull();
     expect(metric.unavailableReason).toBe("No in-scope paid media spend in the selected period.");
+  });
+});
+
+describe("90-Day LTV : Paid-Media Blended CAC", () => {
+  const ltvMetric = (minorUnits: number | null) =>
+    createMetricViewModel({
+      metricKey: "customers.ltv_90d",
+      environment: "test",
+      dataPeriod: PERIOD,
+      sources: [source("shopify")],
+      value: minorUnits === null ? null : { kind: "money", value: usd(minorUnits) },
+      ...(minorUnits === null
+        ? { dataPendingReason: "Matured 90-day cohorts cover 4 customers; 30 are required." }
+        : {}),
+    });
+
+  const views = (
+    spendRows: readonly SheetRecord[],
+    orderRecords: readonly SheetRecord[],
+    ltvMinorUnits: number | null = 17_309,
+  ) =>
+    buildPaidAcquisitionViews({
+      context: combinedContext(),
+      spendRows,
+      orderRecords,
+      ltv90d: ltvMetric(ltvMinorUnits),
+    });
+
+  // The live July 2026 case: the workbook's one production row against the three Shopify
+  // customers acquired that month, and the real $173.09 LTV.
+  const julyCustomers = [
+    order("O-1", "C-1", "2026-07-02", "2026-07-02"),
+    order("O-2", "C-2", "2026-07-03", "2026-07-03"),
+    order("O-3", "C-3", "2026-07-04", "2026-07-04"),
+  ];
+  const julySpend = [spendRow({ record_id: "MKT-1", date: "2026-07-05", spend_usd: 1_850 })];
+
+  it("stores the ratio in hundredths, not basis points", () => {
+    // $1,850 / 3 = $616.67 CAC. 17,309c x 100 / 61,667c = 28 -> the KPI formatter
+    // renders `28 / 100` as "0.28 : 1". Using basis points here would render 100x high.
+    const { cac, ltvCac } = views(julySpend, julyCustomers);
+
+    expect(cac.value).toEqual({ kind: "money", value: { currency: "USD", minorUnits: 61_667 } });
+    expect(ltvCac.value).toEqual({ kind: "rate_basis_points", value: 28 });
+  });
+
+  it("publishes when every counted customer was acquired in a month that had spend", () => {
+    const { ltvCac } = views(julySpend, julyCustomers);
+
+    expect(ltvCac.value).not.toBeNull();
+    expect(ltvCac.warnings).toContain("LTV_CAC_PERIOD_SCOPE_APPROXIMATE");
+    expect(ltvCac.warnings.some((code) => code.startsWith("LTV_CAC_SPEND_COVERAGE_THIN"))).toBe(
+      false,
+    );
+  });
+
+  it("never reports better than partial, because the two sides cover different windows", () => {
+    const { ltvCac } = views(julySpend, julyCustomers);
+
+    expect(ltvCac.readiness.state).toBe("partial");
+  });
+
+  it("withholds when the period spans months the spend never covered", () => {
+    // This is the misleading reading the guard exists to stop. Widen the period to three
+    // months while spend stays in July alone: the denominator picks up May and June
+    // customers that no advertising bought, so the ratio would look far healthier than
+    // the truth. Coverage is 1/3 = 33%.
+    const wide = {
+      environment: "test" as const,
+      dataPeriod: { startDate: "2026-05-01", endDate: "2026-07-31" },
+      sourceStatuses: [source("google_sheets"), source("shopify")],
+    };
+    const { cac, ltvCac } = buildPaidAcquisitionViews({
+      context: wide,
+      spendRows: julySpend,
+      orderRecords: [
+        order("O-1", "C-1", "2026-07-02", "2026-07-02"),
+        order("O-2", "C-2", "2026-05-10", "2026-05-10"),
+        order("O-3", "C-3", "2026-06-10", "2026-06-10"),
+      ],
+      ltv90d: ltvMetric(17_309),
+    });
+
+    // The CAC itself still publishes — $1,850 over 3 customers — which is exactly why
+    // the ratio needs its own guard rather than relying on the denominator being absent.
+    expect(cac.value).toEqual({ kind: "money", value: { currency: "USD", minorUnits: 61_667 } });
+    expect(ltvCac.value).toBeNull();
+    expect(ltvCac.warnings).toContain("LTV_CAC_SPEND_COVERAGE_THIN:33");
+    expect(ltvCac.unavailableReason).toBe(
+      "Only 33% of this period's first-time customers fall in months with recorded paid spend, so the ratio would not be comparable.",
+    );
+  });
+
+  it("withholds when the LTV base is too thin to divide", () => {
+    const { ltvCac } = views(julySpend, julyCustomers, null);
+
+    expect(ltvCac.value).toBeNull();
+    expect(ltvCac.unavailableReason).toBe("The 90-day LTV base is too thin to publish a ratio.");
+  });
+
+  it("passes the CAC's own reason through when the denominator is absent", () => {
+    const { ltvCac } = views([], julyCustomers);
+
+    expect(ltvCac.value).toBeNull();
+    expect(ltvCac.unavailableReason).toBe("No in-scope paid media spend in the selected period.");
+  });
+
+  it("carries both inputs' disclosures so the reader sees every limit that applies", () => {
+    const { ltvCac } = views(julySpend, julyCustomers);
+
+    expect(ltvCac.warnings).toContain("BLENDED_CAC_SHOPIFY_ONLY_DENOMINATOR");
+    expect(ltvCac.warnings).toContain("BLENDED_CAC_GUEST_CHECKOUTS_EXCLUDED");
+    expect(ltvCac.warnings).toContain("BLENDED_CAC_NOT_COMPANY_WIDE");
   });
 });

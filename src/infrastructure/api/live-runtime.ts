@@ -146,6 +146,11 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "sheets-migrated",
     "insights-freshness",
     "v1-composite-migrated",
+    // Feeds the LTV:CAC card on this page (DEC-021). The card has always existed in the
+    // page spec, but the metric was not catalogued on this section, so it resolved to
+    // nothing and fell back to the catalog's blocked status. Shares Customer
+    // Intelligence's cached order read — the dataset cache key carries no section.
+    "shopify-customer-ltv",
   ],
   "Revenue Intelligence": [
     "shopify-product-units",
@@ -210,7 +215,15 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
   // Migrated: sheets-financial keeps its name but now reads the new workbook, which
   // holds three of its five tabs. Finance_Actuals and Cash_Position are absent there,
   // so expenses and cash position blank until ZACAO adds them.
-  "Financial Intelligence": ["shopify-sales", "sheets-financial", "deferred-google_drive"],
+  // shopify-customer-ltv is here for marketing.ltv_cac, which is catalogued on this
+  // section. Without it this page would serve a null while Customer Intelligence served
+  // a real ratio — one metric key with two answers depending on which page asked.
+  "Financial Intelligence": [
+    "shopify-sales",
+    "sheets-financial",
+    "deferred-google_drive",
+    "shopify-customer-ltv",
+  ],
   // Migrated. The legacy SKU_Master and Channel_Mapping hold only example rows, so the
   // data-quality tiles reported on a two-SKU placeholder catalogue; the new workbook has
   // the real five. sheets-insights keeps its name but reads the new workbook too — see

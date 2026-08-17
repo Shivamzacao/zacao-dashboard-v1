@@ -160,11 +160,18 @@ describe("COGS per bar", () => {
     { sku_id: "SKU-02", is_active: "yes" },
     { sku_id: "SKU-03", is_active: "no" },
   ];
-  const cost = (sku: string, effectiveFrom: string, total: number) => ({
+  /**
+   * Landed cost is rebuilt from components under DEC-020, so these rows carry the
+   * amount as a component. `total_unit_cost_usd` is still written, deliberately
+   * disagreeing where a test needs to prove the stored total is ignored.
+   */
+  const cost = (sku: string, effectiveFrom: string, total: number, packaging = 0) => ({
     sku,
     effective_from: effectiveFrom,
     cost_basis: "landed",
-    total_unit_cost_usd: total,
+    production_cost_usd: total - packaging,
+    packaging_usd: packaging,
+    total_unit_cost_usd: total - packaging,
   });
   const target = (sku: string, value: number) => ({
     metric_key: "target_landed_cogs_per_bar",
@@ -306,7 +313,7 @@ describe("COGS per bar target timing", () => {
           sku: "SKU-01",
           effective_from: "2026-07-06",
           cost_basis: "landed",
-          total_unit_cost_usd: 2.301,
+          production_cost_usd: 2.301,
         },
       ],
       [

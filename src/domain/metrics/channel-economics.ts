@@ -43,6 +43,17 @@ export interface ChannelEconomics {
  * labelled fallback when SKU mix is unavailable"), which is what
  * MARGIN_ESTIMATED_FROM_BLENDED_COGS discloses.
  */
+/**
+ * @deprecated Superseded in principle by DEC-020 and not yet rewired.
+ *
+ * This is SKU-02's stored `total_unit_cost_usd`, which DEC-020 established omits
+ * `packaging_usd` — so it understates landed cost by roughly 9c and disagrees with
+ * `finance.effective_cogs`, which recomputes from components. It is left in place
+ * deliberately: replacing it means threading a real cost through
+ * `channelContributionMarginBasisPoints` and every caller, and a channel margin
+ * built on a wrong constant should not be swapped for one that silently changes
+ * without ZACAO seeing the movement first.
+ */
 export const BLENDED_LANDED_COGS_PER_BAR_USD = 2.494;
 
 /**

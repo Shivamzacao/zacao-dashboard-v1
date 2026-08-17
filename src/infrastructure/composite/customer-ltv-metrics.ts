@@ -1,6 +1,6 @@
 import {
   buildActiveCustomersMetric,
-  buildBlendedCacMetric,
+  buildPaidAcquisitionViews,
   buildRealizedLtvViews,
 } from "@/src/application/metrics";
 import type {
@@ -104,16 +104,17 @@ export function createCustomerLtvContributor(input: {
         channels: context.filters.channels,
         sourceWarnings: status.warningCodes,
       });
-      // Blended CAC is the only metric here that spans both sources, so it is the only
-      // one whose context carries the sheets status. Widening the others would change
-      // their readiness for a source they do not read.
-      const blendedCac = buildBlendedCacMetric({
+      // Blended CAC and its LTV ratio are the only metrics here that span both sources,
+      // so they are the only ones whose context carries the sheets status. Widening the
+      // others would change their readiness for a source they do not read.
+      const paidAcquisition = buildPaidAcquisitionViews({
         context: {
           ...metricContext,
           sourceStatuses: sheetTabs.status ? [status, sheetTabs.status] : [status],
         },
         spendRows,
         orderRecords: records,
+        ltv90d: views.ltv90d,
         channelMapping,
         channels: context.filters.channels,
         sourceWarnings: status.warningCodes,
@@ -129,7 +130,8 @@ export function createCustomerLtvContributor(input: {
           }),
           views.metric,
           views.ltv90d,
-          blendedCac,
+          paidAcquisition.cac,
+          paidAcquisition.ltvCac,
         ],
         tables: [views.cohorts],
         sourceStatuses: sheetTabs.status ? [status, sheetTabs.status] : [status],
