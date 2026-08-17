@@ -13,7 +13,16 @@ export interface CustomerClassificationFact {
 
 export interface CustomerClassificationSummary {
   readonly rows: readonly CustomerClassificationFact[];
+}
+
+/**
+ * Shopify's reported returning-customer rate plus the ungrouped distinct customer
+ * total for the same period. The rate is never derived from the classification
+ * counts, which can overlap; see `mapReturningCustomerRate`.
+ */
+export interface ReturningCustomerRateFact {
   readonly returningRateBasisPoints: number | null;
+  readonly distinctCustomers: number | null;
 }
 
 export interface ShopifyFunnelFact {

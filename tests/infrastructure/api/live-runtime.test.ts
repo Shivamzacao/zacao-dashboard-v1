@@ -48,6 +48,17 @@ const shopifyqlPayloads: Record<string, unknown> = {
       { new_or_returning_customer: "Returning", orders: "54", customers: "100" },
     ],
   },
+  // 4,610 bp against 122 distinct customers. A local returning/(new+returning)
+  // division over the same stub would give 100/400 = 2,500 bp, so this fixture
+  // fails if the rate is ever derived again instead of passed through.
+  returning_customer_rate: {
+    columns: [
+      { name: "returning_customers", dataType: "INTEGER" },
+      { name: "customers", dataType: "INTEGER" },
+      { name: "returning_customer_rate", dataType: "FLOAT" },
+    ],
+    rows: [{ returning_customers: "100", customers: "122", returning_customer_rate: "0.4610" }],
+  },
   "FROM sessions": {
     columns: [],
     rows: [
@@ -83,6 +94,7 @@ const defaultProductLineRows = [
 function stubFetch(
   overrides: {
     failFunnel?: boolean;
+    failReturningRate?: boolean;
     productLineRows?: readonly Record<string, string>[];
   } = {},
 ) {
@@ -134,6 +146,17 @@ function stubFetch(
           return json({
             data: {
               shopifyqlQuery: { parseErrors: [], tableData: shopifyqlPayloads["FROM sessions"] },
+            },
+          });
+        }
+        if (body.includes("returning_customer_rate")) {
+          if (overrides.failReturningRate) return json({}, 500);
+          return json({
+            data: {
+              shopifyqlQuery: {
+                parseErrors: [],
+                tableData: shopifyqlPayloads["returning_customer_rate"],
+              },
             },
           });
         }
@@ -445,6 +468,29 @@ describe("LiveBackendApiRuntime", () => {
     }
   });
 
+  it("keeps the customer counts when only the returning-rate read fails", async () => {
+    const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
+      fetchImplementation: stubFetch({ failReturningRate: true }),
+    });
+    const result = await runtime.loadDashboard("Customer Intelligence", filters);
+
+    // The counts come from the other dataset and are still true, so one missing
+    // provider field must not blank three metrics.
+    expect(metricByKey(result.page, "customers.new_count").value).toEqual({
+      kind: "count",
+      value: 300,
+    });
+    expect(metricByKey(result.page, "customers.returning_count").value).toEqual({
+      kind: "count",
+      value: 100,
+    });
+
+    // The rate itself is withheld rather than falling back to a local division.
+    const rate = metricByKey(result.page, "customers.returning_rate");
+    expect(rate.value).toBeNull();
+    expect(rate.readiness.warningCodes).toContain("RETURNING_RATE_PROVIDER_UNAVAILABLE");
+  });
+
   it("serves certifiable Shopify values while blocked metrics stay null", async () => {
     const runtime = new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
       fetchImplementation: stubFetch(),
@@ -452,7 +498,9 @@ describe("LiveBackendApiRuntime", () => {
     const result = await runtime.loadDashboard("Executive Health", filters);
 
     const returningRate = metricByKey(result.page, "customers.returning_rate");
-    expect(returningRate.value).toEqual({ kind: "rate_basis_points", value: 2_500 });
+    // Shopify's own returning_customer_rate, passed through. Deriving it from the
+    // classification counts would give 2,500 bp — see the stub fixture.
+    expect(returningRate.value).toEqual({ kind: "rate_basis_points", value: 4_610 });
     expect(returningRate.readiness.state).toBe("current");
 
     // DEC-015-activated revenue metrics pass through canonical provider values.
