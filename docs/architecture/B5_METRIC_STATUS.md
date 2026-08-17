@@ -53,6 +53,7 @@ Reconciled before B6: the six metrics outside the four active-status counts are 
 | inventory.value | Product; Financial | Inventory + costs | Quantity × approved effective canonical cost | BUSINESS_RULE_REQUIRED | Cost authority/mapping |
 | inventory.runway_reorder | Product; Operations | Shopify + manual planning | Approved velocity, stockout and reorder rules | BUSINESS_RULE_REQUIRED | Velocity/lead/safety rules |
 | products.frequently_bought_together | Product | Detailed order lines | Pair support/confidence under approved rules | BUSINESS_RULE_REQUIRED | History/thresholds |
+| products.cogs_flags | Product | COGS_By_SKU + Metric_Targets + SKU_Master | Count active SKUs whose effective landed cost per bar exceeds their approved target; compared only where both a cost and a target exist; targets predating the DEC-020 landed-cost basis are disclosed | CERTIFIABLE | DEC-022 |
 | operations.shipped_delivered | Operations | Shopify fulfillment | Provider aggregates with partial warning | SOURCE_LIMITED | Carrier-event completeness |
 | inventory.combined | Operations | Shopify + Inventory | Sum mapped facts only with complete location coverage | DATA_PENDING | Production inventory empty |
 | inventory.lots | Operations | Inventory_Lots + S&OP | Valid current lot rows and remaining quantities | DATA_PENDING | Production lots empty |

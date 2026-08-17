@@ -27,6 +27,7 @@ function metric(
   metricKey: string,
   value: Parameters<typeof createMetricViewModel>[0]["value"],
   warnings: readonly string[] = [],
+  dataPendingReason?: string,
 ): MetricViewModel {
   return createMetricViewModel({
     metricKey,
@@ -35,6 +36,7 @@ function metric(
     sources: context.sourceStatuses,
     value,
     warnings,
+    ...(dataPendingReason ? { dataPendingReason } : {}),
   });
 }
 
@@ -625,6 +627,16 @@ const mean = (values: readonly number[]): number | null =>
 const perBarUsd = (value: number) => usd(Math.round(value * 100));
 
 /**
+ * Tolerance for calling a per-bar cost equal to its target.
+ *
+ * Appendix C.4 initialised every target to that SKU's landed cost, so the two sides are
+ * routinely the same number arrived at by different float paths. Comparing them exactly
+ * would report a SKU as over target on a rounding artefact. Half a hundredth of a cent
+ * is below anything the workbook can express and well above float noise.
+ */
+const BASELINE_EPSILON = 0.0005;
+
+/**
  * Landed manufacturing cost per sellable bar against the approved target
  * (spec §7.1, Appendix C.4). Costs are effective-dated, so each point carries
  * every active SKU's most recent record forward — a SKU is not dropped from the
@@ -641,7 +653,11 @@ export function buildCogsPerBarViews(
   targetRecords: readonly SheetRecord[],
   skuMaster: readonly SheetRecord[],
   warnings: readonly string[] = [],
-): { readonly metric: MetricViewModel; readonly trend: MetricBreakdownViewModel } {
+): {
+  readonly metric: MetricViewModel;
+  readonly flags: MetricViewModel;
+  readonly trend: MetricBreakdownViewModel;
+} {
   const activeSkus = new Set(
     skuMaster.flatMap((record) => {
       const sku = text(record, "sku_id");
@@ -682,7 +698,7 @@ export function buildCogsPerBarViews(
   const targetIsBaseline =
     latest?.target !== null &&
     latest !== null &&
-    Math.abs((latest.target ?? 0) - latest.actual) < 0.0005;
+    Math.abs((latest.target ?? 0) - latest.actual) < BASELINE_EPSILON;
   const resultWarnings = [
     ...warnings,
     ...(latest ? ["COGS_BLENDED_WITHOUT_SKU_MIX", `COGS_SKUS_IN_BLEND:${skusInBlend}`] : []),
@@ -695,8 +711,57 @@ export function buildCogsPerBarViews(
     latest ? { kind: "money", value: perBarUsd(latest.actual) } : null,
     resultWarnings,
   );
+
+  // Per-SKU comparison as of the period end, for products.cogs_flags. Deliberately not
+  // derived from the blended trend above: an average that sits on target can hide one
+  // SKU over and one under, which is the entire question this metric answers.
+  const asOf = context.dataPeriod.endDate;
+  const costsAtEnd = effectiveLandedCostBySku(costRecords, activeSkus, asOf);
+  const targetsAtEnd = effectiveTargetBySku(targetRecords, activeSkus, asOf);
+  // Only a SKU with both an effective cost and an approved target can be judged. One
+  // without a target is unmeasured, not on target, so it is excluded and counted in a
+  // warning rather than silently passing.
+  const compared = [...costsAtEnd].filter(([sku]) => targetsAtEnd.has(sku));
+  const withoutTarget = costsAtEnd.size - compared.length;
+  const above = compared.filter(
+    ([sku, cost]) => cost - (targetsAtEnd.get(sku) ?? 0) > BASELINE_EPSILON,
+  );
+  const allTargetsAreBaseline =
+    compared.length > 0 &&
+    compared.every(([sku, cost]) => Math.abs(cost - (targetsAtEnd.get(sku) ?? 0)) < BASELINE_EPSILON);
+  // A target that matches the SKU's STORED `total_unit_cost_usd` rather than its
+  // recomputed landed cost was set on the pre-DEC-020 basis, which that decision
+  // established omits `packaging_usd`. Such a SKU reads as over target by exactly its
+  // packaging cost — a basis mismatch, not cost drift — and saying so is the difference
+  // between an explained count and one that looks like costs rose.
+  const staleBasis = above.filter(([sku]) => {
+    const row = effectiveLandedRow(costRecords, sku, asOf);
+    const stored = row ? numeric(row, "total_unit_cost_usd") : null;
+    const target = targetsAtEnd.get(sku);
+    return stored !== null && target !== undefined && Math.abs(stored - target) < BASELINE_EPSILON;
+  }).length;
+  const flagWarnings = [
+    ...warnings,
+    ...(compared.length > 0 ? [`COGS_FLAGS_SKUS_COMPARED:${compared.length}`] : []),
+    ...(withoutTarget > 0 ? [`COGS_FLAGS_SKUS_WITHOUT_TARGET:${withoutTarget}`] : []),
+    // Same disclosure the blended metric carries: a zero count against baseline targets
+    // is the C.4 initialisation, not an approved goal being met.
+    ...(allTargetsAreBaseline ? ["COGS_TARGET_EQUALS_BASELINE"] : []),
+    ...(staleBasis > 0 ? [`COGS_TARGET_PREDATES_LANDED_BASIS:${staleBasis}`] : []),
+  ];
+  const flags = metric(
+    context,
+    "products.cogs_flags",
+    compared.length > 0 ? { kind: "count", value: above.length } : null,
+    flagWarnings,
+    compared.length > 0
+      ? undefined
+      : "No active SKU has both an effective landed cost and an approved target for this period.",
+  );
+
   return {
     metric: base,
+    flags,
     trend: metricBreakdownViewModelSchema.parse({
       metric: base,
       dimension: "cogs_effective_period",
