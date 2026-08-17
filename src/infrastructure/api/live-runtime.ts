@@ -152,6 +152,8 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "shopify-sales",
     "shopify-purchase-timing",
     "shopify-channels",
+    // Feeds the detailed-orders drill-down and its CSV export.
+    "shopify-detailed-orders",
     // Migrated: its only sheet dependency is Channel_Mapping, which the composite
     // reads. Shares the cached read with Executive Health.
     "v1-composite-migrated",
@@ -165,6 +167,9 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     // Sales_Actuals tab they used to read held only seeded example rows, so the
     // page reported fabricated customer value.
     "shopify-customer-ltv",
+    // The drill-down is declared on this section too, so the table has to be
+    // planned here or the card renders empty on Customer Intelligence alone.
+    "shopify-detailed-orders",
     "klaviyo-performance",
     "klaviyo-profiles",
   ],
@@ -402,6 +407,7 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
         new DeferredSourceContributor("shopify-catalog-inventory", "shopify", now),
         new DeferredSourceContributor("shopify-history", "shopify", now),
         new DeferredSourceContributor("shopify-refund-rate", "shopify", now),
+        new DeferredSourceContributor("shopify-detailed-orders", "shopify", now),
         new DeferredSourceContributor("shopify-sales", "shopify", now),
         new DeferredSourceContributor("shopify-purchase-timing", "shopify", now),
         new DeferredSourceContributor("shopify-geography", "shopify", now),

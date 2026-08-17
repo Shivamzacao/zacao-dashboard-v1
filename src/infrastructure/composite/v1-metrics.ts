@@ -176,6 +176,7 @@ export function createV1CompositeContributor(input: {
         ],
         breakdowns: [
           revenueChannels.channelMix,
+          revenueChannels.channelMargin,
           inventory.shopify,
           inventory.combined,
           inventory.stockBand,

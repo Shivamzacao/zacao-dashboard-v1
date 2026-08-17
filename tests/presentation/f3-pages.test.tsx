@@ -141,8 +141,11 @@ describe("F3 dashboard pages", () => {
     expect(screen.getByLabelText("DTC revenue (total): $10,260.00")).toBeTruthy();
     expect(screen.getByLabelText("Wholesale & in-store revenue: $3,750.00")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Product revenue" })).toBeNull();
-    expect(screen.getByText("Business rule required")).toBeTruthy();
-    expect(screen.getByText(/Margin is unavailable until landed COGS/)).toBeTruthy();
+    // Margin is no longer rule-blocked, so no card on this page reports that
+    // state. The table's coverage note now discloses the provisional fee rates
+    // instead of claiming the metric cannot be produced at all.
+    expect(screen.queryByText("Business rule required")).toBeNull();
+    expect(screen.getByText(/Margin is provisional/)).toBeTruthy();
     expect(screen.getAllByText("Source: Shopify").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("Source: Shopify + Faire")).toBeTruthy();
     expect(screen.getByText("Source: Shopify + mapping / cost sources")).toBeTruthy();
@@ -419,7 +422,9 @@ describe("F3 dashboard pages", () => {
     ).toHaveLength(9);
     expect(screen.getByLabelText("Actual operating expenses: $35,700.00")).toBeTruthy();
     expect(screen.getByLabelText("Cash position: $248,000.00")).toBeTruthy();
-    expect(screen.getAllByText("Business rule required")).toHaveLength(4);
+    // Three, not four: contribution margin by channel also appears on this page
+    // and is no longer rule-blocked now that the channel fee table exists.
+    expect(screen.getAllByText("Business rule required")).toHaveLength(3);
     expect(screen.getAllByText("Data pending")).toHaveLength(3);
     expect(screen.getAllByText("Actual").length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("Plan").length).toBeGreaterThanOrEqual(2);

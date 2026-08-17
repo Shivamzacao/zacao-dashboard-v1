@@ -64,12 +64,16 @@ describe("B7 frozen Phase 2 API compatibility", () => {
       sourceLimited: false,
       implementationPending: false,
     });
+    // The PII-safe field contract now exists (order date, channel, amount,
+    // quantity — no customer identity), so the drill-down is implemented and
+    // exportable. This is additive: the dataset name and every endpoint path
+    // above are unchanged, so no Phase 2 consumer loses anything it had.
     expect(
       apiContractManifest.drilldowns.find(({ dataset }) => dataset === "detailed-orders"),
     ).toMatchObject({
-      exportable: false,
+      exportable: true,
       sourceLimited: false,
-      implementationPending: true,
+      implementationPending: false,
     });
   });
 });

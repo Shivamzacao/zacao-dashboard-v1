@@ -32,7 +32,7 @@ describe("B7 bounded CSV exports", () => {
     expect(csv).not.toContain("providerRaw");
   });
 
-  it("rejects oversized and unapproved exports", async () => {
+  it("rejects oversized exports", async () => {
     expect(
       (
         await handlers().exportCsv(
@@ -41,14 +41,18 @@ describe("B7 bounded CSV exports", () => {
         )
       ).status,
     ).toBe(400);
-    expect(
-      (
-        await handlers().exportCsv(
-          new Request(`https://example.test/api/v1/exports/detailed-orders?${API_QUERY}`),
-          "detailed-orders",
-        )
-      ).status,
-    ).toBe(400);
+  });
+
+  it("refuses an order export field that was never approved for display", async () => {
+    // detailed-orders is exportable now, but only over its four approved fields.
+    // A request for customer identity must fail rather than be silently dropped.
+    const response = await handlers().exportCsv(
+      new Request(
+        `https://example.test/api/v1/exports/detailed-orders?${API_QUERY}&fields=orderDate,customerId`,
+      ),
+      "detailed-orders",
+    );
+    expect(response.status).toBe(400);
   });
 
   it("exports certified channel performance fields while keeping margin unavailable", async () => {

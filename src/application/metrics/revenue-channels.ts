@@ -7,6 +7,7 @@ import {
 } from "@/src/application/view-models";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
 import type { SourceStatus } from "@/src/domain/contracts";
+import { channelContributionMarginBasisPoints } from "@/src/domain/metrics/channel-economics";
 import { usd } from "@/src/domain/utilities/money";
 
 import type { MetricServiceContext, NativeChannelFact } from "./types";
@@ -142,6 +143,44 @@ function metric(
   });
 }
 
+/**
+ * A basis-points metric whose sources are always marked partial.
+ *
+ * Margin is derived from placeholder fee rates and an estimated bar count, so it
+ * is never "current" no matter how healthy Shopify and the workbook are. Routing
+ * it through `partialSources` puts the disclosure on the source itself, which is
+ * what drives the visible state on the card — a reader must not be able to see
+ * this percentage without also seeing that it is provisional.
+ */
+function rateMetric(
+  context: MetricServiceContext,
+  key: string,
+  basisPoints: number | null,
+  warnings: readonly string[],
+): MetricViewModel {
+  const base = createMetricViewModel({
+    metricKey: key,
+    environment: context.environment,
+    dataPeriod: context.dataPeriod,
+    sources: partialSources(context.sourceStatuses, warnings),
+    value: basisPoints === null ? null : { kind: "rate_basis_points", value: basisPoints },
+    warnings,
+  });
+  if (!warnings.includes("CHANNEL_FEES_PROVISIONAL")) return base;
+  // The default partial copy — "Source data has a disclosed limitation" — reads
+  // as a transient source hiccup. This one is not transient and is not the
+  // source's fault: the fee rates are invented. Say so.
+  return {
+    ...base,
+    readiness: {
+      ...base.readiness,
+      state: "partial" as const,
+      message:
+        "Provisional: channel fee rates are placeholders awaiting ZACAO approval, and COGS is estimated from a blended per-bar cost.",
+    },
+  };
+}
+
 function unresolvedRollup(
   context: MetricServiceContext,
   key: string,
@@ -176,6 +215,7 @@ export function buildRevenueChannelViews(
   readonly dtcTotal: MetricViewModel;
   readonly retailTotal: MetricViewModel;
   readonly channelMix: MetricBreakdownViewModel;
+  readonly channelMargin: MetricBreakdownViewModel;
   readonly channelPerformance: MetricTableViewModel;
 } {
   const mappings = activeChannelMappings(mappingRecords, context.dataPeriod.endDate);
@@ -247,6 +287,63 @@ export function buildRevenueChannelViews(
       warnings: channel.channel === UNCLASSIFIED ? ["UNCLASSIFIED_CHANNEL"] : [],
     })),
   });
+  // Contribution margin per channel. Channels with no configured economics —
+  // Unclassified above all — return null rather than a blended guess, and are
+  // left out of the company rate's numerator *and* denominator so they cannot
+  // drag it toward a number nobody can defend.
+  const margins = new Map(
+    channels.map((channel) => [
+      channel.channel,
+      channelContributionMarginBasisPoints({
+        channel: channel.channel,
+        revenueMinorUnits: channel.revenueMinorUnits,
+        orders: channel.orders,
+      }),
+    ]),
+  );
+  const marginWarnings = new Set(warningList);
+  // Every rate but TikTok Shop's is a working placeholder, so any margin built
+  // from them has to arrive labelled. Dropping this warning would turn invented
+  // fees into an approved-looking percentage.
+  if ([...margins.values()].some((result) => result.provisional)) {
+    marginWarnings.add("CHANNEL_FEES_PROVISIONAL");
+  }
+  // Per-channel revenue carries no unit counts, so bars are inferred from price
+  // and COGS is the blended per-bar cost, not a SKU mix.
+  marginWarnings.add("MARGIN_ESTIMATED_FROM_BLENDED_COGS");
+  const pricedChannels = channels.filter(
+    ({ channel }) => margins.get(channel)?.marginMinorUnits !== null,
+  );
+  if (pricedChannels.length < channels.length) {
+    marginWarnings.add("CHANNEL_ECONOMICS_MISSING");
+  }
+  const marginRevenue = pricedChannels.reduce((total, row) => total + row.revenueMinorUnits, 0);
+  const marginAmount = pricedChannels.reduce(
+    (total, row) => total + (margins.get(row.channel)?.marginMinorUnits ?? 0),
+    0,
+  );
+  const marginWarningList = [...marginWarnings];
+  const blendedMargin =
+    marginRevenue > 0 ? Math.round((marginAmount / marginRevenue) * 10_000) : null;
+  const marginMetric = rateMetric(
+    context,
+    "revenue.channel_margin",
+    blendedMargin,
+    marginWarningList,
+  );
+  const channelMargin = metricBreakdownViewModelSchema.parse({
+    metric: marginMetric,
+    dimension: "dashboard_channel",
+    items: pricedChannels.map((channel) => ({
+      key: channel.channel,
+      label: channel.channel,
+      values: [
+        { kind: "rate_basis_points", value: margins.get(channel.channel)?.basisPoints ?? 0 },
+      ],
+      warnings: margins.get(channel.channel)?.provisional ? ["CHANNEL_FEES_PROVISIONAL"] : [],
+    })),
+  });
+
   const channelPerformance = metricTableViewModelSchema.parse({
     metric: channelMetric,
     columns: [
@@ -261,7 +358,7 @@ export function buildRevenueChannelViews(
       revenueMinorUnits: channel.revenueMinorUnits,
       orders: channel.orders,
       averageOrderValueMinorUnits: channel.averageOrderValueMinorUnits,
-      marginBasisPoints: null,
+      marginBasisPoints: margins.get(channel.channel)?.basisPoints ?? null,
     })),
   });
 
@@ -269,6 +366,7 @@ export function buildRevenueChannelViews(
     dtcTotal: groupMetric("revenue.dtc_total", DTC_CHANNELS),
     retailTotal: groupMetric("revenue.retail_total", RETAIL_CHANNELS),
     channelMix,
+    channelMargin,
     channelPerformance,
   };
 }

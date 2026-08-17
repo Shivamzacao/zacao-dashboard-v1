@@ -115,17 +115,21 @@ describe("B7 JSON route contracts", () => {
     expect(drilldownApiResponseSchema.parse(await next.json()).data.rows).toHaveLength(1);
   });
 
-  it("returns explicit implementation-pending readiness for detailed orders", async () => {
+  it("serves detailed orders over the approved columns only", async () => {
     const response = await setup().drilldown(
       new Request(`https://example.test/api/v1/drilldowns/detailed-orders?${API_QUERY}`),
       "detailed-orders",
     );
     const body = drilldownApiResponseSchema.parse(await response.json());
-    expect(body.data.rows).toEqual([]);
-    expect(body.data.readiness).toMatchObject({
-      state: "not_configured",
-      warningCodes: expect.arrayContaining(["IMPLEMENTATION_PENDING"]),
-    });
+    // No longer IMPLEMENTATION_PENDING: the drill-down is built and read_all_orders
+    // is granted. The column set is the guarantee that no customer identity leaks.
+    expect(body.data.readiness.warningCodes).not.toContain("IMPLEMENTATION_PENDING");
+    expect(body.data.columns).toEqual([
+      "orderDate",
+      "channel",
+      "amountMinorUnits",
+      "quantity",
+    ]);
   });
 
   it("separates liveness, readiness, and deferred source status", async () => {

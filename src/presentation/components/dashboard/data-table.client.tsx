@@ -28,6 +28,13 @@ interface DataTableProps<Row extends object> {
   readonly rows: readonly Row[];
   readonly rowKey: (row: Row) => string;
   readonly state?: DisplayState;
+  /**
+   * Why this table has nothing to show. Without it the surface falls back to
+   * generic copy — "the required source data has not arrived yet" — which is
+   * wrong whenever the blocker is an unapproved rule or unbuilt feature rather
+   * than late data, and sends the reader looking in the wrong place.
+   */
+  readonly stateDescription?: string | undefined;
   readonly page: number;
   readonly pageSize: number;
   readonly totalRows: number;
@@ -41,6 +48,7 @@ export function DataTable<Row extends object>({
   rows,
   rowKey,
   state = "current",
+  stateDescription,
   page,
   pageSize,
   totalRows,
@@ -76,8 +84,8 @@ export function DataTable<Row extends object>({
   });
 
   if (state !== "current" && state !== "partial" && state !== "stale")
-    return <StateSurface state={state} />;
-  if (rows.length === 0) return <StateSurface state="empty" />;
+    return <StateSurface state={state} description={stateDescription} />;
+  if (rows.length === 0) return <StateSurface state="empty" description={stateDescription} />;
 
   return (
     <div className="data-table-region">

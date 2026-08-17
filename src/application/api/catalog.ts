@@ -276,10 +276,13 @@ export const drilldownCatalog = Object.freeze([
     dataset: "detailed-orders",
     section: "Revenue Intelligence",
     metricKey: "commerce.detailed_order_drilldown",
-    fields: [],
-    sortFields: [],
-    exportable: false,
-    implementationPending: true,
+    // The four fields ZACAO approved for display. Shopify order records carry
+    // customer name, email, phone and address; none are listed here and none are
+    // requested by the orders query, so there is no field a sort or export could
+    // reach that would leak one.
+    fields: ["orderDate", "channel", "amountMinorUnits", "quantity"],
+    sortFields: ["orderDate", "channel", "amountMinorUnits", "quantity"],
+    exportable: true,
   }),
 ] satisfies readonly DrilldownDefinition[]);
 

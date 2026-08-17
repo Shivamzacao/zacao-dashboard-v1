@@ -14,6 +14,7 @@ import type {
   CatalogVariantFact,
   CustomerCityFact,
   CustomerClassificationSummary,
+  DetailedOrderFact,
   InventoryFact,
   MetricServiceContext,
   ProductUnitsFact,
@@ -264,6 +265,36 @@ export function buildProductSkuVelocityBreakdown(
       values: [{ kind: "quantity", value: sumSafeNumbers(units) / days }],
       warnings: [],
     })),
+  });
+}
+
+/**
+ * Order-level drill-down, newest first.
+ *
+ * The columns are the four ZACAO approved for display: order date, channel,
+ * amount, quantity. Nothing that could identify a customer is included, and
+ * nothing that could is fetched either — see DetailedOrderFact.
+ */
+export function buildDetailedOrdersTable(
+  context: MetricServiceContext,
+  facts: readonly DetailedOrderFact[],
+): MetricTableViewModel {
+  const base = metric(
+    context,
+    "commerce.detailed_order_drilldown",
+    facts.length === 0 ? null : { kind: "count", value: facts.length },
+  );
+  return metricTableViewModelSchema.parse({
+    metric: base,
+    columns: ["orderDate", "channel", "amountMinorUnits", "quantity"],
+    rows: [...facts]
+      .sort((left, right) => right.orderDate.localeCompare(left.orderDate))
+      .map((fact) => ({
+        orderDate: fact.orderDate,
+        channel: fact.channel,
+        amountMinorUnits: fact.amountMinorUnits,
+        quantity: fact.quantity,
+      })),
   });
 }
 

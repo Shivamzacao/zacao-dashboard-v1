@@ -2,6 +2,7 @@ import {
   buildBillingGeographyBreakdown,
   buildCustomerCityBreakdown,
   buildCatalogTable,
+  buildDetailedOrdersTable,
   buildFulfillmentSummaryBreakdown,
   buildNativeChannelMixBreakdown,
   buildProductMixBreakdown,
@@ -428,6 +429,53 @@ export function createShopifyContributors(input: {
     },
   );
 
+  // Its own contributor rather than a second view on shopify-refund-rate: that
+  // one is planned for Operations Intelligence alone, and the drill-down belongs
+  // to Revenue and Customer Intelligence. Sharing it would have dragged an
+  // operations metric onto two unrelated pages to get at the order read.
+  const detailedOrders = new ShopifyContributor(
+    "shopify-detailed-orders",
+    sourceIdentity,
+    ADMIN_CACHE,
+    async (context) => {
+      const { admin, hasReadAllOrders } = await adapters();
+      const result = await admin.readOrders({
+        dateRange: context.dataPeriod,
+        hasReadAllOrders,
+      });
+      const status = currentStatus(
+        now().toISOString(),
+        buildShopifyHistory({
+          mode: "detailed",
+          requestedStartDate: context.dataPeriod.startDate,
+          requestedEndDate: context.dataPeriod.endDate,
+          earliestDetailedRecordAt: result.records.at(-1)?.createdAt ?? null,
+          hasReadAllOrders,
+          detailedRangeVerified: !result.truncated,
+        }),
+      );
+      return {
+        // Test and cancelled orders are excluded so the row count and amounts
+        // reconcile with the revenue figures elsewhere on the page.
+        tables: [
+          buildDetailedOrdersTable(
+            metricContext(context, [status]),
+            result.records
+              .filter((order) => !order.test && order.cancelledAt === null)
+              .map((order) => ({
+                orderDate: order.createdAt.slice(0, 10),
+                channel: order.sourceName,
+                amountMinorUnits: order.total.minorUnits,
+                quantity: order.quantity,
+              })),
+          ),
+        ],
+        sourceStatuses: [status],
+        ...(result.truncated ? { warnings: ["SHOPIFY_ORDER_HISTORY_TRUNCATED"] } : {}),
+      };
+    },
+  );
+
   const channels = new ShopifyContributor(
     "shopify-channels",
     sourceIdentity,
@@ -481,6 +529,7 @@ export function createShopifyContributors(input: {
     catalogInventory,
     history,
     refunds,
+    detailedOrders,
     sales,
     purchaseTiming,
     billingGeography,

@@ -363,9 +363,15 @@ export const metricCatalog = Object.freeze([
     sourceFields: "net product revenue, landed COGS, channel fees, commission",
     calculation:
       "(Net product revenue minus landed COGS, channel fees, and commission) divided by net product revenue.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason:
-      "Approved landed COGS, channel-fee, and commission rules are not available for every channel.",
+    // The calculation runs, so this is no longer BUSINESS_RULE_REQUIRED — that
+    // status discards the value before it is ever read. It is not a clean
+    // certification either: only TikTok Shop's take rate is approved, every
+    // other channel uses a placeholder from channel-economics.ts, and bars are
+    // inferred from price because channel facts carry no unit counts. The
+    // disclosure therefore rides on the metric itself, which always reports
+    // partial with CHANNEL_FEES_PROVISIONAL, never as a signed-off margin.
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "products.sales",
@@ -417,9 +423,12 @@ export const metricCatalog = Object.freeze([
     sources: "Shopify Admin GraphQL orders",
     sourceFields: "order and line-item history",
     calculation: "Return sanitized detailed records only when the requested range is complete.",
-    status: "DATA_PENDING",
-    blockingReason:
-      "The PII-safe order-level field contract and drill-down implementation are pending; Shopify read_all_orders access is available.",
+    // Was DATA_PENDING on the strength of a missing field contract, not missing
+    // data — read_all_orders is granted and returns history back to 2024-09. The
+    // contract now exists (order date, channel, amount, quantity; no customer
+    // identity in the query or the columns), so the drill-down renders.
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "commerce.predictive_forecast",

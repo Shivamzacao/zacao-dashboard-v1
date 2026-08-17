@@ -131,6 +131,21 @@ export interface ProductSalesFact {
   readonly netSalesMinorUnits: number;
 }
 
+/**
+ * One order, reduced to the fields approved for on-screen display.
+ *
+ * Deliberately narrow. Order-level Shopify data carries names, emails, phone
+ * numbers and addresses; none of them appear here, and none are fetched — the
+ * orders query requests `customer { id }` only. Widening this shape is a
+ * privacy decision, not a formatting one.
+ */
+export interface DetailedOrderFact {
+  readonly orderDate: string;
+  readonly channel: string;
+  readonly amountMinorUnits: number;
+  readonly quantity: number | null;
+}
+
 export interface NativeChannelFact {
   readonly channel: string;
   readonly orders: number;
