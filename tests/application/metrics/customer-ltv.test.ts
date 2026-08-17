@@ -166,6 +166,26 @@ describe("Realized LTV", () => {
     expect(august?.ltvMinorUnits.lifetime).toBe(9_000);
   });
 
+  // Cohorts are published to the dashboard as a table, so a customer identifier leaking
+  // into a row would put PII in the payload. This assertion moved here from the
+  // sheets-customers contributor test when that contributor was removed.
+  it("aggregates cohorts without carrying any customer identifier", () => {
+    const views = buildRealizedLtvViews({
+      context: context([source("google_sheets")]),
+      records: [
+        order("O-1", "C-PRIVATE", "2026-01-05", "2026-01-05"),
+        order("O-2", "C-PRIVATE", "2026-01-25", "2026-01-05", { net_product_revenue_usd: 50 }),
+      ],
+      channelMapping: mappings,
+      channels: [],
+    });
+
+    expect(views.cohorts.rows).toEqual([
+      expect.objectContaining({ cohortMonth: "2026-01", customerCount: 1 }),
+    ]);
+    expect(JSON.stringify(views.cohorts.rows)).not.toContain("C-PRIVATE");
+  });
+
   it("excludes invalid identity, test, currency, status, date, duplicate, and inconsistent rows", () => {
     const result = calculateRealizedLtv({
       records: [

@@ -1,6 +1,5 @@
 import {
   buildCashPositionMetric,
-  buildActiveCustomersMetric,
   buildCashPositionBreakdown,
   buildCogsPerBarViews,
   buildCombinedInventoryBreakdown,
@@ -23,7 +22,6 @@ import {
   buildManufacturerOperationsViews,
   buildPackagingViews,
   buildProductionCostBreakdown,
-  buildRealizedLtvViews,
   hasComparableInputCostRows,
   hasManufacturerOtifRows,
   buildWarehouseAccuracyMetric,
@@ -79,38 +77,14 @@ export function createSheetsApiContributors(
   source: SheetsTabDataSource,
   executiveSource: SheetsTabDataSource | null = null,
 ): readonly DashboardDatasetContributor[] {
-  const customers = new SheetsContributor("sheets-customers", async (value) => {
-    const result = await source.readPageTabs("customers", ["Sales_Actuals", "Channel_Mapping"]);
-    const sales = selectExampleFallback(result, "Sales_Actuals");
-    const channelMapping = selectExampleFallback(result, "Channel_Mapping");
-    const usedExample = sales.usedExample || channelMapping.usedExample;
-    const status = syntheticSourceStatus(result.sourceStatus, usedExample);
-    const warnings = syntheticWarnings(result.warnings, usedExample);
-    const views = buildRealizedLtvViews({
-      context: context(value, status),
-      records: sales.rows,
-      channelMapping: channelMapping.rows,
-      channels: value.filters.channels,
-      sourceWarnings: warnings,
-    });
-    return {
-      metrics: [
-        buildActiveCustomersMetric({
-          context: context(value, status),
-          records: sales.rows,
-          sourceWarnings: warnings,
-        }),
-        views.metric,
-      ],
-      tables: [views.cohorts],
-      sourceStatuses: [status],
-      warnings,
-    };
-  });
+  // sheets-customers is gone: the legacy Sales_Actuals tab held only seeded example
+  // rows, so Customer Intelligence now derives LTV from Shopify order history via
+  // shopify-customer-ltv. buildRealizedLtvViews is still exercised directly in
+  // tests/application/metrics/customer-ltv.test.ts.
 
-  // Executive Health and Operations Intelligence share this loader but not their
-  // workbook: the migration runs page by page, so Executive Health reads the new
-  // operations workbook while Operations Intelligence stays on the legacy one.
+  // One loader, one workbook. It kept a page parameter while Executive Health read the
+  // new workbook and Operations Intelligence the legacy one; both are migrated now, so
+  // sheets-migrated is its only caller.
   const operationsLoader =
     (from: SheetsTabDataSource, page: SheetsDashboardPage) =>
     async (value: OrchestrationContext) => {
@@ -259,17 +233,16 @@ export function createSheetsApiContributors(
       };
     };
 
-  // Kept for any section still on the legacy workbook. Nothing references it now
-  // that Operations Intelligence is migrated; removing a dataset is a separate call.
-  const operations = new SheetsContributor(
-    "sheets-operations",
-    operationsLoader(source, "operations"),
-  );
   // Named for the workbook it reads, not a page: Executive Health and Operations
-  // Intelligence both use it and share one cached read.
-  const migrated = executiveSource
-    ? new SheetsContributor("sheets-migrated", operationsLoader(executiveSource, "migrated"))
-    : null;
+  // Intelligence both use it and share one cached read. It now follows the same
+  // fallback shape as every other contributor, so it exists whether or not the new
+  // workbook is configured — the legacy-only sheets-operations twin is gone.
+  const migratedSource = executiveSource ?? source;
+  const migratedPage: SheetsDashboardPage = executiveSource ? "migrated" : "operations";
+  const migrated = new SheetsContributor(
+    "sheets-migrated",
+    operationsLoader(migratedSource, migratedPage),
+  );
 
   // Product Intelligence is migrated, so this binds to the new workbook when it is
   // configured and falls back to the legacy one otherwise.
@@ -448,14 +421,5 @@ export function createSheetsApiContributors(
     };
   });
 
-  return [
-    customers,
-    operations,
-    ...(migrated ? [migrated] : []),
-    product,
-    insights,
-    marketing,
-    growth,
-    financial,
-  ];
+  return [migrated, product, insights, marketing, growth, financial];
 }
