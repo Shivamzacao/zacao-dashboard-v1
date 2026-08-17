@@ -19,6 +19,7 @@ import type {
   MetricServiceContext,
   ProductUnitsFact,
   RefundOrderFact,
+  ReturningCustomerRateFact,
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
 } from "./types";
@@ -34,6 +35,7 @@ function metric(
   metricKey: string,
   value: Parameters<typeof createMetricViewModel>[0]["value"],
   warnings: readonly string[] = [],
+  dataPendingReason?: string,
 ): MetricViewModel {
   return createMetricViewModel({
     metricKey,
@@ -42,12 +44,14 @@ function metric(
     sources: context.sourceStatuses,
     value,
     warnings,
+    ...(dataPendingReason ? { dataPendingReason } : {}),
   });
 }
 
 export function buildCustomerClassificationMetrics(
   context: MetricServiceContext,
   summary: CustomerClassificationSummary,
+  rate: ReturningCustomerRateFact,
 ): readonly MetricViewModel[] {
   const facts = summary.rows;
   const newCustomers = sumSafeNumbers(
@@ -65,7 +69,17 @@ export function buildCustomerClassificationMetrics(
       .filter(({ classification }) => classification === "unclassified")
       .map(({ customers }) => customers),
   );
-  const warnings = unclassified > 0 ? ["UNCLASSIFIED_CUSTOMER_ROWS"] : [];
+  // A customer counted as both new and returning inside the period makes the two
+  // tiles sum past the distinct total. Disclosing it explains why dividing them by
+  // hand does not reproduce the provider's rate — the exact confusion that led the
+  // rate to be derived incorrectly in the first place.
+  const overlapping =
+    rate.distinctCustomers !== null && newCustomers + returningCustomers > rate.distinctCustomers;
+  const warnings = [
+    ...(unclassified > 0 ? ["UNCLASSIFIED_CUSTOMER_ROWS"] : []),
+    ...(overlapping ? ["CUSTOMER_CLASSIFICATION_OVERLAP"] : []),
+  ];
+  const rateUnavailable = rate.returningRateBasisPoints === null;
   return [
     metric(context, "customers.new_count", { kind: "count", value: newCustomers }, warnings),
     metric(
@@ -77,10 +91,15 @@ export function buildCustomerClassificationMetrics(
     metric(
       context,
       "customers.returning_rate",
-      summary.returningRateBasisPoints === null
+      rateUnavailable
         ? null
-        : { kind: "rate_basis_points", value: summary.returningRateBasisPoints },
-      warnings,
+        : { kind: "rate_basis_points", value: rate.returningRateBasisPoints ?? 0 },
+      rateUnavailable ? [...warnings, "RETURNING_RATE_PROVIDER_UNAVAILABLE"] : warnings,
+      // Deliberately no local fallback: deriving it from the counts above is what
+      // produced the wrong figure, so an absent provider value stays absent.
+      rateUnavailable
+        ? "Shopify did not report returning_customer_rate for this period."
+        : undefined,
     ),
   ];
 }

@@ -13,6 +13,7 @@ import type {
   ProductSalesFact,
   ProductUnitsFact,
   PurchaseTimingFact,
+  ReturningCustomerRateFact,
   ShopifyFunnelFact,
   ShopifySessionEngagementFact,
   ShopifySalesTotalsFact,
@@ -106,15 +107,36 @@ export function mapCustomerClassificationSummary(
       customers: parseShopifyQlCount(requireColumn(row, "customers"), "customers"),
     };
   });
-  const returning = facts
-    .filter(({ classification }) => classification === "returning")
-    .reduce((total, { customers }) => total + customers, 0);
-  const classified = facts
-    .filter(({ classification }) => classification !== "unclassified")
-    .reduce((total, { customers }) => total + customers, 0);
+  return { rows: facts };
+}
+
+/**
+ * Shopify's own returning-customer rate, passed through untouched.
+ *
+ * This used to be derived here as returning / (new + returning) from the grouped
+ * classification rows. That is wrong: one customer can appear in *both* groups
+ * inside a period — a first purchase followed by a repeat — so summing the groups
+ * double-counts them in the denominator and deflates the rate. The provider figure
+ * accounts for the overlap and no local division can.
+ *
+ * `customers` on this dataset is the ungrouped distinct total, which is what makes
+ * that overlap detectable downstream.
+ */
+export function mapReturningCustomerRate(rows: readonly ShopifyQlRow[]): ReturningCustomerRateFact {
+  const row = rows[0];
+  if (!row) return { returningRateBasisPoints: null, distinctCustomers: null };
+  const rate = requireColumn(row, "returning_customer_rate");
+  const customers = requireColumn(row, "customers");
+  const distinctCustomers = customers === null ? null : parseShopifyQlCount(customers, "customers");
   return {
-    rows: facts,
-    returningRateBasisPoints: ratioToBasisPoints(returning, classified),
+    // A provider zero is a real 0% — a week where nobody came back is an answer, not
+    // missing data (spec §9). Only an actual null is "not reported". The exception is
+    // an empty population: a rate over zero customers is undefined, not 0%.
+    returningRateBasisPoints:
+      rate === null || distinctCustomers === 0
+        ? null
+        : parseShopifyQlRateBasisPoints(rate, "returning_customer_rate"),
+    distinctCustomers,
   };
 }
 

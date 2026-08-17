@@ -17,20 +17,57 @@ import { context, source } from "./fixtures";
 
 describe("B5 Shopify metric services", () => {
   it("uses provider customer classification and provider aggregate rate without identity inference", () => {
-    const results = buildCustomerClassificationMetrics(context(), {
-      rows: [
-        { classification: "new", customers: 60 },
-        { classification: "returning", customers: 40 },
-        { classification: "unclassified", customers: 3 },
-      ],
-      returningRateBasisPoints: 4000,
-    });
+    // 4610 bp is deliberately NOT 40/(60+40) = 4000 bp, so a regression to the old
+    // local division fails this assertion instead of coincidentally passing.
+    const results = buildCustomerClassificationMetrics(
+      context(),
+      {
+        rows: [
+          { classification: "new", customers: 60 },
+          { classification: "returning", customers: 40 },
+          { classification: "unclassified", customers: 3 },
+        ],
+      },
+      { returningRateBasisPoints: 4610, distinctCustomers: 100 },
+    );
     expect(results.map(({ key, value }) => [key, value])).toEqual([
       ["customers.new_count", { kind: "count", value: 60 }],
       ["customers.returning_count", { kind: "count", value: 40 }],
-      ["customers.returning_rate", { kind: "rate_basis_points", value: 4000 }],
+      ["customers.returning_rate", { kind: "rate_basis_points", value: 4610 }],
     ]);
     expect(results[0]?.warnings).toContain("UNCLASSIFIED_CUSTOMER_ROWS");
+    // 60 + 40 does not exceed 100 distinct, so no overlap is disclosed.
+    expect(results[0]?.warnings).not.toContain("CUSTOMER_CLASSIFICATION_OVERLAP");
+  });
+
+  it("withholds the returning rate when the provider does not report one", () => {
+    const [, , rate] = buildCustomerClassificationMetrics(
+      context(),
+      { rows: [{ classification: "returning", customers: 40 }] },
+      { returningRateBasisPoints: null, distinctCustomers: 100 },
+    );
+    expect(rate?.value).toBeNull();
+    expect(rate?.warnings).toContain("RETURNING_RATE_PROVIDER_UNAVAILABLE");
+    expect(rate?.unavailableReason).toBe(
+      "Shopify did not report returning_customer_rate for this period.",
+    );
+  });
+
+  it("discloses classification overlap when the counts exceed the distinct total", () => {
+    // 75 new + 47 returning = 122 against 110 distinct: 12 customers were both.
+    const results = buildCustomerClassificationMetrics(
+      context(),
+      {
+        rows: [
+          { classification: "new", customers: 75 },
+          { classification: "returning", customers: 47 },
+        ],
+      },
+      { returningRateBasisPoints: 4610, distinctCustomers: 110 },
+    );
+    for (const result of results) {
+      expect(result.warnings).toContain("CUSTOMER_CLASSIFICATION_OVERLAP");
+    }
   });
 
   it("preserves zero funnel counts as values and unavailable as a distinct state", () => {

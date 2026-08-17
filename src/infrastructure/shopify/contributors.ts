@@ -39,6 +39,7 @@ import {
   mapFulfillmentTrendFacts,
   mapNativeChannelFacts,
   mapCustomerClassificationSummary,
+  mapReturningCustomerRate,
   mapInventoryFacts,
   mapProductSalesFacts,
   mapProductUnitsFacts,
@@ -120,14 +121,30 @@ export function createShopifyContributors(input: {
     SHOPIFYQL_CACHE,
     async (context) => {
       const { shopifyql } = await adapters();
-      const result = await shopifyql.read({
-        dataset: "new_returning_customers",
-        dateRange: context.dataPeriod,
-      });
-      const status = currentStatus(now().toISOString(), result.history);
-      const summary = mapCustomerClassificationSummary(result.rows);
+      // Two provider reads. The grouped dataset gives the new/returning split but
+      // cannot give the rate, because summing its groups double-counts a customer
+      // who is both inside the period; the ungrouped dataset carries the provider's
+      // own rate and the distinct customer total. Neither can be derived from the
+      // other, so both are read.
+      const [classificationResult, rate] = await Promise.all([
+        shopifyql.read({ dataset: "new_returning_customers", dateRange: context.dataPeriod }),
+        // The rate read is allowed to fail on its own. The new and returning counts
+        // come from the other dataset and are still true, so letting this rejection
+        // propagate would blank three metrics to report one missing field. The rate
+        // then resolves to null and says so.
+        shopifyql
+          .read({ dataset: "returning_customer_rate", dateRange: context.dataPeriod })
+          .then((result) => mapReturningCustomerRate(result.rows))
+          .catch(() => ({ returningRateBasisPoints: null, distinctCustomers: null })),
+      ]);
+      const status = currentStatus(now().toISOString(), classificationResult.history);
+      const summary = mapCustomerClassificationSummary(classificationResult.rows);
       return {
-        metrics: buildCustomerClassificationMetrics(metricContext(context, [status]), summary),
+        metrics: buildCustomerClassificationMetrics(
+          metricContext(context, [status]),
+          summary,
+          rate,
+        ),
         sourceStatuses: [status],
       };
     },

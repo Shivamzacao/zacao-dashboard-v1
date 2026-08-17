@@ -5,6 +5,7 @@ import {
   mapAffiliateSessionFacts,
   mapCatalogVariantFacts,
   mapCustomerClassificationSummary,
+  mapReturningCustomerRate,
   mapCustomerCityFacts,
   mapInventoryFacts,
   mapNativeChannelFacts,
@@ -56,16 +57,64 @@ describe("customer classification summary", () => {
       { classification: "returning", customers: 100 },
       { classification: "unclassified", customers: 5 },
     ]);
-    // 100 returning / 400 classified = 25.00%
-    expect(summary.returningRateBasisPoints).toBe(2_500);
+    // The rate is deliberately not derived here — see mapReturningCustomerRate.
+    expect(summary).not.toHaveProperty("returningRateBasisPoints");
   });
 
-  it("returns a null rate when no classified customers exist", () => {
-    expect(mapCustomerClassificationSummary([]).returningRateBasisPoints).toBeNull();
+  it("returns no rows for an empty classification response", () => {
+    expect(mapCustomerClassificationSummary([]).rows).toEqual([]);
   });
 
   it("throws when a required column is missing", () => {
     expect(() => mapCustomerClassificationSummary([{ customers: "10" }])).toThrow(
+      /missing the required column/,
+    );
+  });
+});
+
+describe("returning customer rate", () => {
+  it("passes the provider rate through and keeps the distinct customer total", () => {
+    // 0.4610 -> 4610 basis points. Note a local returning/(new+returning) division
+    // over the same period could not produce this: it is the provider's own figure,
+    // computed against 122 distinct customers rather than 47 + 75.
+    const fact = mapReturningCustomerRate([
+      { returning_customers: "47", customers: "122", returning_customer_rate: "0.4610" },
+    ]);
+    expect(fact).toEqual({ returningRateBasisPoints: 4_610, distinctCustomers: 122 });
+  });
+
+  it("returns nulls when the provider reports no rows", () => {
+    expect(mapReturningCustomerRate([])).toEqual({
+      returningRateBasisPoints: null,
+      distinctCustomers: null,
+    });
+  });
+
+  it("keeps a provider zero as a real 0% and only nulls an actual null", () => {
+    // A week where 10 customers bought and none returned is 0%, not missing data.
+    expect(
+      mapReturningCustomerRate([
+        { returning_customers: "0", customers: "10", returning_customer_rate: "0.0" },
+      ]).returningRateBasisPoints,
+    ).toBe(0);
+    expect(
+      mapReturningCustomerRate([
+        { returning_customers: "0", customers: "10", returning_customer_rate: null },
+      ]).returningRateBasisPoints,
+    ).toBeNull();
+  });
+
+  it("withholds the rate when there is no customer population to divide", () => {
+    // A rate over zero customers is undefined, not 0%.
+    expect(
+      mapReturningCustomerRate([
+        { returning_customers: "0", customers: "0", returning_customer_rate: "0.0" },
+      ]).returningRateBasisPoints,
+    ).toBeNull();
+  });
+
+  it("throws when the provider omits the rate column", () => {
+    expect(() => mapReturningCustomerRate([{ customers: "10" }])).toThrow(
       /missing the required column/,
     );
   });

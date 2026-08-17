@@ -71,7 +71,9 @@ const datasets: Record<ShopifyQlDataset, string> = {
 
 const timeSeriesDatasets = new Set<ShopifyQlDataset>([
   "sales_trend",
-  "returning_customer_rate",
+  // returning_customer_rate is deliberately absent: it feeds a single KPI, and a
+  // period rate is not the mean of its monthly rates. One ungrouped row carries the
+  // provider's rate for the whole period, which is the only correct value to show.
   "web_funnel",
   "fulfillment_trend",
   "product_units_weekly",
