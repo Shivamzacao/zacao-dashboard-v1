@@ -16,7 +16,7 @@ import type {
   ProductUnitsFact,
   WeeklyProductUnitsFact,
 } from "./types";
-import { buildSellThroughMetric } from "./sheets";
+import { buildSellThroughMetric, effectiveLandedRow, landedCostPerBar } from "./sheets";
 import { createMetricViewModel } from "./view-model";
 
 function text(record: SheetRecord, key: string): string | null {
@@ -80,22 +80,8 @@ function applicableLandedCost(
   canonicalSku: string,
   endDate: string,
 ): number | null {
-  const row = records
-    .filter((record) => {
-      const from = text(record, "effective_from");
-      const to = text(record, "effective_to");
-      return (
-        text(record, "sku") === canonicalSku &&
-        text(record, "cost_basis") === "landed" &&
-        from !== null &&
-        from <= endDate &&
-        (!to || to >= endDate)
-      );
-    })
-    .sort((left, right) =>
-      (text(right, "effective_from") ?? "").localeCompare(text(left, "effective_from") ?? ""),
-    )[0];
-  return row ? numeric(row, "total_unit_cost_usd") : null;
+  const row = effectiveLandedRow(records, canonicalSku, endDate);
+  return row ? landedCostPerBar(row) : null;
 }
 
 export function hasApplicableProductLandedCosts(

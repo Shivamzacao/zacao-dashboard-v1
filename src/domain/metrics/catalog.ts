@@ -1449,17 +1449,28 @@ export const metricCatalog = Object.freeze([
   }),
   entry({
     key: "marketing.ltv_cac",
-    label: "LTV:CAC",
-    sections: ["Customer Intelligence", "Marketing Intelligence", "Financial Intelligence"],
+    label: "90-Day LTV : Paid-Media Blended CAC",
+    sections: [
+      // Executive Health carries the headline LTV:CAC card. The metric was absent from
+      // this list while the page spec still rendered a card for it, so the card resolved
+      // to no metric at all and fell back to the catalog's blocked status.
+      "Executive Health",
+      "Customer Intelligence",
+      "Marketing Intelligence",
+      "Financial Intelligence",
+    ],
     v1Class: "conditional",
+    // Stored as the ratio in HUNDREDTHS despite the name — the KPI formatter renders
+    // `value / 100` followed by " : 1". See buildLtvToCacMetric.
     valueKind: "rate_basis_points",
-    sourceKeys: ["shopify", "klaviyo", "google_sheets"],
-    sources: "Approved LTV and CAC",
-    sourceFields: "approved LTV numerator and CAC denominator",
-    calculation: "Approved LTV divided by approved CAC for an identical scope.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason:
-      "The LTV numerator and its 90-day window are approved; the CAC spend scope and attribution model are not. Paid CAC is published separately in the meantime.",
+    // Klaviyo feeds neither side of this ratio.
+    sourceKeys: ["shopify", "google_sheets"],
+    sources: "Shopify order history and Google Sheets Marketing_Spend",
+    sourceFields: "90-day LTV numerator and Paid-Media Blended CAC denominator",
+    calculation:
+      "The 90-day LTV divided by Paid-Media Blended CAC. Scope is approximate, not identical: the LTV numerator covers acquisition cohorts whose 90 days have fully elapsed, while the CAC denominator covers the selected reporting period. Withheld unless at least 80 percent of the period first-time customers were acquired in months that recorded in-scope paid spend, so one month of spend is never divided by a year of customers.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "social.performance",
@@ -2148,11 +2159,13 @@ export const metricCatalog = Object.freeze([
     v1Class: "conditional",
     valueKind: "money",
     sourceKeys: ["google_sheets", "google_drive"],
-    sources: "Production rows and Rules_Targets",
+    // Rules_Targets is not a tab in the workbook; the rebate registry does not exist.
+    sources: "No approved source — a signed Fairafric rebate agreement registry does not exist",
     sourceFields: "qualifying units/PO plus approved rebate parameters",
     calculation: "Apply only a signed/effective approved rebate rule.",
     status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "No approved rebate rule registry exists.",
+    blockingReason:
+      "No signed Fairafric volume-rebate agreement exists, so a $0 rebate is recognised (DEC-020) and no rebate amount is published.",
   }),
   entry({
     key: "finance.effective_cogs",
@@ -2160,14 +2173,17 @@ export const metricCatalog = Object.freeze([
     sections: ["Financial Intelligence"],
     v1Class: "conditional",
     valueKind: "money",
-    sourceKeys: ["google_sheets", "google_drive"],
-    sources: "Fairafric invoices and approved effective-dated rebate rules",
-    sourceFields: "base per-bar COGS, qualifying volume, effective rebate tier and rate",
+    // Computed entirely from Sheets tabs under DEC-020. Google Drive is deliberately
+    // not a source: the deferred Drive connector reports not_configured, and the
+    // weakest-source rule would suppress a value this metric can genuinely produce.
+    sourceKeys: ["google_sheets"],
+    sources: "Approved COGS_By_SKU, Inventory_Lots and Production_Orders",
+    sourceFields:
+      "landed cost components, lot quantity remaining and received date, purchase-order received and accepted units",
     calculation:
-      "Apply only an approved effective-dated Fairafric rebate rate to certified base per-bar COGS.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason:
-      "No approved Fairafric volume-rebate agreement and effective landed-cost policy are available.",
+      "Weighted-average landed cost of bars on hand, less the recognised Fairafric rebate (DEC-020). Landed cost per bar is rebuilt from production, packaging, freight, fulfillment and duties components because the stored total omits packaging. Each lot is costed at the SKU rate effective on its goods-received date and adjusted by its purchase order's accepted-unit yield; unmatched lots are disclosed as estimated. No signed agreement exists, so the recognised rebate is $0 and effective equals gross.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "finance.rebate_tier",
@@ -2179,9 +2195,10 @@ export const metricCatalog = Object.freeze([
     sources: "Fairafric invoices and approved effective-dated rebate rules",
     sourceFields: "qualifying volume, tier thresholds, rebate rate and effective dates",
     calculation:
-      "Select the effective approved rebate tier containing certified qualifying Fairafric volume.",
+      'Select the effective approved rebate tier containing certified qualifying Fairafric volume. Publishes no tier rather than a zero tier: rendering "Tier 0" would imply an approved agreement exists whose opening tier is zero percent.',
     status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "No approved Fairafric volume-rebate agreement is available.",
+    blockingReason:
+      "No signed Fairafric volume-rebate agreement exists, so no tier is in effect and the rebate rate is 0 (DEC-020).",
   }),
   entry({
     key: "finance.rebate_tiers",
@@ -2194,9 +2211,10 @@ export const metricCatalog = Object.freeze([
     sourceFields:
       "tier names, minimum and maximum qualifying units, rebate rate, certified progress and effective COGS",
     calculation:
-      "Present approved effective-dated tiers and certified progress without inferring missing thresholds or rates.",
+      "Present approved effective-dated tiers and certified progress without inferring missing thresholds or rates. Whether a rebate is retroactive or incremental is never assumed; if the agreement leaves it undefined the calculation stays unavailable.",
     status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "No approved Fairafric volume-rebate agreement is available.",
+    blockingReason:
+      "No signed Fairafric volume-rebate agreement exists, so there are no approved tiers to present (DEC-020).",
   }),
   entry({
     key: "finance.predictive_cashflow",

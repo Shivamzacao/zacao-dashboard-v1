@@ -539,6 +539,10 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
         enumValues: ["SKU-01", "SKU-02", "SKU-03", "SKU-04", "SKU-05"],
       },
       { header: "lot_number", kind: "text", required: true },
+      // Links a lot to the purchase order carrying its cost (DEC-020). Optional so
+      // both workbooks keep validating until ZACAO adds the column; a lot without it
+      // is costed at the unadjusted SKU rate and disclosed as estimated.
+      { header: "po_number", kind: "text", required: false },
       { header: "production_date", kind: "date", required: false },
       { header: "received_date", kind: "date", required: false },
       { header: "best_by_date", kind: "date", required: true },
@@ -1050,6 +1054,10 @@ export const MANUAL_TAB_CONTRACTS: Readonly<Record<ManualWorkbookTab, ManualTabC
       { header: "packaging_usd", kind: "usd", required: true },
       { header: "freight_usd", kind: "usd", required: true },
       { header: "fulfillment_usd", kind: "usd", required: false },
+      // DEC-020 component 5. No column is populated yet, so effective COGS discloses
+      // DUTIES_INSURANCE_RECEIVING_NOT_CAPTURED rather than reading an absent duty as
+      // a zero duty. Optional now so the figure has a path to completeness later.
+      { header: "duties_insurance_receiving_usd", kind: "usd", required: false },
       { header: "total_unit_cost_usd", kind: "usd", required: true },
       {
         header: "source_status",

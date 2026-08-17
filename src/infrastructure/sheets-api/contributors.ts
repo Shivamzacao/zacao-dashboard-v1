@@ -7,6 +7,7 @@ import {
   buildFinanceActualMetrics,
   buildGrantViews,
   buildGrowthPipelineMetrics,
+  buildEffectiveCogsMetric,
   buildGrowthSocialViews,
   buildInputCostMovementBreakdown,
   buildInvestorViews,
@@ -24,6 +25,7 @@ import {
   buildPackagingViews,
   buildProductionCostBreakdown,
   hasComparableInputCostRows,
+  hasCostableInventoryLots,
   hasManufacturerOtifRows,
   buildWarehouseAccuracyMetric,
 } from "@/src/application/metrics";
@@ -396,6 +398,7 @@ export function createSheetsApiContributors(
       "Inventory_Snapshots",
       "COGS_By_SKU",
       "Production_Orders",
+      "Inventory_Lots",
     ]);
     const metricContext = context(value, result.sourceStatus);
     const finance = buildFinanceActualMetrics(
@@ -403,6 +406,12 @@ export function createSheetsApiContributors(
       toFinanceActualRecords(result.tabs["Finance_Actuals"] ?? []),
     );
     const cash = toCashPositionFacts(result.tabs["Cash_Position"] ?? []);
+    // Effective COGS needs a costable on-hand lot; only then may example lots stand
+    // in, and doing so degrades the whole contribution to partial.
+    const cogsCosts = result.tabs["COGS_By_SKU"] ?? [];
+    const lots = selectExampleFallback(result, "Inventory_Lots", (rows) =>
+      hasCostableInventoryLots(rows, cogsCosts),
+    );
     return {
       metrics: [
         finance.total,
@@ -410,7 +419,14 @@ export function createSheetsApiContributors(
         buildInventoryValueMetric(
           metricContext,
           result.tabs["Inventory_Snapshots"] ?? [],
-          result.tabs["COGS_By_SKU"] ?? [],
+          cogsCosts,
+        ),
+        buildEffectiveCogsMetric(
+          context(value, syntheticSourceStatus(result.sourceStatus, lots.usedExample)),
+          cogsCosts,
+          lots.rows,
+          result.tabs["Production_Orders"] ?? [],
+          syntheticWarnings([], lots.usedExample),
         ),
       ],
       breakdowns: [
@@ -418,8 +434,8 @@ export function createSheetsApiContributors(
         buildCashPositionBreakdown(metricContext, result.tabs["Cash_Position"] ?? []),
         buildProductionCostBreakdown(metricContext, result.tabs["Production_Orders"] ?? []),
       ],
-      sourceStatuses: [result.sourceStatus],
-      warnings: result.warnings,
+      sourceStatuses: [syntheticSourceStatus(result.sourceStatus, lots.usedExample)],
+      warnings: syntheticWarnings(result.warnings, lots.usedExample),
     };
   });
 

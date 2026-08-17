@@ -444,6 +444,11 @@ describe("First-time customers in a reporting period", () => {
 
   it("returns zero for an empty period without throwing", () => {
     const result = calculateFirstTimeCustomers({ records: [], ...period });
-    expect(result).toEqual({ count: 0, excludedInconsistentRows: 0, excludedRows: 0 });
+    expect(result).toEqual({
+      count: 0,
+      countsByMonth: new Map(),
+      excludedInconsistentRows: 0,
+      excludedRows: 0,
+    });
   });
 });

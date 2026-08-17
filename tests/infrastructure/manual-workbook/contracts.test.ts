@@ -28,6 +28,10 @@ const INTENTIONAL_ADDITIONS: Readonly<Record<string, readonly string[]>> = {
   Production_Orders: ["received_units", "week_ending"],
   Inventory_Snapshots: ["week_ending"],
   Additional_Depletions: ["week_ending"],
+  // DEC-020: the lot to purchase-order join, and the fifth landed-cost component.
+  // Both optional, so neither workbook stops validating before ZACAO populates them.
+  Inventory_Lots: ["po_number"],
+  COGS_By_SKU: ["duties_insurance_receiving_usd"],
   Marketing_Spend: [
     "week_ending",
     "new_customers_acquired",

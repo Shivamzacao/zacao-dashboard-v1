@@ -95,8 +95,15 @@ export function calculateInScopePaidSpend(input: {
   readonly rows: readonly SheetRecord[];
   readonly startDate: string;
   readonly endDate: string;
-}): { readonly minorUnits: number; readonly rowsCounted: number; readonly rowsExcluded: number } {
+}): {
+  readonly minorUnits: number;
+  readonly rowsCounted: number;
+  readonly rowsExcluded: number;
+  /** Months (`YYYY-MM`) that recorded in-scope spend, for the coverage test. */
+  readonly monthsWithSpend: ReadonlySet<string>;
+} {
   const amounts = [];
+  const monthsWithSpend = new Set<string>();
   let rowsExcluded = 0;
   for (const row of input.rows) {
     const date = text(row, "date");
@@ -109,13 +116,48 @@ export function calculateInScopePaidSpend(input: {
     const spend = number(row, "spend_usd");
     if (spend === null) continue;
     amounts.push(usdFromDecimalNumber(spend));
+    monthsWithSpend.add(date.slice(0, 7));
   }
   return {
     minorUnits: amounts.length === 0 ? 0 : addUsd(amounts).minorUnits,
     rowsCounted: amounts.length,
     rowsExcluded,
+    monthsWithSpend,
   };
 }
+
+/**
+ * Share of the counted first-time customers who were acquired in a month that recorded
+ * in-scope paid spend. Null when there are no customers to divide by.
+ *
+ * This is the honesty check on a period-scoped CAC ratio. One July spend row divided by
+ * twelve months of customers yields a flattering number that says nothing about
+ * acquisition cost, because eleven of those months bought no advertising. Coverage
+ * detects exactly that: it reads 1.0 for a July-only period and 0.04 for a trailing
+ * year, so the ratio can be withheld rather than published as if it meant something.
+ */
+export function spendCoverage(input: {
+  readonly monthsWithSpend: ReadonlySet<string>;
+  readonly countsByMonth: ReadonlyMap<string, number>;
+  readonly customerCount: number;
+}): number | null {
+  if (input.customerCount <= 0) return null;
+  let covered = 0;
+  for (const [month, count] of input.countsByMonth) {
+    if (input.monthsWithSpend.has(month)) covered += count;
+  }
+  return covered / input.customerCount;
+}
+
+/**
+ * Coverage floor for publishing the ratio.
+ *
+ * Set so the one period whose spend actually explains its customers publishes, while a
+ * widened window whose extra customers arrived in unfunded months does not. It is a
+ * threshold on data completeness, not on the ratio's value — a bad ratio computed over
+ * well-covered months is exactly the number the reader needs to see.
+ */
+export const LTV_CAC_MIN_SPEND_COVERAGE = 0.8;
 
 function withState(
   sources: readonly SourceStatus[],
@@ -148,15 +190,37 @@ export function buildBlendedCacMetric(input: {
   readonly spendSourceReadable?: boolean;
 }): MetricViewModel {
   const { startDate, endDate } = input.context.dataPeriod;
-  const spend = calculateInScopePaidSpend({ rows: input.spendRows, startDate, endDate });
-  const customers = calculateFirstTimeCustomers({
-    records: input.orderRecords,
-    ...(input.channelMapping ? { channelMapping: input.channelMapping } : {}),
-    startDate,
-    endDate,
-    ...(input.channels ? { channels: input.channels } : {}),
+  return assembleBlendedCac({
+    context: input.context,
+    spend: calculateInScopePaidSpend({ rows: input.spendRows, startDate, endDate }),
+    customers: calculateFirstTimeCustomers({
+      records: input.orderRecords,
+      ...(input.channelMapping ? { channelMapping: input.channelMapping } : {}),
+      startDate,
+      endDate,
+      ...(input.channels ? { channels: input.channels } : {}),
+    }),
+    ...(input.sourceWarnings ? { sourceWarnings: input.sourceWarnings } : {}),
+    ...(input.spendSourceReadable === undefined
+      ? {}
+      : { spendSourceReadable: input.spendSourceReadable }),
   });
+}
 
+/**
+ * The CAC view model, from already-computed inputs.
+ *
+ * Split out so `buildPaidAcquisitionViews` can hand the same spend and customer results
+ * to both this and the ratio without walking order history twice.
+ */
+function assembleBlendedCac(input: {
+  readonly context: MetricServiceContext;
+  readonly spend: ReturnType<typeof calculateInScopePaidSpend>;
+  readonly customers: ReturnType<typeof calculateFirstTimeCustomers>;
+  readonly sourceWarnings?: readonly string[];
+  readonly spendSourceReadable?: boolean;
+}): MetricViewModel {
+  const { spend, customers } = input;
   const spendUnreadable = input.spendSourceReadable === false;
   const sourceWarnings = input.sourceWarnings ?? [];
   // Truncated history pushes a long-standing customer's derived first_order_date later,
@@ -200,4 +264,142 @@ export function buildBlendedCacMetric(input: {
     warnings,
     ...(publishable ? {} : { dataPendingReason: unavailableReason }),
   });
+}
+
+function moneyMinorUnits(metric: MetricViewModel): number | null {
+  return metric.value?.kind === "money" ? metric.value.value.minorUnits : null;
+}
+
+/**
+ * 90-Day LTV : Paid-Media Blended CAC (DEC-021).
+ *
+ * Both halves come from metrics that are already published and already gated, so this
+ * reads their values rather than recomputing either. A null on either side means the
+ * ratio is absent, never zero.
+ *
+ * The scope is APPROXIMATE and that is disclosed on every result. The LTV numerator is a
+ * customer-weighted mean over acquisition cohorts whose 90 days have fully elapsed —
+ * months that ended well before the selected period — while the CAC denominator covers
+ * the selected period itself. DEC-018 asks for an identical scope on both sides; a truly
+ * scope-matched ratio is not yet computable, because no paid spend has been recorded in
+ * any month whose cohort has matured. Until it is, the ratio is published as an
+ * approximation with a coverage floor rather than withheld entirely.
+ *
+ * The value is stored as the ratio in HUNDREDTHS, not in basis points, despite the
+ * `rate_basis_points` value kind: the KPI formatter renders `value / 100` followed by
+ * " : 1". Using `ratioToBasisPoints` here would render the card 100x too high.
+ */
+export function buildLtvToCacMetric(input: {
+  readonly context: MetricServiceContext;
+  readonly ltv90d: MetricViewModel;
+  readonly blendedCac: MetricViewModel;
+  readonly coverage: number | null;
+  readonly sourceWarnings?: readonly string[];
+}): MetricViewModel {
+  const ltvMinorUnits = moneyMinorUnits(input.ltv90d);
+  const cacMinorUnits = moneyMinorUnits(input.blendedCac);
+  const coverageSufficient =
+    input.coverage !== null && input.coverage >= LTV_CAC_MIN_SPEND_COVERAGE;
+  const publishable =
+    ltvMinorUnits !== null && cacMinorUnits !== null && cacMinorUnits > 0 && coverageSufficient;
+
+  const coveragePercent = Math.round((input.coverage ?? 0) * 100);
+  // Deduplicated on the way in. Both inputs already carry the shared Shopify source
+  // codes, and `createMetricViewModel` concatenates metric warnings with every source's
+  // codes without deduping — so an undeduped list here reaches the payload three times
+  // over.
+  const warnings = [
+    ...new Set([
+      ...(input.sourceWarnings ?? []),
+      // Inherit both inputs' disclosures. A reader of the ratio needs every limit that
+      // applies to either half, and re-deriving them here would let the two drift.
+      ...input.ltv90d.warnings,
+      ...input.blendedCac.warnings,
+      // LTV counts matured cohorts, CAC counts the selected period. Never presented as
+      // the identical-scope ratio DEC-018 describes.
+      "LTV_CAC_PERIOD_SCOPE_APPROXIMATE",
+      ...(publishable || coverageSufficient
+        ? []
+        : [`LTV_CAC_SPEND_COVERAGE_THIN:${coveragePercent}`]),
+    ]),
+  ];
+
+  const unavailableReason =
+    ltvMinorUnits === null
+      ? "The 90-day LTV base is too thin to publish a ratio."
+      : cacMinorUnits === null || cacMinorUnits <= 0
+        ? (input.blendedCac.unavailableReason ??
+          "Paid-Media Blended CAC is unavailable for this period.")
+        : `Only ${coveragePercent}% of this period's first-time customers fall in months with recorded paid spend, so the ratio would not be comparable.`;
+
+  return createMetricViewModel({
+    metricKey: "marketing.ltv_cac",
+    environment: input.context.environment,
+    dataPeriod: input.context.dataPeriod,
+    // Never `current`. The two sides describe different windows, so even a fully
+    // covered, fully populated ratio is partial by construction.
+    //
+    // No extra codes are pushed onto the sources: the disclosures above are the
+    // metric's, not any one source's, and each source already carries its own. Adding
+    // them here would re-emit the whole list once per source in the payload.
+    sources: withState(input.context.sourceStatuses, "partial", []),
+    value: publishable
+      ? {
+          kind: "rate_basis_points",
+          // Hundredths, not basis points — see the note above.
+          value: divideAndRound((ltvMinorUnits ?? 0) * 100, cacMinorUnits ?? 1),
+        }
+      : null,
+    warnings,
+    ...(publishable ? {} : { dataPendingReason: unavailableReason }),
+  });
+}
+
+/**
+ * Blended CAC and its LTV ratio, sharing one pass over the source data.
+ *
+ * The ratio needs the same spend total and first-time-customer tally the CAC does, and
+ * `calculateFirstTimeCustomers` walks full Shopify order history — so computing them
+ * once here rather than twice is the difference between one parse and two on every
+ * uncached request.
+ */
+export function buildPaidAcquisitionViews(input: {
+  readonly context: MetricServiceContext;
+  readonly spendRows: readonly SheetRecord[];
+  readonly orderRecords: readonly SheetRecord[];
+  readonly ltv90d: MetricViewModel;
+  readonly channelMapping?: readonly SheetRecord[];
+  readonly channels?: readonly string[];
+  readonly sourceWarnings?: readonly string[];
+  readonly spendSourceReadable?: boolean;
+}): { readonly cac: MetricViewModel; readonly ltvCac: MetricViewModel } {
+  const { startDate, endDate } = input.context.dataPeriod;
+  const spend = calculateInScopePaidSpend({ rows: input.spendRows, startDate, endDate });
+  const customers = calculateFirstTimeCustomers({
+    records: input.orderRecords,
+    ...(input.channelMapping ? { channelMapping: input.channelMapping } : {}),
+    startDate,
+    endDate,
+    ...(input.channels ? { channels: input.channels } : {}),
+  });
+  const cac = assembleBlendedCac({
+    context: input.context,
+    spend,
+    customers,
+    ...(input.sourceWarnings ? { sourceWarnings: input.sourceWarnings } : {}),
+    ...(input.spendSourceReadable === undefined
+      ? {}
+      : { spendSourceReadable: input.spendSourceReadable }),
+  });
+  const ltvCac = buildLtvToCacMetric({
+    context: input.context,
+    ltv90d: input.ltv90d,
+    blendedCac: cac,
+    coverage: spendCoverage({
+      monthsWithSpend: spend.monthsWithSpend,
+      countsByMonth: customers.countsByMonth,
+      customerCount: customers.count,
+    }),
+  });
+  return { cac, ltvCac };
 }

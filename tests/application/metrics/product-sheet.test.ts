@@ -160,7 +160,11 @@ describe("Product Sheet-backed metrics", () => {
           effective_from: "2026-08-01",
           effective_to: "2026-08-31",
           cost_basis: "landed",
-          total_unit_cost_usd: 1.42,
+          // Landed cost is rebuilt from components under DEC-020; the stored total is
+          // written lower on purpose to prove it is not the value being read.
+          production_cost_usd: 1.3,
+          packaging_usd: 0.12,
+          total_unit_cost_usd: 1.3,
         },
       ],
       warnings: ["SYNTHETIC_EXAMPLE_DATA"],

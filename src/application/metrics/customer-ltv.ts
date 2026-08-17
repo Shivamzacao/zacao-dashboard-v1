@@ -385,6 +385,14 @@ export function calculateFirstTimeCustomers(input: {
   readonly channels?: readonly string[];
 }): {
   readonly count: number;
+  /**
+   * Counted customers grouped by acquisition month (`YYYY-MM` of `first_order_date`).
+   *
+   * Lets a caller ask whether the customers it is counting were acquired in months that
+   * recorded any paid spend — the coverage test that keeps a period-scoped CAC ratio
+   * from dividing one month of spend by a year of customers.
+   */
+  readonly countsByMonth: ReadonlyMap<string, number>;
   readonly excludedInconsistentRows: number;
   readonly excludedRows: number;
 } {
@@ -396,15 +404,26 @@ export function calculateFirstTimeCustomers(input: {
   });
   // Only a qualifying order establishes acquisition, matching how `first_order_date`
   // is derived upstream and how `calculateRealizedLtv` picks its eligible customers.
-  const customers = new Set(
-    parsed.rows.flatMap((item) =>
-      QUALIFYING_STATUSES.has(item.row.orderStatus) &&
-      item.row.firstOrderDate >= input.startDate &&
-      item.row.firstOrderDate <= input.endDate
-        ? [item.row.customerId]
-        : [],
-    ),
-  );
+  //
+  // Keyed by customer rather than collected as a plain set of ids, because the month
+  // tally has to count each customer once. The consistency guard in `parseRows` has
+  // already ensured one `first_order_date` per customer, so the last write cannot
+  // disagree with the first.
+  const acquisitionMonth = new Map<string, string>();
+  for (const item of parsed.rows) {
+    if (
+      !QUALIFYING_STATUSES.has(item.row.orderStatus) ||
+      item.row.firstOrderDate < input.startDate ||
+      item.row.firstOrderDate > input.endDate
+    ) {
+      continue;
+    }
+    acquisitionMonth.set(item.row.customerId ?? "", item.row.firstOrderDate.slice(0, 7));
+  }
+  const countsByMonth = new Map<string, number>();
+  for (const month of acquisitionMonth.values()) {
+    countsByMonth.set(month, (countsByMonth.get(month) ?? 0) + 1);
+  }
   const excludedInconsistentRows = new Set(
     parsed.diagnostics
       .filter(({ reason }) => reason === "inconsistent_first_order_date")
@@ -417,7 +436,7 @@ export function calculateFirstTimeCustomers(input: {
       .filter(({ reason }) => reason !== "unmapped_channel")
       .map(({ rowNumber }) => rowNumber),
   ).size;
-  return { count: customers.size, excludedInconsistentRows, excludedRows };
+  return { count: acquisitionMonth.size, countsByMonth, excludedInconsistentRows, excludedRows };
 }
 
 export function calculateActiveCustomers(input: {
