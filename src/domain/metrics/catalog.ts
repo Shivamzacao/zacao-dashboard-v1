@@ -1403,17 +1403,21 @@ export const metricCatalog = Object.freeze([
   }),
   entry({
     key: "marketing.cac",
-    label: "Customer acquisition cost",
+    label: "Paid-Media Blended CAC, Shopify Customers Only",
     sections: ["Customer Intelligence", "Marketing Intelligence"],
+    // Conditional rather than core: the numerator depends on ZACAO keeping
+    // Marketing_Spend populated, so the metric can be correct and still have no data.
     v1Class: "conditional",
     valueKind: "money",
-    sourceKeys: ["shopify", "klaviyo", "google_sheets"],
-    sources: "Approved spend and acquisition attribution",
-    sourceFields: "approved spend numerator and acquired-customer denominator",
+    // Klaviyo is deliberately absent. It contributes to neither side, and leaving it
+    // here would let an unavailable Klaviyo blank a metric it has no part in.
+    sourceKeys: ["shopify", "google_sheets"],
+    sources: "Shopify order history and Google Sheets Marketing_Spend",
+    sourceFields: "date, platform, spend_usd; Shopify customer id and first_order_date",
     calculation:
-      "Numerator divided by denominator only under an approved blended/attributed policy.",
-    status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Numerator, denominator, and acquisition attribution are not approved.",
+      "Total in-scope paid media spend in the reporting period divided by the unique Shopify customers whose first order fell in that same period. Not campaign-attributed: no attribution model or window applies. Spend excludes amazon_ads and klaviyo platforms, and excludes affiliate, agency, events and gifting costs. The denominator counts Shopify customers only, so wholesale, Faire, Amazon and in-store buyers are absent and guest checkouts cannot be counted. This is not a company-wide CAC.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
   }),
   entry({
     key: "marketing.roas",

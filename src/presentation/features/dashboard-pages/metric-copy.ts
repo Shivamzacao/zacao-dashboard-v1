@@ -11,6 +11,11 @@ const metricLabelOverrides: Readonly<Record<string, string>> = Object.freeze({
   "products.units_velocity": "Unit sales velocity trend",
   "inventory.runway_reorder": "Inventory runway and reorder alert",
   "inventory.combined": "Combined SNAPL and YBYD inventory",
+  // The approved catalog label spells out the full scope for API payloads and exports;
+  // a 46-character card would wrap to three lines beside "Paid CAC". The full wording
+  // still reaches the reader through the card's help text, which is built from the
+  // metric's sources and calculation.
+  "marketing.cac": "Blended CAC (Paid Media)",
   "marketing.ltv_cac": "LTV-to-CAC ratio",
   "social.performance": "Social audience growth",
   "finance.actual_margin": "Actual gross margin",

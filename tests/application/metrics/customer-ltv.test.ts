@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildRealizedLtvViews,
   calculateActiveCustomers,
+  calculateFirstTimeCustomers,
   calculateRealizedLtv,
 } from "@/src/application/metrics/customer-ltv";
 import type { SheetRecord } from "@/src/application/ports/sheets-tabs";
@@ -359,5 +360,90 @@ describe("Realized LTV", () => {
     ]);
     expect(noActivity.readiness.state).toBe("no_activity");
     expect(noActivity.value).toBeNull();
+  });
+});
+
+describe("First-time customers in a reporting period", () => {
+  const period = { startDate: "2026-07-01", endDate: "2026-07-31" };
+
+  it("counts only customers whose first order falls inside the period", () => {
+    const result = calculateFirstTimeCustomers({
+      records: [
+        // Acquired in the period.
+        order("O-1", "C-1", "2026-07-05", "2026-07-05"),
+        order("O-2", "C-2", "2026-07-20", "2026-07-20"),
+        // Acquired before it, still buying inside it — not an acquisition. Their
+        // earlier order is present because the contributor reads full history; without
+        // it the consistency guard would drop the customer instead.
+        order("O-3", "C-3", "2026-05-02", "2026-05-02"),
+        order("O-4", "C-3", "2026-07-10", "2026-05-02"),
+      ],
+      channelMapping: mappings,
+      ...period,
+    });
+    expect(result.count).toBe(2);
+    expect(result.excludedInconsistentRows).toBe(0);
+  });
+
+  it("counts a repeat buyer once, however many orders they placed", () => {
+    const result = calculateFirstTimeCustomers({
+      records: [
+        order("O-1", "C-1", "2026-07-05", "2026-07-05"),
+        order("O-2", "C-1", "2026-07-11", "2026-07-05"),
+        order("O-3", "C-1", "2026-07-28", "2026-07-05"),
+      ],
+      channelMapping: mappings,
+      ...period,
+    });
+    expect(result.count).toBe(1);
+  });
+
+  it("excludes and counts a customer whose first_order_date is inconsistent", () => {
+    const result = calculateFirstTimeCustomers({
+      records: [
+        order("O-1", "C-1", "2026-07-05", "2026-07-05"),
+        // Same customer, two different claimed first-order dates.
+        order("INC-1", "C-6", "2026-07-02", "2026-07-02"),
+        order("INC-2", "C-6", "2026-07-09", "2026-07-03"),
+      ],
+      channelMapping: mappings,
+      ...period,
+    });
+    expect(result.count).toBe(1);
+    expect(result.excludedInconsistentRows).toBe(2);
+    expect(result.excludedRows).toBe(2);
+  });
+
+  it("excludes a customer whose earliest qualifying order is later than the claimed first order", () => {
+    const result = calculateFirstTimeCustomers({
+      records: [order("TRUNC-1", "C-7", "2026-07-20", "2026-07-02")],
+      channelMapping: mappings,
+      ...period,
+    });
+    expect(result.count).toBe(0);
+    expect(result.excludedInconsistentRows).toBe(1);
+  });
+
+  it("does not count a customer acquired by a non-qualifying order alone", () => {
+    const result = calculateFirstTimeCustomers({
+      records: [
+        order("O-1", "C-1", "2026-07-05", "2026-07-05", {
+          gross_product_sales_usd: 100,
+          discounts_usd: 0,
+          cancellations_usd: 0,
+          refunds_returns_usd: 0,
+          net_product_revenue_usd: 100,
+          order_status: "pending",
+        }),
+      ],
+      channelMapping: mappings,
+      ...period,
+    });
+    expect(result.count).toBe(0);
+  });
+
+  it("returns zero for an empty period without throwing", () => {
+    const result = calculateFirstTimeCustomers({ records: [], ...period });
+    expect(result).toEqual({ count: 0, excludedInconsistentRows: 0, excludedRows: 0 });
   });
 });

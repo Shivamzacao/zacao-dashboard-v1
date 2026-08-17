@@ -452,6 +452,10 @@ describe("LiveBackendApiRuntime", () => {
       "v1-composite-migrated",
     );
     expect(LIVE_DASHBOARD_SECTION_PLAN["Marketing Intelligence"]).toContain("sheets-marketing");
+    // marketing.cac is catalogued on Marketing Intelligence as well as Customer
+    // Intelligence, so both plans need the contributor or the two pages would answer
+    // the same metric key differently.
+    expect(LIVE_DASHBOARD_SECTION_PLAN["Marketing Intelligence"]).toContain("shopify-customer-ltv");
     expect(LIVE_DASHBOARD_SECTION_PLAN["Growth Intelligence"]).toContain("sheets-growth");
     // Customer Intelligence no longer reads a sheet for LTV: the Sales_Actuals tab
     // held only seeded example rows, so it now sources from Shopify orders.

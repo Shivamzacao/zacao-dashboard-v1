@@ -186,7 +186,11 @@ describe("F3 dashboard pages", () => {
     render(<DashboardPageView spec={customers} fixture={f3CustomerPageFixtureData} />);
     expect(screen.getAllByRole("article")).toHaveLength(10);
     expect(screen.getByLabelText("Time on site: 3m 12s")).toBeTruthy();
-    expect(screen.getAllByText("Business rule required")).toHaveLength(2);
+    // One, not two: marketing.cac now carries the approved Blended CAC rule (DEC-019),
+    // leaving marketing.ltv_cac as the only gated metric on this page. The CAC card
+    // reads "No activity" here because the fixture supplies no value, matching how
+    // marketing.paid_cac already behaves.
+    expect(screen.getAllByText("Business rule required")).toHaveLength(1);
     expect(screen.queryByRole("heading", { name: "Customer geography" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Customers by city" })).toBeTruthy();
     expect(screen.getAllByText(/reporting-period filters do not apply/)).toHaveLength(2);

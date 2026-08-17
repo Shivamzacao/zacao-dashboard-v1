@@ -42,7 +42,7 @@ All listed metric keys are existing B5/B7 fields. `BRR` means `BUSINESS_RULE_REQ
 | Products: Frequently bought together                  | `products.frequently_bought_together` (BRR)                                          | Pair list                | Products        | CONDITIONAL      |
 | Products: Unit velocity                               | `products.units_velocity`                                                            | Trend chart              | Products        | REBUILD_TO_MATCH |
 | Marketing: marketing revenue                          | Re-label to `klaviyo.attributed_revenue` (DP); no cross-channel inference            | KPI                      | Marketing       | CONDITIONAL      |
-| Marketing: ROAS/CAC                                   | `marketing.roas`, `marketing.cac` (BRR)                                              | KPI/chart                | Marketing       | CONDITIONAL      |
+| Marketing: ROAS/CAC                                   | `marketing.roas` (BRR), `marketing.cac` (active, DEC-019)                            | KPI/chart                | Marketing       | CONDITIONAL      |
 | Marketing: Email revenue share                        | No approved share calculation; use Klaviyo overview/revenue separately               | KPI/readiness            | Marketing       | CONDITIONAL      |
 | Marketing: Funnel                                     | `commerce.web_funnel`                                                                | Funnel                   | Marketing       | REBUILD_TO_MATCH |
 | Marketing: Performance by channel                     | Klaviyo campaign/flow fields (DP), spend/social fields (DP); no inferred attribution | Table                    | Marketing       | CONDITIONAL      |
