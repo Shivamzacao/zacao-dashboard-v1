@@ -1,10 +1,18 @@
-import { buildActiveCustomersMetric, buildRealizedLtvViews } from "@/src/application/metrics";
+import {
+  buildActiveCustomersMetric,
+  buildBlendedCacMetric,
+  buildRealizedLtvViews,
+} from "@/src/application/metrics";
 import type {
   DashboardContribution,
   DashboardDatasetContributor,
   OrchestrationContext,
 } from "@/src/application/orchestration";
-import type { SheetsDashboardPage, SheetsTabDataSource } from "@/src/application/ports/sheets-tabs";
+import type {
+  SheetsDashboardPage,
+  SheetsTabDataSource,
+  SheetsTabReadResult,
+} from "@/src/application/ports/sheets-tabs";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 import { mapShopifyLtvRecords } from "@/src/infrastructure/shopify/facts";
 import type { ShopifyAdapterProvider } from "@/src/infrastructure/shopify/contributors";
@@ -50,12 +58,26 @@ export function createCustomerLtvContributor(input: {
       const checkedAt = input.now().toISOString();
       const records = mapShopifyLtvRecords(orders.records, checkedAt.slice(0, 10));
 
-      const channelMapping = input.sheets
+      // Marketing_Spend rides along for Blended CAC's numerator (DEC-019). This is a
+      // second cache entry rather than a shared one — the sheets cache keys on
+      // `page:sortedTabs` — so it costs one extra batchGet per fresh window, not a
+      // second full workbook read.
+      //
+      // A failed read must stay distinguishable from an empty tab: absent spend rows
+      // would otherwise divide a zero numerator and read as "no campaigns ran".
+      const unreadable: {
+        readonly tabs: SheetsTabReadResult["tabs"];
+        readonly status: SourceStatus | null;
+        readonly read: boolean;
+      } = { tabs: {}, status: null, read: false };
+      const sheetTabs = input.sheets
         ? await input.sheets
-            .readPageTabs(page, ["Channel_Mapping"])
-            .then((result) => result.tabs["Channel_Mapping"] ?? [])
-            .catch(() => [])
-        : [];
+            .readPageTabs(page, ["Channel_Mapping", "Marketing_Spend"])
+            .then((result) => ({ tabs: result.tabs, status: result.sourceStatus, read: true }))
+            .catch(() => unreadable)
+        : unreadable;
+      const channelMapping = sheetTabs.tabs["Channel_Mapping"] ?? [];
+      const spendRows = sheetTabs.tabs["Marketing_Spend"] ?? [];
 
       const status: SourceStatus = {
         source: "shopify",
@@ -82,6 +104,22 @@ export function createCustomerLtvContributor(input: {
         channels: context.filters.channels,
         sourceWarnings: status.warningCodes,
       });
+      // Blended CAC is the only metric here that spans both sources, so it is the only
+      // one whose context carries the sheets status. Widening the others would change
+      // their readiness for a source they do not read.
+      const blendedCac = buildBlendedCacMetric({
+        context: {
+          ...metricContext,
+          sourceStatuses: sheetTabs.status ? [status, sheetTabs.status] : [status],
+        },
+        spendRows,
+        orderRecords: records,
+        channelMapping,
+        channels: context.filters.channels,
+        sourceWarnings: status.warningCodes,
+        spendSourceReadable: sheetTabs.read,
+      });
+
       return {
         metrics: [
           buildActiveCustomersMetric({
@@ -91,9 +129,10 @@ export function createCustomerLtvContributor(input: {
           }),
           views.metric,
           views.ltv90d,
+          blendedCac,
         ],
         tables: [views.cohorts],
-        sourceStatuses: [status],
+        sourceStatuses: sheetTabs.status ? [status, sheetTabs.status] : [status],
         warnings: status.warningCodes,
       };
     },

@@ -153,9 +153,12 @@ describe("B6 dashboard orchestration", () => {
       filters: FILTERS,
     });
     const funnel = result.page.metrics.find(({ key }) => key === "commerce.web_funnel");
-    const cac = result.page.metrics.find(({ key }) => key === "marketing.cac");
+    // ROAS, not CAC: `marketing.cac` became CERTIFIABLE with the Blended CAC rule
+    // (DEC-019), so it no longer exercises the blocked-metric path this asserts. ROAS
+    // still awaits an approved attribution model.
+    const roas = result.page.metrics.find(({ key }) => key === "marketing.roas");
     expect(funnel).toMatchObject({ value: { kind: "rate_basis_points", value: 250 } });
-    expect(cac).toMatchObject({
+    expect(roas).toMatchObject({
       implementationStatus: "BUSINESS_RULE_REQUIRED",
       value: null,
     });

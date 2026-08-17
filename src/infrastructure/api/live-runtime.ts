@@ -199,6 +199,12 @@ export const LIVE_DASHBOARD_SECTION_PLAN: Readonly<Record<DashboardSection, read
     "klaviyo-engagement",
     "sheets-marketing",
     "marketing-composite-metrics",
+    // marketing.cac is catalogued on this section too, so without the contributor here
+    // this page would synthesize a null while Customer Intelligence served a real
+    // number — the same metric key answering differently depending on which page asked.
+    // The dataset cache key carries no section, so this shares Customer Intelligence's
+    // cached order read rather than repeating it.
+    "shopify-customer-ltv",
   ],
   "Growth Intelligence": ["sheets-growth", "growth-composite-metrics"],
   // Migrated: sheets-financial keeps its name but now reads the new workbook, which

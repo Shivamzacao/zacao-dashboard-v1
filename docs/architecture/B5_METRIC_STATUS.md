@@ -82,7 +82,7 @@ Reconciled before B6: the six metrics outside the four active-status counts are 
 | klaviyo.attributed_revenue | Marketing | Klaviyo conversion value | Label only as Klaviyo-attributed revenue | DATA_PENDING | No report data/settings not recorded |
 | klaviyo.engagement_trend | Marketing | Metric aggregates | Event-time points in New York periods | DATA_PENDING | No events/live deferred |
 | marketing.spend | Marketing; Financial | Marketing_Spend | Sum validated spend; no attribution inferred | DATA_PENDING | Production rows empty |
-| marketing.cac | Marketing | Spend + acquisition source | Approved numerator ÷ acquired customers | BUSINESS_RULE_REQUIRED | Definition/attribution |
+| marketing.cac | Marketing | Marketing_Spend + Shopify orders | In-scope paid media spend ÷ unique Shopify first-time customers, same period | CERTIFIABLE | DEC-019 |
 | marketing.roas | Marketing | Attributed revenue + spend | Matching attributed revenue ÷ spend | BUSINESS_RULE_REQUIRED | Attribution/scope |
 | marketing.ltv_cac | Marketing; Financial | Approved LTV + CAC | Approved LTV ÷ approved CAC | BUSINESS_RULE_REQUIRED | Both definitions unresolved |
 | social.performance | Marketing; Growth | Social_Metrics | Valid dated observations; blanks remain unavailable | DATA_PENDING | Production rows empty |

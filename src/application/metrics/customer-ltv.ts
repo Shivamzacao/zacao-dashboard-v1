@@ -359,6 +359,67 @@ export function calculateRealizedLtv(input: {
   };
 }
 
+/**
+ * Distinct customers whose first order falls inside an arbitrary reporting period.
+ *
+ * This is the denominator of Paid-Media Blended CAC (DEC-019), and it is deliberately
+ * not expressible with the existing cohort helpers: `calculateRealizedLtv` buckets by
+ * a fixed trailing twelve months and `calculateActiveCustomers` by a fixed trailing
+ * ninety days on `order_date`. Neither honours `dataPeriod.startDate`, and neither
+ * keys on `first_order_date`.
+ *
+ * `parseRows` does the work that matters. Beyond the per-row guards it drops every row
+ * of any customer whose `first_order_date` is internally inconsistent, or later than
+ * their earliest qualifying order — a customer placed in the wrong month is exactly the
+ * failure a period-scoped acquisition count cannot absorb, so those customers are
+ * excluded and counted rather than guessed at.
+ *
+ * `customers.new_count` is not a substitute: it is a ShopifyQL provider classification
+ * that can count one person as both new and returning within a period.
+ */
+export function calculateFirstTimeCustomers(input: {
+  readonly records: readonly SheetRecord[];
+  readonly channelMapping?: readonly SheetRecord[];
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly channels?: readonly string[];
+}): {
+  readonly count: number;
+  readonly excludedInconsistentRows: number;
+  readonly excludedRows: number;
+} {
+  const parsed = parseRows({
+    records: input.records,
+    channelMapping: input.channelMapping ?? [],
+    endDate: input.endDate,
+    channels: input.channels ?? [],
+  });
+  // Only a qualifying order establishes acquisition, matching how `first_order_date`
+  // is derived upstream and how `calculateRealizedLtv` picks its eligible customers.
+  const customers = new Set(
+    parsed.rows.flatMap((item) =>
+      QUALIFYING_STATUSES.has(item.row.orderStatus) &&
+      item.row.firstOrderDate >= input.startDate &&
+      item.row.firstOrderDate <= input.endDate
+        ? [item.row.customerId]
+        : [],
+    ),
+  );
+  const excludedInconsistentRows = new Set(
+    parsed.diagnostics
+      .filter(({ reason }) => reason === "inconsistent_first_order_date")
+      .map(({ rowNumber }) => rowNumber),
+  ).size;
+  const excludedRows = new Set(
+    parsed.diagnostics
+      // An unmapped channel is a labelling gap, not a rejected row — the row still
+      // counted, so reporting it as an exclusion would overstate the loss.
+      .filter(({ reason }) => reason !== "unmapped_channel")
+      .map(({ rowNumber }) => rowNumber),
+  ).size;
+  return { count: customers.size, excludedInconsistentRows, excludedRows };
+}
+
 export function calculateActiveCustomers(input: {
   readonly records: readonly SheetRecord[];
   readonly endDate: string;
