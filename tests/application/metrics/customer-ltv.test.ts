@@ -186,6 +186,76 @@ describe("Realized LTV", () => {
     expect(JSON.stringify(views.cohorts.rows)).not.toContain("C-PRIVATE");
   });
 
+  describe("90-day LTV", () => {
+    // The period ends 2026-07-31, so a cohort is 90-day matured when its month end
+    // plus 89 days lands on or before that: 2026-04 is the last matured month.
+    const cohort = (
+      month: string,
+      customers: number,
+      ordersPerCustomer: number,
+      offset = 0,
+    ): readonly SheetRecord[] =>
+      Array.from({ length: customers }, (_unused, index) =>
+        Array.from({ length: ordersPerCustomer }, (_ignored, order_) =>
+          order(
+            `O-${month}-${index}-${order_}`,
+            `C-${month}-${index + offset}`,
+            `${month}-${String(2 + order_ * 3).padStart(2, "0")}`,
+            `${month}-02`,
+          ),
+        ),
+      ).flat();
+
+    const build = (records: readonly SheetRecord[]) =>
+      buildRealizedLtvViews({
+        context: context([source("shopify")]),
+        records,
+        channelMapping: mappings,
+        channels: [],
+      }).ltv90d;
+
+    it("weights matured cohorts by customer count", () => {
+      // 20 customers at one $90 order, 10 at two: (20*9000 + 10*18000) / 30 = 12000.
+      const metric = build([...cohort("2026-01", 20, 1), ...cohort("2026-03", 10, 2, 100)]);
+      expect(metric.value).toEqual({
+        kind: "money",
+        value: { currency: "USD", minorUnits: 12_000 },
+      });
+    });
+
+    it("ignores a cohort whose 90-day window has not elapsed", () => {
+      const matured = [...cohort("2026-01", 20, 1), ...cohort("2026-03", 10, 2, 100)];
+      // 2026-06 is immature, and every customer in it bought five times — if it
+      // leaked into either side of the mean the value would move sharply.
+      const withImmature = build([...matured, ...cohort("2026-06", 40, 5, 200)]);
+      expect(withImmature.value).toEqual(build(matured).value);
+    });
+
+    it("withholds the value below thirty matured customers", () => {
+      const metric = build(cohort("2026-01", 29, 1));
+      expect(metric.value).toBeNull();
+      expect(metric.warnings).toContain("LTV_COHORT_INSUFFICIENT_90D");
+      // One customer short still withholds, so the floor is not off by one.
+      expect(build(cohort("2026-01", 30, 1)).value).not.toBeNull();
+    });
+
+    it("publishes at exactly thirty, still flagging a thin base", () => {
+      const metric = build(cohort("2026-01", 30, 1));
+      expect(metric.value).toEqual({
+        kind: "money",
+        value: { currency: "USD", minorUnits: 9_000 },
+      });
+      expect(metric.warnings).toContain("LTV_COHORT_INSUFFICIENT_90D");
+      expect(metric.readiness.state).toBe("partial");
+    });
+
+    it("drops the thin-base warning once the cohort reaches one hundred", () => {
+      const metric = build(cohort("2026-01", 100, 1));
+      expect(metric.value).not.toBeNull();
+      expect(metric.warnings).not.toContain("LTV_COHORT_INSUFFICIENT_90D");
+    });
+  });
+
   it("excludes invalid identity, test, currency, status, date, duplicate, and inconsistent rows", () => {
     const result = calculateRealizedLtv({
       records: [

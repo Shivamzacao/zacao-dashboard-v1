@@ -164,6 +164,7 @@ describe("F3 dashboard pages", () => {
       "customers.returning_rate",
       "customers.active",
       "customers.realized_ltv",
+      "customers.ltv_90d",
       "engagement.time_on_site",
       "marketing.cac",
       "marketing.ltv_cac",
@@ -180,7 +181,7 @@ describe("F3 dashboard pages", () => {
     expect(customers.tables.map(({ title }) => title)).toEqual(["Email campaign performance"]);
 
     render(<DashboardPageView spec={customers} fixture={f3CustomerPageFixtureData} />);
-    expect(screen.getAllByRole("article")).toHaveLength(9);
+    expect(screen.getAllByRole("article")).toHaveLength(10);
     expect(screen.getByLabelText("Time on site: 3m 12s")).toBeTruthy();
     expect(screen.getAllByText("Business rule required")).toHaveLength(2);
     expect(screen.queryByRole("heading", { name: "Customer geography" })).toBeNull();
@@ -290,6 +291,7 @@ describe("F3 dashboard pages", () => {
       "klaviyo.email_open_rate",
       "klaviyo.email_click_rate",
       "klaviyo.attributed_revenue",
+      "marketing.paid_cac",
       "social.followers_total",
       "collabs.active",
       "ambassadors.active",
@@ -316,7 +318,7 @@ describe("F3 dashboard pages", () => {
     ]);
 
     render(<DashboardPageView spec={marketing} fixture={f3MarketingPageFixtureData} />);
-    expect(screen.getAllByRole("article")).toHaveLength(10);
+    expect(screen.getAllByRole("article")).toHaveLength(11);
     expect(screen.getByLabelText("Email recipients: 2,840")).toBeTruthy();
     expect(screen.getByLabelText("Affiliate-driven revenue: $2,100.00")).toBeTruthy();
     expect(screen.getAllByText("Business rule required")).toHaveLength(2);
@@ -326,7 +328,7 @@ describe("F3 dashboard pages", () => {
     expect(screen.queryByRole("heading", { name: "Campaign performance" })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Klaviyo campaigns" })).toBeNull();
     expect(screen.queryByRole("region", { name: "Needs attention" })).toBeNull();
-    expect(screen.getAllByText(/^Source:/)).toHaveLength(24);
+    expect(screen.getAllByText(/^Source:/)).toHaveLength(25);
 
     const table = screen.getByRole("table", { name: "Social channel performance" });
     expect(

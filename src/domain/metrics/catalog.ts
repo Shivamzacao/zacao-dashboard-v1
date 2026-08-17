@@ -595,12 +595,26 @@ export const metricCatalog = Object.freeze([
     sections: ["Customer Intelligence"],
     v1Class: "core",
     valueKind: "money",
-    sourceKeys: ["google_sheets"],
-    sources: "Sales_Actuals",
+    sourceKeys: ["shopify"],
+    sources: "Shopify order history",
     sourceFields:
       "customer_id, order_id, order_date, first_order_date, product revenue and deductions, order_status, acquisition_channel",
     calculation:
       "Net product revenue through the selected end date divided by distinct eligible customers. The start-date, product/SKU, and warehouse filters do not apply.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
+    key: "customers.ltv_90d",
+    label: "90-day LTV",
+    sections: ["Customer Intelligence"],
+    v1Class: "core",
+    valueKind: "money",
+    sourceKeys: ["shopify"],
+    sources: "Shopify order history",
+    sourceFields: "customer_id, order_date, first_order_date, net product revenue",
+    calculation:
+      "Customer-weighted mean net product revenue earned in a customer's first 90 days, across monthly acquisition cohorts old enough to have completed that window. Unavailable below 30 matured customers, because a mean over a smaller base moves too far on a single reorder to compare against acquisition cost.",
     status: "CERTIFIABLE",
     blockingReason: null,
   }),
@@ -610,8 +624,8 @@ export const metricCatalog = Object.freeze([
     sections: ["Customer Intelligence"],
     v1Class: "core",
     valueKind: "money",
-    sourceKeys: ["google_sheets"],
-    sources: "Sales_Actuals and Channel_Mapping",
+    sourceKeys: ["shopify"],
+    sources: "Shopify order history and Channel_Mapping",
     sourceFields: "customer identity, first order, product revenue, acquisition channel",
     calculation:
       "Trailing twelve monthly acquisition cohorts at 30, 60, 90, 180 days and lifetime-to-date; immature fixed horizons remain unavailable.",
@@ -1407,6 +1421,20 @@ export const metricCatalog = Object.freeze([
     blockingReason: "Revenue attribution and spend scope are not approved.",
   }),
   entry({
+    key: "marketing.paid_cac",
+    label: "Paid CAC",
+    sections: ["Marketing Intelligence"],
+    v1Class: "core",
+    valueKind: "money",
+    sourceKeys: ["google_sheets"],
+    sources: "Google Sheets Marketing_Spend",
+    sourceFields: "date, spend_usd, new_customers_acquired",
+    calculation:
+      "Paid media spend divided by the first-time customers the ad platforms attribute to it, over the selected period. Scoped to paid media only — this is not a blended company CAC, which needs a deduplicated cross-source new-customer population. A campaign missing an attributed-customer count is excluded from both the numerator and the denominator, since charging its spend to other campaigns' customers would understate the cost.",
+    status: "CERTIFIABLE",
+    blockingReason: null,
+  }),
+  entry({
     key: "marketing.ltv_cac",
     label: "LTV:CAC",
     sections: ["Customer Intelligence", "Marketing Intelligence", "Financial Intelligence"],
@@ -1417,7 +1445,8 @@ export const metricCatalog = Object.freeze([
     sourceFields: "approved LTV numerator and CAC denominator",
     calculation: "Approved LTV divided by approved CAC for an identical scope.",
     status: "BUSINESS_RULE_REQUIRED",
-    blockingReason: "Both LTV and CAC policies are unresolved.",
+    blockingReason:
+      "The LTV numerator and its 90-day window are approved; the CAC spend scope and attribution model are not. Paid CAC is published separately in the meantime.",
   }),
   entry({
     key: "social.performance",

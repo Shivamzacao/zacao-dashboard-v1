@@ -191,6 +191,87 @@ describe("SheetsApiClient direct Google source", () => {
     expect(result.sourceStatus.state).toBe("current");
   });
 
+  it("reads the new Marketing_Spend width so example campaigns stay out of production", async () => {
+    // The contract used to stop at Q, leaving source_status (R) unread — every row
+    // then looked like production and the workbook's own DEMO rows shipped as spend.
+    const rows = [
+      [
+        "record_id",
+        "date",
+        "week_ending",
+        "platform",
+        "account",
+        "campaign_id",
+        "campaign_name",
+        "spend_usd",
+        "impressions",
+        "clicks",
+        "conversions",
+        "new_customers_acquired",
+        "attributed_revenue_usd",
+        "cpc_usd",
+        "cpa_usd",
+        "cac_usd",
+        "roas",
+        "source_status",
+        "data_as_of",
+        "created_at",
+        "updated_at",
+        "updated_by",
+        "source_reference",
+        "notes",
+      ],
+      // prettier-ignore
+      ["MKT-1", "7/5/2026", "7/11/2026", "Meta", "ZACAO Main", "", "Summer prospecting",
+       1850, 412000, 8600, 132, 9, "", 0.215, 14.02, "", 0,
+       "production", "7/5/2026", "", "", "", "", ""],
+      // prettier-ignore
+      ["MKT-2", "7/25/2026", "7/25/2026", "Meta", "ZACAO Main", "", "DEMO Late July prospecting",
+       1240, 288000, 6100, 94, 61, 4820, 0.203, 13.19, 20.33, 3.887,
+       "example", "7/25/2026", "", "", "", "", "DEMO ROW — delete before go-live"],
+    ];
+    const client = new SheetsApiClient(configuration(), {
+      fetch: clientFetch({ titles: ["Marketing_Spend"], rows }) as typeof fetch,
+      accessToken: async () => "token",
+    });
+
+    const result = await client.readPageTabs("migrated", ["Marketing_Spend"]);
+
+    expect(result.tabs["Marketing_Spend"]?.map((row) => row["record_id"])).toEqual(["MKT-1"]);
+    expect(result.exampleTabs?.["Marketing_Spend"]?.map((row) => row["record_id"])).toEqual([
+      "MKT-2",
+    ]);
+    // The CAC denominator and the freshness stamp are now inside the read window.
+    expect(result.tabs["Marketing_Spend"]?.[0]?.["new_customers_acquired"]).toBe(9);
+    expect(result.tabs["Marketing_Spend"]?.[0]?.["data_as_of"]).toBe("2026-07-05");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("keeps a legacy 17-column Marketing_Spend valid with the new columns null", async () => {
+    const rows = [
+      // prettier-ignore
+      ["record_id", "date", "platform", "account", "campaign_id", "campaign_name", "spend_usd",
+       "impressions", "clicks", "conversions", "source_status", "data_as_of", "created_at",
+       "updated_at", "updated_by", "source_reference", "notes"],
+      // prettier-ignore
+      ["LEG-1", "7/6/2026", "Google", "ZACAO Main", "", "Legacy search", 500, 1000, 40, 5,
+       "production", "7/6/2026", "", "", "", "", ""],
+    ];
+    const client = new SheetsApiClient(configuration(), {
+      fetch: clientFetch({ titles: ["Marketing_Spend"], rows }) as typeof fetch,
+      accessToken: async () => "token",
+    });
+
+    const result = await client.readPageTabs("marketing", ["Marketing_Spend"]);
+    const row = result.tabs["Marketing_Spend"]?.[0];
+
+    expect(row?.["record_id"]).toBe("LEG-1");
+    expect(row?.["spend_usd"]).toBe(500);
+    expect(row?.["new_customers_acquired"]).toBeNull();
+    expect(row?.["week_ending"]).toBeNull();
+    expect(result.warnings).toEqual([]);
+  });
+
   it("batch reads and normalizes requested tabs", async () => {
     const fetchMock = clientFetch({});
     const client = new SheetsApiClient(configuration(), {

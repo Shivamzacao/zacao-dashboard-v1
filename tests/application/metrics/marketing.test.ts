@@ -5,6 +5,7 @@ import {
   buildBlockedCampaignRoi,
   buildCollaborationViews,
   buildMarketingSpendMonthlyBreakdown,
+  buildPaidCacMetric,
   buildSocialMarketingViews,
 } from "@/src/application/metrics";
 
@@ -26,6 +27,57 @@ describe("Marketing Intelligence certified calculations", () => {
     });
     expect(result.items).toHaveLength(1);
     expect(result.metric.warnings).toContain("SPEND_ONLY_NO_ATTRIBUTION");
+  });
+
+  describe("Paid CAC", () => {
+    it("divides in-period paid spend by attributed first-time customers", () => {
+      // (100 + 50) / (8 + 2) = 15.00. The August row is outside the period.
+      const metric = buildPaidCacMetric(sheetsContext(), [
+        { date: "2026-07-01", spend_usd: 100, new_customers_acquired: 8 },
+        { date: "2026-07-20", spend_usd: 50, new_customers_acquired: 2 },
+        { date: "2026-08-01", spend_usd: 900, new_customers_acquired: 1 },
+      ]);
+      expect(metric.value).toEqual({
+        kind: "money",
+        value: { currency: "USD", minorUnits: 1500 },
+      });
+      expect(metric.warnings).toContain("PAID_CAC_PLATFORM_REPORTED");
+      expect(metric.warnings).not.toContain("PAID_CAC_SPEND_COVERAGE_PARTIAL");
+    });
+
+    it("excludes a campaign with no attributed customers from both sides", () => {
+      // The uncounted $900 must not inflate the cost of the other campaign's
+      // customers: the answer stays 100/8, not 1000/8.
+      const metric = buildPaidCacMetric(sheetsContext(), [
+        { date: "2026-07-01", spend_usd: 100, new_customers_acquired: 8 },
+        { date: "2026-07-02", spend_usd: 900, new_customers_acquired: null },
+        { date: "2026-07-03", spend_usd: 400, new_customers_acquired: 0 },
+      ]);
+      expect(metric.value).toEqual({
+        kind: "money",
+        value: { currency: "USD", minorUnits: 1250 },
+      });
+      expect(metric.warnings).toContain("PAID_CAC_SPEND_COVERAGE_PARTIAL");
+    });
+
+    it("never substitutes conversions for attributed first-time customers", () => {
+      const metric = buildPaidCacMetric(sheetsContext(), [
+        { date: "2026-07-01", spend_usd: 1850, conversions: 132, new_customers_acquired: null },
+      ]);
+      expect(metric.value).toBeNull();
+      expect(metric.warnings).toContain("PAID_CAC_SPEND_COVERAGE_PARTIAL");
+      // "No activity" would read as "no campaigns ran" — the opposite of the truth.
+      expect(metric.unavailableReason).toBe(
+        "Paid campaigns ran, but none reported attributed first-time customers.",
+      );
+    });
+
+    it("returns null rather than zero when no campaign has spend", () => {
+      const metric = buildPaidCacMetric(sheetsContext(), []);
+      expect(metric.value).toBeNull();
+      expect(metric.warnings).toContain("PAID_CAC_PLATFORM_REPORTED");
+      expect(metric.unavailableReason).toBe("No paid campaign spend in the selected period.");
+    });
   });
 
   it("uses latest as-of social snapshots without carrying future values backward", () => {

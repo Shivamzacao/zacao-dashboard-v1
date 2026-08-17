@@ -90,6 +90,7 @@ export function createCustomerLtvContributor(input: {
             sourceWarnings: status.warningCodes,
           }),
           views.metric,
+          views.ltv90d,
         ],
         tables: [views.cohorts],
         sourceStatuses: [status],
