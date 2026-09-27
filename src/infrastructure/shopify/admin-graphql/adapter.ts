@@ -24,7 +24,15 @@ const shopSchema = z.object({
   plan: z.object({ displayName: z.string() }),
 });
 const scopeSchema = z.object({ handle: z.string() });
-const locationSchema = z.object({ id: z.string(), name: z.string(), isActive: z.boolean() });
+const locationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  isActive: z.boolean(),
+  // Selected since the migration; optional so older fixtures still parse.
+  hasActiveInventory: z.boolean().nullable().optional(),
+  shipsInventory: z.boolean().nullable().optional(),
+  fulfillsOnlineOrders: z.boolean().nullable().optional(),
+});
 const customerSchema = z.object({
   id: z.string(),
   createdAt: z.string().datetime({ offset: true }),
@@ -41,12 +49,76 @@ export interface ShopifyDetailedReadResult<T> {
   readonly truncated: boolean;
 }
 
+/**
+ * A `created_at` window pushed down to Shopify's order search. Bounds are
+ * instants; `from` is inclusive and `to` exclusive. Either may be omitted.
+ */
+export interface ShopifyCreatedAtWindow {
+  readonly from?: string;
+  readonly to?: string;
+}
+
+const instantSchema = z.string().datetime({ offset: true });
+
+/**
+ * Shopify order search syntax for a created_at window. Values are validated
+ * instants, so nothing user-controlled reaches the search string.
+ */
+export function buildOrderSearchQuery(window: ShopifyCreatedAtWindow): string | null {
+  const clauses: string[] = [];
+  if (window.from) clauses.push(`created_at:>='${instantSchema.parse(window.from)}'`);
+  if (window.to) clauses.push(`created_at:<'${instantSchema.parse(window.to)}'`);
+  return clauses.length > 0 ? clauses.join(" AND ") : null;
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * A created_at window that is a strict superset of the calendar days of a
+ * reporting period, padded by `paddingDays` on each side. Period builders keep
+ * applying their own exact date rule to the returned orders, so pushing this
+ * window down to Shopify changes how many orders are fetched, never which
+ * orders a metric counts.
+ */
+export function paddedCreatedAtWindow(
+  dateRange: DateRange,
+  paddingDays = 1,
+): Required<ShopifyCreatedAtWindow> {
+  const start = Date.parse(`${dateRange.startDate}T00:00:00Z`) - paddingDays * DAY_MS;
+  const endExclusive = Date.parse(`${dateRange.endDate}T00:00:00Z`) + (1 + paddingDays) * DAY_MS;
+  return {
+    from: new Date(start).toISOString(),
+    to: new Date(endExclusive).toISOString(),
+  };
+}
+
+export interface ShopifyAdminAdapterOptions {
+  /** Nodes per page. Orders stay small because nested line items drive query cost. */
+  readonly pageSize?: number;
+  /** Page ceiling for catalog-style connections (products, locations, customers). */
+  readonly maxPages?: number;
+  /** Page ceiling for orders; high because a requested period must be read in full. */
+  readonly orderMaxPages?: number;
+}
+
 export class ShopifyAdminAdapter {
+  private readonly pageSize: number;
+  private readonly maxPages: number;
+  private readonly orderMaxPages: number;
+
   constructor(
     private readonly client: ShopifyGraphQlClient,
-    private readonly pageSize = 100,
-    private readonly maxPages = 20,
-  ) {}
+    pageSizeOrOptions: number | ShopifyAdminAdapterOptions = {},
+    maxPages?: number,
+  ) {
+    const options =
+      typeof pageSizeOrOptions === "number"
+        ? { pageSize: pageSizeOrOptions, ...(maxPages === undefined ? {} : { maxPages }) }
+        : pageSizeOrOptions;
+    this.pageSize = options.pageSize ?? 100;
+    this.maxPages = options.maxPages ?? 20;
+    this.orderMaxPages = options.orderMaxPages ?? options.maxPages ?? 20;
+  }
 
   async readShop(signal?: AbortSignal) {
     const result = await this.client.execute<{ shop: unknown }>({
@@ -91,13 +163,27 @@ export class ShopifyAdminAdapter {
     });
   }
 
-  readOrders(input: { dateRange: DateRange; hasReadAllOrders: boolean; signal?: AbortSignal }) {
+  /**
+   * Orders, newest first. With `createdAt` the window is applied by Shopify's
+   * search, so a period read returns every matching order (paged to
+   * exhaustion) instead of the most recent N. Without it the full history is
+   * read — callers such as LTV need every order a customer ever placed.
+   */
+  readOrders(input: {
+    dateRange: DateRange;
+    hasReadAllOrders: boolean;
+    createdAt?: ShopifyCreatedAtWindow;
+    signal?: AbortSignal;
+  }) {
+    const search = input.createdAt ? buildOrderSearchQuery(input.createdAt) : null;
     return this.readConnection({
       document: ORDERS_QUERY,
       root: "orders",
       dateRange: input.dateRange,
       hasReadAllOrders: input.hasReadAllOrders,
       normalize: normalizeOrder,
+      maxPages: this.orderMaxPages,
+      ...(search ? { search } : {}),
       ...(input.signal ? { signal: input.signal } : {}),
     });
   }
@@ -119,15 +205,22 @@ export class ShopifyAdminAdapter {
     dateRange: DateRange;
     hasReadAllOrders: boolean;
     normalize: (value: unknown) => T;
+    maxPages?: number;
+    /** Provider search filter; when set, the result covers exactly that window. */
+    search?: string;
     signal?: AbortSignal;
   }): Promise<ShopifyDetailedReadResult<T>> {
     const pages = await collectShopifyPages({
-      maxPages: this.maxPages,
+      maxPages: input.maxPages ?? this.maxPages,
       ...(input.signal ? { signal: input.signal } : {}),
       fetchPage: async (cursor, signal) => {
         const result = await this.client.execute<Record<string, unknown>>({
           document: input.document,
-          variables: { first: this.pageSize, after: cursor },
+          variables: {
+            first: this.pageSize,
+            after: cursor,
+            ...(input.search ? { query: input.search } : {}),
+          },
           ...(signal ? { signal } : {}),
         });
         return connectionSchema.parse(result.data[input.root]);
@@ -149,9 +242,16 @@ export class ShopifyAdminAdapter {
         requestedEndDate: input.dateRange.endDate,
         earliestDetailedRecordAt: earliestCreatedAt ?? null,
         hasReadAllOrders: input.hasReadAllOrders,
+        // A provider-filtered read that was not truncated returned every order
+        // in the window by construction, even when the window's first days had
+        // no orders. An unfiltered read can only prove coverage by reaching a
+        // record at or before the requested start.
         detailedRangeVerified:
           !pages.truncated &&
-          Boolean(earliestCreatedAt && earliestCreatedAt.slice(0, 10) <= input.dateRange.startDate),
+          (input.search !== undefined ||
+            Boolean(
+              earliestCreatedAt && earliestCreatedAt.slice(0, 10) <= input.dateRange.startDate,
+            )),
       }),
     };
   }

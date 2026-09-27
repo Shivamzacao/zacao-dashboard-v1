@@ -18,6 +18,7 @@ import { CONTRACT_SCHEMA_VERSION } from "@/src/domain/contracts";
 import { loadKlaviyoConfigurationOrNull } from "@/src/infrastructure/klaviyo/runtime";
 import { loadShopifyRuntimeSettingsOrNull } from "@/src/infrastructure/shopify/runtime";
 import { loadSheetsApiConfigurationOrNull } from "@/src/infrastructure/sheets-api/config";
+import { parseSourceMode, SOURCE_MODE_ENV } from "@/src/infrastructure/sources/source-mode";
 
 import { createBackendApiRuntime } from "./live-runtime";
 import { PRIVATE_API_HEADERS, problemResponse, successResponse } from "./serialization";
@@ -186,6 +187,7 @@ export const backendApiService = new BackendApiService(
     klaviyo: loadKlaviyoConfigurationOrNull,
     sheets: () => loadSheetsApiConfigurationOrNull("dashboard"),
     executiveSheets: () => loadSheetsApiConfigurationOrNull("executive"),
+    sourceMode: () => parseSourceMode(process.env[SOURCE_MODE_ENV]),
   }),
   now,
 );

@@ -69,7 +69,10 @@ export class KlaviyoAdapter {
   }
 
   async readMetricRegistry(signal?: AbortSignal) {
-    return this.discover("/api/metrics?page[size]=100", normalizeKlaviyoMetric, signal);
+    // The metrics resource rejects page[size] (live 2026-09-28: HTTP 400
+    // "'page_size' is not a valid field for the resource 'metric'"); it pages
+    // with links.next at the provider's default size.
+    return this.discover("/api/metrics", normalizeKlaviyoMetric, signal);
   }
 
   async readCampaigns(channel: "email" | "sms", signal?: AbortSignal) {

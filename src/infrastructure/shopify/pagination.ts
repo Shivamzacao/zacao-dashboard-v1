@@ -12,13 +12,25 @@ export interface PaginatedShopifyResult<T> {
   readonly pagesRead: number;
 }
 
+/**
+ * Hard ceiling on pages for any single connection read. Cursor pagination
+ * normally ends on `hasNextPage: false`; this bound only exists so a provider
+ * fault can never loop forever. Reaching it is reported as `truncated`, never
+ * swallowed.
+ */
+export const MAX_SHOPIFY_PAGES = 2_000;
+
 export async function collectShopifyPages<T>(input: {
   fetchPage: (cursor: string | null, signal?: AbortSignal) => Promise<ShopifyPage<T>>;
   maxPages: number;
   signal?: AbortSignal;
 }): Promise<PaginatedShopifyResult<T>> {
-  if (!Number.isInteger(input.maxPages) || input.maxPages < 1 || input.maxPages > 100) {
-    throw new Error("maxPages must be an integer between 1 and 100");
+  if (
+    !Number.isInteger(input.maxPages) ||
+    input.maxPages < 1 ||
+    input.maxPages > MAX_SHOPIFY_PAGES
+  ) {
+    throw new Error(`maxPages must be an integer between 1 and ${MAX_SHOPIFY_PAGES}`);
   }
 
   const records: T[] = [];

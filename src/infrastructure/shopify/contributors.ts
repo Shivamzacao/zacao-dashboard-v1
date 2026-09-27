@@ -30,7 +30,7 @@ import type {
 } from "@/src/application/orchestration";
 import type { CachePolicy, SourceStatus } from "@/src/domain/contracts";
 
-import type { ShopifyAdminAdapter } from "./admin-graphql/adapter";
+import { paddedCreatedAtWindow, type ShopifyAdminAdapter } from "./admin-graphql/adapter";
 import { buildShopifyHistory, type ShopifyHistory } from "./history";
 import {
   mapBillingGeographyFacts,
@@ -378,7 +378,9 @@ export function createShopifyContributors(input: {
         tables: [buildCatalogTable(serviceContext, catalogFacts)],
         breakdowns: [buildInventoryBreakdown(serviceContext, inventoryFacts)],
         sourceStatuses: [status],
-        ...(result.truncated ? { warnings: ["SHOPIFY_CATALOG_TRUNCATED"] } : {}),
+        ...(result.truncated || result.records.some((product) => product.nestedTruncated)
+          ? { warnings: ["SHOPIFY_CATALOG_TRUNCATED"] }
+          : {}),
       };
     },
   );
@@ -415,6 +417,7 @@ export function createShopifyContributors(input: {
       const result = await admin.readOrders({
         dateRange: context.dataPeriod,
         hasReadAllOrders,
+        createdAt: paddedCreatedAtWindow(context.dataPeriod),
       });
       const completeHistory = hasReadAllOrders && !result.truncated;
       const status = currentStatus(
@@ -459,6 +462,7 @@ export function createShopifyContributors(input: {
       const result = await admin.readOrders({
         dateRange: context.dataPeriod,
         hasReadAllOrders,
+        createdAt: paddedCreatedAtWindow(context.dataPeriod),
       });
       const status = currentStatus(
         now().toISOString(),
@@ -473,12 +477,20 @@ export function createShopifyContributors(input: {
       );
       return {
         // Test and cancelled orders are excluded so the row count and amounts
-        // reconcile with the revenue figures elsewhere on the page.
+        // reconcile with the revenue figures elsewhere on the page. The period
+        // rule matches operations.refund_rate (created_at calendar date); the
+        // provider window above is padded, so the exact cut happens here.
         tables: [
           buildDetailedOrdersTable(
             metricContext(context, [status]),
             result.records
               .filter((order) => !order.test && order.cancelledAt === null)
+              .filter((order) => {
+                const created = order.createdAt.slice(0, 10);
+                return (
+                  created >= context.dataPeriod.startDate && created <= context.dataPeriod.endDate
+                );
+              })
               .map((order) => ({
                 orderDate: order.createdAt.slice(0, 10),
                 channel: order.sourceName,

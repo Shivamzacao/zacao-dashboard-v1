@@ -3,6 +3,8 @@ import { z } from "zod";
 import type { UsdMoney } from "@/src/domain/contracts/money";
 import { parseUsdDecimal } from "@/src/domain/utilities/money";
 
+import { merchandiseQuantity, normalizeLineItem } from "./line-items";
+
 const providerMoneySchema = z.object({ amount: z.string(), currencyCode: z.string() }).strict();
 const providerMoneySetSchema = z.object({ shopMoney: providerMoneySchema }).strict();
 const nullableInstant = z.string().datetime({ offset: true }).nullable();
@@ -68,7 +70,10 @@ const providerVariantSchema = z.object({
       sku: z.string().nullable(),
       tracked: z.boolean(),
       unitCost: providerMoneySchema.nullable(),
-      inventoryLevels: z.object({ nodes: z.array(providerInventoryLevelSchema) }),
+      inventoryLevels: z.object({
+        nodes: z.array(providerInventoryLevelSchema),
+        pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
+      }),
     })
     .nullable(),
 });
@@ -78,7 +83,10 @@ const providerProductSchema = z.object({
   title: z.string(),
   handle: z.string(),
   status: z.string(),
-  variants: z.object({ nodes: z.array(providerVariantSchema) }),
+  variants: z.object({
+    nodes: z.array(providerVariantSchema),
+    pageInfo: z.object({ hasNextPage: z.boolean() }).optional(),
+  }),
 });
 
 export function normalizeProduct(value: unknown) {
@@ -88,6 +96,14 @@ export function normalizeProduct(value: unknown) {
     title: product.title,
     handle: product.handle,
     status: product.status,
+    // True when a nested connection (variants, or a variant's inventory
+    // levels) had more nodes than the query's fixed page. Those nodes are not
+    // fetched, so any aggregate over this product is partial and must say so.
+    nestedTruncated:
+      product.variants.pageInfo?.hasNextPage === true ||
+      product.variants.nodes.some(
+        (variant) => variant.inventoryItem?.inventoryLevels.pageInfo?.hasNextPage === true,
+      ),
     variants: product.variants.nodes.map((variant) => ({
       id: normalizeShopifyId(variant.id),
       title: variant.title,
@@ -150,15 +166,10 @@ const providerOrderSchema = z.object({
   netPaymentSet: providerMoneySetSchema,
   refunds: z.array(providerRefundSchema),
   fulfillments: z.array(providerFulfillmentSchema),
-  // The orders query has always requested line items; nothing parsed them, so
-  // they were silently dropped. Optional because older fixtures build orders
-  // without them, and an absent block must stay distinguishable from a genuine
-  // zero-quantity order.
-  lineItems: z
-    .object({
-      nodes: z.array(z.object({ currentQuantity: z.number().int().nonnegative() })),
-    })
-    .optional(),
+  // Optional because older fixtures build orders without line items, and an
+  // absent block must stay distinguishable from a genuine zero-quantity order.
+  // Each node is validated and classified by line-items.ts.
+  lineItems: z.object({ nodes: z.array(z.unknown()) }).optional(),
 });
 
 export function normalizeOrder(value: unknown) {
@@ -166,6 +177,7 @@ export function normalizeOrder(value: unknown) {
   if (order.currencyCode !== "USD") {
     throw new Error(`Unsupported Shopify order currency: ${order.currencyCode}`);
   }
+  const lineItems = order.lineItems ? order.lineItems.nodes.map(normalizeLineItem) : null;
   return {
     id: normalizeShopifyId(order.id),
     name: order.name,
@@ -178,12 +190,13 @@ export function normalizeOrder(value: unknown) {
     tags: order.tags,
     financialStatus: order.displayFinancialStatus,
     fulfillmentStatus: order.displayFulfillmentStatus,
-    // Units on the order after edits and refunds, or null when the provider
-    // payload carried no line items at all. Never 0 for "unknown" — a real
-    // zero-unit order and an unfetched one are different facts.
-    quantity: order.lineItems
-      ? order.lineItems.nodes.reduce((total, item) => total + item.currentQuantity, 0)
-      : null,
+    // Merchandise units on the order after edits and refunds, or null when the
+    // provider payload carried no line items at all. Never 0 for "unknown" — a
+    // real zero-unit order and an unfetched one are different facts. Configured
+    // fee lines (e.g. Faire commission) are not units of product (C-4).
+    quantity: lineItems ? merchandiseQuantity(lineItems) : null,
+    // Classified, canonically identified lines (C-3/C-4). Null when unfetched.
+    lineItems,
     subtotal: normalizeShopifyMoneySet(order.currentSubtotalPriceSet),
     total: normalizeShopifyMoneySet(order.currentTotalPriceSet),
     discounts: normalizeShopifyMoneySet(order.currentTotalDiscountsSet),

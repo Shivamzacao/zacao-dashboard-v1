@@ -101,6 +101,17 @@ describe("Klaviyo report/event request contracts", () => {
     });
   });
 
+  it("requests every statistic the facts read, including unsubscribes (C-7)", () => {
+    const request = buildCampaignReportRequest({
+      dateRange: { startDate: "2026-09-01", endDate: "2026-09-27" },
+      timeZone: "America/New_York",
+      conversionMetricId: "Rt8Ckz",
+    });
+    expect(request.data.attributes.statistics).toEqual(
+      expect.arrayContaining(["unsubscribe_uniques", "unsubscribe_rate"]),
+    );
+  });
+
   it("rejects ranges longer than the audited one-year API maximum", () => {
     expect(() =>
       buildMetricAggregateRequest({

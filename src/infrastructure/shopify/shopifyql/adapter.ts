@@ -36,8 +36,9 @@ export interface ShopifyQlReadResult {
 
 /**
  * A dashboard page fans out several datasets at once, and contributors add
- * their own parallel reads on top. Two in flight keeps pages responsive while
- * staying under the ShopifyQL analytics quota.
+ * their own parallel reads on top. Two in flight keeps pages responsive; the
+ * client's shared analytics window (see client.ts) makes every queued query
+ * wait for a known reset instead of retrying into a closed budget.
  */
 const DEFAULT_SHOPIFYQL_CONCURRENCY = 2;
 
@@ -62,6 +63,7 @@ export class ShopifyQlAdapter {
       this.client.execute<unknown>({
         document: SHOPIFYQL_QUERY,
         variables: { query },
+        budget: "analytics",
         ...(input.signal ? { signal: input.signal } : {}),
       }),
     );
