@@ -51,6 +51,12 @@ import {
   type SopWorkbookInspection,
 } from "@/src/infrastructure/google/reference-adapters";
 
+import { businessConfiguration } from "@/src/infrastructure/config/business-config";
+import { ShopifyCommerceReader } from "@/src/infrastructure/shopify/commerce-reader";
+import { ParityLedger } from "@/src/infrastructure/sources/parity-ledger";
+import { ParityTabSource } from "@/src/infrastructure/sources/parity-tab-source";
+import type { SourceMode, SourceModeSetting } from "@/src/infrastructure/sources/source-mode";
+
 import { DefaultBackendApiRuntime } from "./default-runtime";
 
 function deferredStatus(source: SourceKey, checkedAt: string): SourceStatus {
@@ -254,6 +260,9 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
   private readonly sheetsSource: SheetsTabDataSource | null;
   private readonly executiveSheetsSource: SheetsTabDataSource | null;
   private readonly sopInspection: (() => Promise<SopWorkbookInspection>) | null;
+  /** Latest Sheets-vs-API parity results; empty unless the source mode is not `legacy`. */
+  readonly parityLedger = new ParityLedger();
+  readonly sourceMode: SourceMode;
 
   constructor(
     shopifySettings: ShopifyRuntimeSettings | null,
@@ -262,8 +271,10 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       fetchImplementation?: typeof fetch;
       sheetsConfiguration?: SheetsApiConfiguration | null;
       executiveSheetsConfiguration?: SheetsApiConfiguration | null;
+      sourceMode?: SourceMode;
     } = {},
   ) {
+    this.sourceMode = dependencies.sourceMode ?? "legacy";
     const now = () => this.clock.now();
     const fetchDependency = dependencies.fetchImplementation
       ? { fetchImplementation: dependencies.fetchImplementation }
@@ -272,14 +283,14 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
       ? { fetch: dependencies.fetchImplementation }
       : {};
     const sheetsConfiguration = dependencies.sheetsConfiguration ?? null;
-    this.sheetsSource = sheetsConfiguration
+    const workbookSource = sheetsConfiguration
       ? new SheetsApiClient(sheetsConfiguration, {
           ...clientFetch,
           now: () => this.clock.now(),
         })
       : null;
     const executiveSheetsConfiguration = dependencies.executiveSheetsConfiguration ?? null;
-    this.executiveSheetsSource = executiveSheetsConfiguration
+    const executiveWorkbookSource = executiveSheetsConfiguration
       ? new SheetsApiClient(executiveSheetsConfiguration, {
           ...clientFetch,
           now: () => this.clock.now(),
@@ -319,15 +330,44 @@ export class LiveBackendApiRuntime implements BackendApiRuntime {
               getToken: runtime.accessToken.getToken,
               invalidate: runtime.accessToken.invalidate,
             },
-            clientFetch,
+            {
+              ...clientFetch,
+              maxThrottleWaitMs: businessConfiguration.shopify.analyticsMaxThrottleWaitMs,
+            },
           );
           return {
             shopifyql: new ShopifyQlAdapter(client),
-            admin: new ShopifyAdminAdapter(client, 25, 20),
+            // Orders are read to exhaustion for the requested window (C-2); the
+            // page ceiling only guards against a provider pagination fault.
+            admin: new ShopifyAdminAdapter(client, {
+              pageSize: businessConfiguration.shopify.orders.pageSize,
+              maxPages: businessConfiguration.shopify.catalog.maxPages,
+              orderMaxPages: businessConfiguration.shopify.orders.maxPages,
+            }),
             hasReadAllOrders: runtime.configuration.grantedScopes.includes("read_all_orders"),
           };
         })
       : null;
+
+    // Source selection lives at the one seam every sheet-backed contributor
+    // reads through. In `legacy` mode the workbook sources are used unwrapped.
+    const selectSource = (source: SheetsTabDataSource | null): SheetsTabDataSource | null => {
+      const shopifyAdapters = this.shopifyAdapters;
+      if (!source || this.sourceMode === "legacy") return source;
+      return new ParityTabSource(source, {
+        mode: this.sourceMode,
+        ledger: this.parityLedger,
+        logger: new ConsoleLogger(),
+        now,
+        reader: async () => {
+          if (!shopifyAdapters) return null;
+          const adapters = await shopifyAdapters();
+          return new ShopifyCommerceReader(adapters.admin, adapters.hasReadAllOrders, now);
+        },
+      });
+    };
+    this.sheetsSource = selectSource(workbookSource);
+    this.executiveSheetsSource = selectSource(executiveWorkbookSource);
 
     this.klaviyoAdapter = klaviyoConfiguration
       ? new KlaviyoAdapter(
@@ -635,7 +675,19 @@ export function createBackendApiRuntime(loaders: {
   klaviyo: () => KlaviyoConfiguration | null;
   sheets?: () => SheetsApiConfiguration | null;
   executiveSheets?: () => SheetsApiConfiguration | null;
+  sourceMode?: () => SourceModeSetting;
 }): BackendApiRuntime {
+  const sourceModeSetting = loaders.sourceMode?.() ?? {
+    mode: "legacy" as const,
+    invalidValue: null,
+  };
+  if (sourceModeSetting.invalidValue !== null) {
+    // Never silently: an unrecognised mode falls back to the safe default and says so.
+    new ConsoleLogger().error("source_mode.invalid", {
+      configured: sourceModeSetting.invalidValue,
+      using: sourceModeSetting.mode,
+    });
+  }
   const shopifySettings = safeLoad(loaders.shopify);
   const klaviyoConfiguration = safeLoad(loaders.klaviyo);
   const sheetsConfiguration = loaders.sheets ? safeLoad(loaders.sheets) : null;
@@ -653,5 +705,6 @@ export function createBackendApiRuntime(loaders: {
   return new LiveBackendApiRuntime(shopifySettings, klaviyoConfiguration, {
     sheetsConfiguration,
     executiveSheetsConfiguration,
+    sourceMode: sourceModeSetting.mode,
   });
 }

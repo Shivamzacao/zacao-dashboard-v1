@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "lineItemClassification": {
+    "feeSkus": [
+      {
+        "sku": "FAIRE-COMMISSION",
+        "category": "marketplace_commission",
+        "channel": "Faire",
+        "evidence": "Verified live 2026-09-27 on e93644-3 (API 2026-07): 34 Faire order line items with no product/variant. Live capability audit C-4."
+      },
+      {
+        "sku": "FAIRE-PAYMENT-PROCESSING-FEE",
+        "category": "payment_processing_fee",
+        "channel": "Faire",
+        "evidence": "Verified live 2026-09-27 on e93644-3 (API 2026-07): 34 Faire order line items with no product/variant. Live capability audit C-4."
+      }
+    ]
+  },
+  "shopify": {
+    "orders": {
+      "pageSize": 25,
+      "maxPages": 400
+    },
+    "catalog": {
+      "pageSize": 25,
+      "maxPages": 20
+    },
+    "analyticsMaxThrottleWaitMs": 75000
+  }
+}

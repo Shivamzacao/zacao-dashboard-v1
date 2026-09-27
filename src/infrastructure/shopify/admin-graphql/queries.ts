@@ -16,11 +16,13 @@ export const PRODUCTS_QUERY = `
       nodes {
         id title handle status
         variants(first: 25) {
+          pageInfo { hasNextPage }
           nodes {
             id title sku price inventoryQuantity sellableOnlineQuantity
             inventoryItem {
               id sku tracked unitCost { amount currencyCode }
               inventoryLevels(first: 10) {
+                pageInfo { hasNextPage }
                 nodes {
                   id updatedAt
                   location { id name isActive }
@@ -38,16 +40,16 @@ export const PRODUCTS_QUERY = `
 
 export const LOCATIONS_QUERY = `
   query CurrentLocations($first: Int!, $after: String) {
-    locations(first: $first, after: $after, includeLegacy: true) {
-      nodes { id name isActive }
+    locations(first: $first, after: $after, includeLegacy: true, includeInactive: true) {
+      nodes { id name isActive hasActiveInventory shipsInventory fulfillsOnlineOrders }
       pageInfo { hasNextPage endCursor }
     }
   }
 `;
 
 export const ORDERS_QUERY = `
-  query RecentOrders($first: Int!, $after: String) {
-    orders(first: $first, after: $after, sortKey: CREATED_AT, reverse: true) {
+  query RecentOrders($first: Int!, $after: String, $query: String) {
+    orders(first: $first, after: $after, sortKey: CREATED_AT, reverse: true, query: $query) {
       nodes {
         id name createdAt processedAt cancelledAt test currencyCode sourceName tags
         displayFinancialStatus displayFulfillmentStatus

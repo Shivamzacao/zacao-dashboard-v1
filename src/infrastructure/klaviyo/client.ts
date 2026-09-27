@@ -23,6 +23,8 @@ export class KlaviyoClientError extends Error {
     message: string,
     readonly retryable: boolean,
     readonly requestId: string | null,
+    /** Provider-stated wait before retrying (Retry-After / RateLimit-Reset), ms. */
+    readonly retryAfterMs: number | null = null,
   ) {
     super(message);
     this.name = "KlaviyoClientError";
@@ -38,12 +40,49 @@ export interface KlaviyoResponse<T> {
 export interface KlaviyoClientDependencies {
   readonly fetch: typeof fetch;
   readonly sleep: (milliseconds: number) => Promise<void>;
+  /** Epoch ms; injected so report spacing is testable. */
+  readonly now: () => number;
+  /** Jitter source for throttle waits. */
+  readonly random: () => number;
+  /**
+   * Upper bound on the total time one request may wait on 429s. Bounded so a
+   * closed reporting window cannot hang a page; beyond it the request fails
+   * explicitly as `throttled`.
+   */
+  readonly maxThrottleWaitMs: number;
+  /** Minimum gap between values-report requests (provider burst limit: 1/s). */
+  readonly reportSpacingMs: number;
 }
 
 const defaultDependencies: KlaviyoClientDependencies = {
   fetch,
   sleep: (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+  now: Date.now,
+  random: Math.random,
+  maxThrottleWaitMs: 65_000,
+  reportSpacingMs: 1_100,
 };
+
+/**
+ * The campaign/flow values-report endpoints carry a far smaller budget than
+ * the rest of the API. Observed live (2026-09-28, revision 2026-07-15):
+ * `ratelimit-limit: 1, 1;w=1, 2;w=60, 225;w=86400` — one per second, two per
+ * minute, 225 per day. They are therefore serialized and spaced per client,
+ * and a 429 waits for the provider-stated reset instead of retrying after
+ * 100 ms into a still-closed window.
+ */
+const VALUES_REPORT_PATHS = new Set(["/api/campaign-values-reports", "/api/flow-values-reports"]);
+
+/** Seconds from Retry-After, or from RateLimit-Reset when Retry-After is absent. */
+function providerRetryAfterMs(headers: Headers): number | null {
+  for (const name of ["retry-after", "ratelimit-reset"]) {
+    const raw = headers.get(name);
+    if (raw === null) continue;
+    const seconds = Number(raw.split(",")[0]?.trim());
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+  }
+  return null;
+}
 
 function assertAllowedRequest(method: "GET" | "POST", url: URL): void {
   if (url.origin !== KLAVIYO_API_ORIGIN || !url.pathname.startsWith("/api/")) {
@@ -67,6 +106,9 @@ function retryableStatus(status: number): boolean {
 
 export class KlaviyoClient {
   private readonly dependencies: KlaviyoClientDependencies;
+  /** Tail of the values-report queue: each report waits for the previous one. */
+  private reportQueue: Promise<unknown> = Promise.resolve();
+  private lastReportAt = 0;
 
   constructor(
     private readonly configuration: KlaviyoConfiguration,
@@ -80,7 +122,21 @@ export class KlaviyoClient {
   }
 
   postReport<T>(path: string, body: unknown, signal?: AbortSignal): Promise<KlaviyoResponse<T>> {
-    return this.request<T>("POST", path, body, signal);
+    if (!VALUES_REPORT_PATHS.has(new URL(path, KLAVIYO_API_ORIGIN).pathname)) {
+      return this.request<T>("POST", path, body, signal);
+    }
+    const run = async () => {
+      const gap = this.lastReportAt + this.dependencies.reportSpacingMs - this.dependencies.now();
+      if (gap > 0) await this.dependencies.sleep(gap);
+      try {
+        return await this.request<T>("POST", path, body, signal);
+      } finally {
+        this.lastReportAt = this.dependencies.now();
+      }
+    };
+    const result = this.reportQueue.then(run, run);
+    this.reportQueue = result.catch(() => undefined);
+    return result;
   }
 
   private async request<T>(
@@ -92,12 +148,23 @@ export class KlaviyoClient {
     const url = new URL(pathOrUrl, KLAVIYO_API_ORIGIN);
     assertAllowedRequest(method, url);
 
+    let throttleWaitedMs = 0;
     for (let attempt = 0; attempt <= this.configuration.maxRetries; attempt += 1) {
       try {
         return await this.requestAttempt<T>(method, url, body, externalSignal);
       } catch (error) {
         const clientError = this.toClientError(error, externalSignal);
         if (!clientError.retryable || attempt === this.configuration.maxRetries) throw clientError;
+        if (clientError.kind === "throttled") {
+          // Wait for the provider-stated reset (plus jitter), else a
+          // one-second-based backoff; never beyond the total bound.
+          const base = clientError.retryAfterMs ?? 1_000 * 2 ** attempt;
+          const delay = base + Math.round(this.dependencies.random() * 500);
+          if (throttleWaitedMs + delay > this.dependencies.maxThrottleWaitMs) throw clientError;
+          throttleWaitedMs += delay;
+          await this.dependencies.sleep(delay);
+          continue;
+        }
         await this.dependencies.sleep(100 * 2 ** attempt);
       }
     }
@@ -132,6 +199,7 @@ export class KlaviyoClient {
         `Klaviyo returned HTTP ${response.status}`,
         retryableStatus(response.status),
         requestId,
+        response.status === 429 ? providerRetryAfterMs(response.headers) : null,
       );
     }
     let responseBody: unknown;

@@ -15,6 +15,11 @@ export const KLAVIYO_REPORT_STATISTICS = [
   "bounce_rate",
   "spam_complaints",
   "spam_complaint_rate",
+  // Read by klaviyo/facts.ts for klaviyo.email_unsubscribe_rate and
+  // klaviyo.sms_unsubscribed; previously never requested, so both were always
+  // null live. Names per docs/research/03_KLAVIYO_DATA_AUDIT.md §"Unsubscribes/rate".
+  "unsubscribe_uniques",
+  "unsubscribe_rate",
   "conversions",
   "conversion_rate",
   "conversion_value",
